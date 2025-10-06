@@ -10,7 +10,7 @@
 - **Định tuyến:** React Router DOM
 - **Gọi API:** Axios & React Query
 - **Quản lý trạng thái:** Redux Toolkit
-- **Styling:** (Ghi thư viện bạn sẽ dùng, ví dụ: Tailwind CSS, Material-UI...)
+- **Styling:** Tailwind CSS, AntDesign5
 - **Kiểm tra & Định dạng code:** ESLint, Prettier, Husky
 
 ## Chức năng chính
