@@ -10,11 +10,11 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuItems = [
-    { label: 'Home', href: '/' },
-    { label: 'Services', href: '#services' },
-    { label: 'Doctors', href: '#doctors' },
-    { label: 'About', href: '#about' },
-    { label: 'Contact', href: '#contact' },
+    { label: 'Trang chủ', href: '/' },
+    { label: 'Dịch vụ', href: '#services' },
+    { label: 'Bác sĩ', href: '#doctors' },
+    { label: 'Giới thiệu', href: '#about' },
+    { label: 'Liên hệ', href: '#contact' },
   ];
 
   return (
@@ -25,11 +25,11 @@ const Header = () => {
           {/* 3. Thay thế icon trong Top bar */}
           <div className="flex items-center gap-2">
             <PhoneOutlined className="w-4 h-4" />
-            <span>+1 (555) 123-4567</span>
+            <span>0888705203</span>
           </div>
           <div className="flex items-center gap-2">
             <MailOutlined className="w-4 h-4" />
-            <span>info@dentalcare.com</span>
+            <span>dentalcare@gmail.com</span>
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@ const Header = () => {
             <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
               <span className="text-2xl text-white font-bold">D</span>
             </div>
-            <span className="text-xl font-bold text-foreground">DentalCare</span>
+            <span className="text-xl font-bold text-foreground">eDental</span>
           </Link>
 
           {/* Desktop menu (giữ nguyên) */}
@@ -61,7 +61,7 @@ const Header = () => {
           {/* 4. Thay thế CTA Button */}
           <div className="hidden md:block">
             <Button type="primary" size="large">
-              Book Appointment
+              Đặt lịch hẹn
             </Button>
           </div>
 
@@ -97,7 +97,7 @@ const Header = () => {
                 ))}
                 {/* 6. Thay thế Button trong mobile menu */}
                 <Button type="primary" size="large" className="w-full mt-2">
-                  Book Appointment
+                  Đặt lịch hẹn
                 </Button>
               </div>
             </motion.div>

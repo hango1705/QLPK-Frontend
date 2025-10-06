@@ -30,7 +30,7 @@ const HeroSection = () => {
               transition={{ delay: 0.2, duration: 0.6 }}
             >
               <span className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-                Your Trusted Dental Partner
+                Đối tác nha khoa đáng tin cậy của bạn
               </span>
             </motion.div>
 
@@ -40,9 +40,9 @@ const HeroSection = () => {
               transition={{ delay: 0.3, duration: 0.6 }}
               className="text-5xl md:text-6xl font-bold text-foreground leading-tight"
             >
-              Your Smile,{' '}
+              Nụ cười của bạn,{' '}
               <span className="bg-gradient-primary bg-clip-text text-transparent">
-                Our Priority
+                Ưu tiên của chúng tôi
               </span>
             </motion.h1>
 
@@ -52,8 +52,8 @@ const HeroSection = () => {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="text-lg text-muted-foreground leading-relaxed"
             >
-              Experience world-class dental care with our team of experienced professionals. We
-              combine modern technology with compassionate care to give you the smile you deserve.
+              Trải nghiệm dịch vụ nha khoa đẳng cấp cùng đội ngũ chuyên gia giàu kinh nghiệm. Chúng tôi
+              kết hợp công nghệ hiện đại với sự tận tâm để mang đến cho bạn nụ cười rạng rỡ.
             </motion.p>
 
             <motion.div
@@ -69,11 +69,11 @@ const HeroSection = () => {
                 className="text-lg px-8 shadow-medium flex items-center justify-center group" // Thêm flex để căn chỉnh
               >
                 <CalendarOutlined />
-                <span className="mx-2">Book Appointment</span>
+                <span className="mx-2">Đặt lịch hẹn</span>
                 <ArrowRightOutlined className="group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button size="large" className="text-lg px-8 border-2 hover:bg-primary/5">
-                Learn More
+                Tìm hiểu thêm
               </Button>
             </motion.div>
 
@@ -86,15 +86,15 @@ const HeroSection = () => {
             >
               <div>
                 <div className="text-3xl font-bold text-primary">15+</div>
-                <div className="text-sm text-muted-foreground">Years Experience</div>
+                <div className="text-sm text-muted-foreground">Năm kinh nghiệm</div>
               </div>
               <div>
                 <div className="text-3xl font-bold text-primary">10K+</div>
-                <div className="text-sm text-muted-foreground">Happy Patients</div>
+                <div className="text-sm text-muted-foreground">Khách hàng hài lòng</div>
               </div>
               <div>
                 <div className="text-3xl font-bold text-primary">25+</div>
-                <div className="text-sm text-muted-foreground">Expert Dentists</div>
+                <div className="text-sm text-muted-foreground">Bác sĩ chuyên môn</div>
               </div>
             </motion.div>
           </motion.div>
@@ -126,8 +126,8 @@ const HeroSection = () => {
                   <span className="text-2xl">✓</span>
                 </div>
                 <div>
-                  <div className="font-semibold text-foreground">Advanced Technology</div>
-                  <div className="text-sm text-muted-foreground">Latest dental equipment</div>
+                  <div className="font-semibold text-foreground">Công nghệ tiên tiến</div>
+                  <div className="text-sm text-muted-foreground">Trang thiết bị nha khoa hiện đại</div>
                 </div>
               </div>
             </motion.div>

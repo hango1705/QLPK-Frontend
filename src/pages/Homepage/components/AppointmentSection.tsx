@@ -18,23 +18,23 @@ const AppointmentSection = () => {
   const features = [
     {
       icon: CalendarOutlined,
-      title: 'Easy Scheduling',
-      description: 'Book online 24/7',
+      title: 'Đặt lịch dễ dàng',
+      description: 'Đặt lịch trực tuyến 24/7',
     },
     {
       icon: ClockCircleOutlined,
-      title: 'Flexible Hours',
-      description: 'Extended availability',
+      title: 'Giờ linh hoạt',
+      description: 'Thời gian phục vụ mở rộng',
     },
     {
       icon: PhoneOutlined,
-      title: 'Quick Response',
-      description: 'Same-day appointments',
+      title: 'Phản hồi nhanh',
+      description: 'Hẹn trong ngày',
     },
     {
       icon: EnvironmentOutlined,
-      title: 'Central Location',
-      description: 'Easy to find',
+      title: 'Vị trí trung tâm',
+      description: 'Dễ dàng tìm thấy',
     },
   ];
 
@@ -55,12 +55,9 @@ const AppointmentSection = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Ready to Transform Your Smile?
-            </h2>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Sẵn sàng thay đổi nụ cười của bạn?</h2>
             <p className="text-xl text-white/90 mb-8">
-              Schedule your appointment today and take the first step towards a healthier, more
-              confident smile.
+              Hẹn lịch ngay hôm nay để bắt đầu hành trình hướng tới nụ cười khỏe đẹp và tự tin hơn.
             </p>
             {/* 4. Thay thế Button của shadcn bằng Button của antd */}
             <Button
@@ -70,7 +67,7 @@ const AppointmentSection = () => {
               // Thêm 'flex items-center' để căn chỉnh icon và text khi có padding lớn
               className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-6 h-auto shadow-glow flex items-center justify-center"
             >
-              Book Your Appointment Now
+              Đặt lịch ngay
             </Button>
           </motion.div>
 
@@ -106,12 +103,12 @@ const AppointmentSection = () => {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="text-center mt-16 pt-12 border-t border-white/20"
           >
-            <p className="text-white/90 text-lg mb-4">Or call us directly at</p>
+            <p className="text-white/90 text-lg mb-4">Hoặc gọi trực tiếp</p>
             <a
               href="tel:+15551234567"
               className="text-3xl font-bold text-white hover:text-white/80 transition-colors"
             >
-              +1 (555) 123-4567
+              0888705203
             </a>
           </motion.div>
         </div>

@@ -17,23 +17,23 @@ const AboutSection = () => {
   const features = [
     {
       icon: TrophyOutlined,
-      title: 'Expert Care',
-      description: 'Board-certified dentists with years of experience',
+      title: 'Chăm sóc chuyên nghiệp',
+      description: 'Bác sĩ giàu kinh nghiệm, được chứng nhận',
     },
     {
       icon: HeartOutlined,
-      title: 'Patient Focused',
-      description: 'Personalized treatment plans for every patient',
+      title: 'Lấy bệnh nhân làm trung tâm',
+      description: 'Phác đồ điều trị cá nhân hóa cho từng người',
     },
     {
       icon: SafetyCertificateOutlined,
-      title: 'Safe & Hygienic',
-      description: 'Strict sterilization protocols for your safety',
+      title: 'An toàn & Vệ sinh',
+      description: 'Quy trình vô trùng nghiêm ngặt vì sự an toàn của bạn',
     },
     {
       icon: ClockCircleOutlined,
-      title: 'Flexible Hours',
-      description: 'Extended hours to fit your busy schedule',
+      title: 'Giờ giấc linh hoạt',
+      description: 'Mở rộng thời gian phù hợp lịch bận rộn',
     },
   ];
 
@@ -67,18 +67,14 @@ const AboutSection = () => {
           >
             <div>
               <span className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-                About Us
+                Về chúng tôi
               </span>
               <h2 className="text-4xl font-bold text-foreground mb-4">
-                Committed to Excellence in{' '}
-                <span className="bg-gradient-primary bg-clip-text text-transparent">
-                  Dental Care
-                </span>
+                Cam kết mang đến{' '}
+                <span className="bg-gradient-primary bg-clip-text text-transparent">dịch vụ nha khoa xuất sắc</span>
               </h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                With over 15 years of experience, our clinic has been serving the community with
-                exceptional dental care. We combine the latest technology with compassionate service
-                to ensure every visit is comfortable and effective.
+                Với hơn 15 năm kinh nghiệm, phòng khám của chúng tôi luôn mang đến dịch vụ nha khoa chất lượng cho cộng đồng. Chúng tôi kết hợp công nghệ mới nhất với sự tận tâm để mỗi lần thăm khám đều thoải mái và hiệu quả.
               </p>
             </div>
 

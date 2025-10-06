@@ -59,17 +59,14 @@ const DoctorsSection = () => {
           className="text-center max-w-2xl mx-auto mb-16"
         >
           <span className="inline-block px-4 py-2 bg-secondary/10 text-secondary rounded-full text-sm font-semibold mb-4">
-            Our Team
+            Đội ngũ của chúng tôi
           </span>
           <h2 className="text-4xl font-bold text-foreground mb-4">
-            Meet Our{' '}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
-              Expert Dentists
-            </span>
+            Gặp gỡ{' '}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">các bác sĩ chuyên môn</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Our team of highly qualified dentists is dedicated to providing you with exceptional
-            care and personalized treatment.
+            Đội ngũ bác sĩ giàu kinh nghiệm luôn tận tâm mang đến cho bạn dịch vụ xuất sắc và phác đồ điều trị cá nhân hóa.
           </p>
         </motion.div>
 

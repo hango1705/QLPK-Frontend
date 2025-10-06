@@ -20,44 +20,44 @@ const ServicesSection = () => {
   const services = [
     {
       icon: SmileOutlined,
-      title: 'General Dentistry',
+      title: 'Nha khoa tổng quát',
       description:
-        'Comprehensive dental care including checkups, cleanings, and preventive treatments.',
+        'Khám tổng quát, làm sạch răng và các điều trị phòng ngừa toàn diện.',
       color: 'bg-primary/10',
       iconColor: 'text-primary',
     },
     {
       icon: CrownOutlined,
-      title: 'Cosmetic Dentistry',
-      description: 'Transform your smile with whitening, veneers, and aesthetic procedures.',
+      title: 'Nha khoa thẩm mỹ',
+      description: 'Tự tin với nụ cười trắng sáng: tẩy trắng, dán sứ và thẩm mỹ.',
       color: 'bg-secondary/10',
       iconColor: 'text-secondary',
     },
     {
       icon: SafetyOutlined,
-      title: 'Orthodontics',
-      description: 'Braces and aligners to straighten teeth and improve your bite.',
+      title: 'Chỉnh nha',
+      description: 'Niềng răng và khay trong để sắp xếp răng chuẩn khớp cắn.',
       color: 'bg-accent/20',
       iconColor: 'text-accent-foreground',
     },
     {
       icon: ThunderboltOutlined,
-      title: 'Emergency Care',
-      description: '24/7 emergency dental services for urgent dental problems.',
+      title: 'Cấp cứu nha khoa',
+      description: 'Hỗ trợ khẩn cấp 24/7 cho các vấn đề răng miệng.',
       color: 'bg-destructive/10',
       iconColor: 'text-destructive',
     },
     {
       icon: ExperimentOutlined,
-      title: 'Oral Surgery',
-      description: 'Expert surgical procedures including extractions and implants.',
+      title: 'Phẫu thuật răng hàm mặt',
+      description: 'Nhổ răng, cấy ghép implant và các thủ thuật chuyên sâu.',
       color: 'bg-primary/10',
       iconColor: 'text-primary',
     },
     {
       icon: StarOutlined,
-      title: 'Pediatric Dentistry',
-      description: 'Specialized care for children in a friendly and comfortable environment.',
+      title: 'Nha khoa trẻ em',
+      description: 'Chăm sóc chuyên biệt cho trẻ trong môi trường thân thiện.',
       color: 'bg-secondary/10',
       iconColor: 'text-secondary',
     },
@@ -74,17 +74,14 @@ const ServicesSection = () => {
           className="text-center max-w-2xl mx-auto mb-16"
         >
           <span className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-            Our Services
+            Dịch vụ của chúng tôi
           </span>
           <h2 className="text-4xl font-bold text-foreground mb-4">
-            Comprehensive{' '}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
-              Dental Solutions
-            </span>
+            Giải pháp{' '}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">nha khoa toàn diện</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            From routine checkups to advanced procedures, we offer a full range of dental services
-            to keep your smile healthy and beautiful.
+            Từ khám định kỳ đến các thủ thuật chuyên sâu, chúng tôi cung cấp đầy đủ dịch vụ để giữ gìn nụ cười khỏe đẹp.
           </p>
         </motion.div>
 
@@ -119,7 +116,7 @@ const ServicesSection = () => {
                     type="link"
                     className="p-0 h-auto self-start font-semibold group flex items-center gap-1"
                   >
-                    Learn More
+                    Tìm hiểu thêm
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </Button>
                 </div>

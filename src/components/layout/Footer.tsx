@@ -15,22 +15,22 @@ const Footer = () => {
 
   const footerLinks = {
     services: [
-      { label: 'General Dentistry', href: '#services' },
-      { label: 'Cosmetic Dentistry', href: '#services' },
-      { label: 'Orthodontics', href: '#services' },
-      { label: 'Emergency Care', href: '#services' },
+      { label: 'Nha khoa tổng quát', href: '#services' },
+      { label: 'Nha khoa thẩm mỹ', href: '#services' },
+      { label: 'Chỉnh nha', href: '#services' },
+      { label: 'Cấp cứu nha khoa', href: '#services' },
     ],
     company: [
-      { label: 'About Us', href: '#about' },
-      { label: 'Our Doctors', href: '#doctors' },
-      { label: 'Testimonials', href: '#testimonials' },
-      { label: 'Contact', href: '#contact' },
+      { label: 'Về chúng tôi', href: '#about' },
+      { label: 'Đội ngũ bác sĩ', href: '#doctors' },
+      { label: 'Cảm nhận khách hàng', href: '#testimonials' },
+      { label: 'Liên hệ', href: '#contact' },
     ],
     resources: [
       { label: 'Blog', href: '#' },
-      { label: 'FAQs', href: '#' },
-      { label: 'Privacy Policy', href: '#' },
-      { label: 'Terms of Service', href: '#' },
+      { label: 'Câu hỏi thường gặp', href: '#' },
+      { label: 'Chính sách bảo mật', href: '#' },
+      { label: 'Điều khoản dịch vụ', href: '#' },
     ],
   };
 
@@ -51,11 +51,10 @@ const Footer = () => {
               <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
                 <span className="text-2xl text-white font-bold">D</span>
               </div>
-              <span className="text-xl font-bold">DentalCare</span>
+              <span className="text-xl font-bold">eDental</span>
             </div>
             <p className="text-background/80 leading-relaxed">
-              Providing exceptional dental care with compassion and expertise. Your smile is our
-              priority.
+              Dịch vụ nha khoa tận tâm và chuyên nghiệp. Nụ cười của bạn là ưu tiên của chúng tôi.
             </p>
             {/* Cách render social links không đổi */}
             <div className="flex gap-3">
@@ -74,7 +73,7 @@ const Footer = () => {
 
           {/* Services & Company links (giữ nguyên) */}
           <div>
-            <h3 className="text-lg font-bold mb-6">Services</h3>
+            <h3 className="text-lg font-bold mb-6">Dịch vụ</h3>
             <ul className="space-y-3">
               {footerLinks.services.map((link) => (
                 <li key={link.label}>
@@ -89,7 +88,7 @@ const Footer = () => {
             </ul>
           </div>
           <div>
-            <h3 className="text-lg font-bold mb-6">Company</h3>
+            <h3 className="text-lg font-bold mb-6">Công ty</h3>
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
@@ -106,14 +105,14 @@ const Footer = () => {
 
           {/* 4. Cập nhật phần Contact Us với icon của Ant Design */}
           <div>
-            <h3 className="text-lg font-bold mb-6">Contact Us</h3>
+            <h3 className="text-lg font-bold mb-6">Liên hệ</h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <EnvironmentOutlined className="w-5 h-5 text-primary flex-shrink-0 mt-1" />
                 <span className="text-background/80">
-                  123 Dental Street
+                  10 Đ.Trần Phú
                   <br />
-                  New York, NY 10001
+                  Quận Hà Đông, TP.HCM
                 </span>
               </li>
               <li className="flex items-center gap-3">
@@ -122,24 +121,24 @@ const Footer = () => {
                   href="tel:+15551234567"
                   className="text-background/80 hover:text-primary transition-colors"
                 >
-                  +1 (555) 123-4567
+                  0888705203
                 </a>
               </li>
               <li className="flex items-center gap-3">
                 <MailOutlined className="w-5 h-5 text-primary flex-shrink-0" />
                 <a
-                  href="mailto:info@dentalcare.com"
+                  href="mailto:dentalcare@gmail.com"
                   className="text-background/80 hover:text-primary transition-colors"
                 >
-                  info@dentalcare.com
+                  dentalcare@gmail.com
                 </a>
               </li>
               <li className="flex items-start gap-3">
                 <ClockCircleOutlined className="w-5 h-5 text-primary flex-shrink-0 mt-1" />
                 <span className="text-background/80">
-                  Mon-Fri: 9AM-6PM
+                  Thứ 2 - Thứ 6: 9:00 - 18:00
                   <br />
-                  Sat: 9AM-2PM
+                  Thứ 7: 9:00 - 14:00
                 </span>
               </li>
             </ul>
@@ -150,18 +149,11 @@ const Footer = () => {
         <div className="pt-8 border-t border-background/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-background/60 text-sm">
-              © {currentYear} DentalCare. All rights reserved.
+              © {currentYear} Nha Khoa. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
-              <a href="#" className="text-background/60 hover:text-primary transition-colors">
-                Privacy Policy
-              </a>
-              <a href="#" className="text-background/60 hover:text-primary transition-colors">
-                Terms of Service
-              </a>
-              <a href="#" className="text-background/60 hover:text-primary transition-colors">
-                Sitemap
-              </a>
+              <a href="#" className="text-background/60 hover:text-primary transition-colors">Chính sách bảo mật</a>
+              <a href="#" className="text-background/60 hover:text-primary transition-colors">Điều khoản</a>
             </div>
           </div>
         </div>
