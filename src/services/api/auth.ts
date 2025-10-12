@@ -14,6 +14,7 @@ export interface RegisterData {
   address?: string;
   dob?: string;
   gender?: string;
+  verificationCode: string;
 }
 
 export interface AuthResponse {
@@ -34,11 +35,13 @@ export const authAPI = {
   login: (credentials: LoginCredentials) =>
     apiClient.post<AuthResponse>('/api/v1/auth/login', credentials),
     
-  register: (userData: RegisterData) =>
-    apiClient.post<AuthResponse>('/api/v1/auth/register/patient', userData),
-    
+  // Bước 1: Gửi mã xác thực email
   sendVerificationCode: (email: string) =>
     apiClient.post<VerificationResponse>(`/api/v1/auth/verifiedCode/${email}`),
+    
+  // Bước 2: Hoàn tất đăng ký với mã xác thực
+  register: (userData: RegisterData & { verificationCode: string }) =>
+    apiClient.post<AuthResponse>('/api/v1/auth/createPatient', userData),
     
   logout: (token: string) =>
     apiClient.post('/auth/logout', { token }),

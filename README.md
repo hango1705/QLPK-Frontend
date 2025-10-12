@@ -21,7 +21,10 @@ Nội dung chính của đồ án:
 KHÁCH (Guest):
 Hiện thông tin quảng cáo trang web của phòng khám.
 BỆNH NHÂN (PATIENT)
-• Đăng ký và đăng nhập tài khoản: Bệnh nhân có thể tự đăng ký tài khoản mới, hệ thống tự động sinh mã bệnh nhân và gửi qua email, sau đó đăng nhập để sử dụng dịch vụ.
+• Đăng ký và đăng nhập tài khoản: Bệnh nhân có thể tự đăng ký tài khoản mới thông qua luồng 2 bước:
+  - Bước 1: Nhập email để nhận mã xác thực 6 chữ số
+  - Bước 2: Nhập mã xác thực và hoàn tất thông tin đăng ký
+  Hệ thống tự động sinh mã bệnh nhân và gửi qua email, sau đó đăng nhập để sử dụng dịch vụ.
 • Xem kết quả khám bệnh và điều trị: Bệnh nhân có thể xem chi tiết kết quả khám bệnh, chẩn đoán, ghi chú của bác sĩ và lịch sử điều trị.
 • Xem kế hoạch điều trị: Bệnh nhân theo dõi kế hoạch điều trị được chia thành nhiều giai đoạn, xem phác đồ thuốc và tiến trình điều trị.
 • Xem hình ảnh y tế: Bệnh nhân có thể xem các hình ảnh X-quang, CT scan, liên quan đến quá trình điều trị của mình.
@@ -57,7 +60,8 @@ QUẢN TRỊ VIÊN (ADMIN)
     ```
 4.  Tạo file `.env` ở thư mục gốc và cấu hình biến môi trường:
     ```
-    VITE_API_BASE_URL=http://localhost:8080/api
+    VITE_API_BASE_URL=http://localhost:8080
+    NODE_ENV=development
     ```
 5.  Chạy dự án ở môi trường development:
     ```bash

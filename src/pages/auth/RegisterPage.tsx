@@ -10,13 +10,21 @@ import authPageImg from '@/assets/auth_page_img.png';
 
 // Validation schemas for each step
 const step1Schema = yup.object({
-  username: yup.string().required('Tên đăng nhập là bắt buộc'),
-  full_name: yup.string().required('Họ tên là bắt buộc'),
   email: yup.string().email('Email không hợp lệ').required('Email là bắt buộc'),
-  phone: yup.string().required('Số điện thoại là bắt buộc'),
 });
 
 const step2Schema = yup.object({
+  verificationCode: yup
+    .string()
+    .length(6, 'Mã xác thực phải có 6 chữ số')
+    .matches(/^\d{6}$/, 'Mã xác thực chỉ được chứa số')
+    .required('Mã xác thực là bắt buộc'),
+});
+
+const step3Schema = yup.object({
+  username: yup.string().required('Tên đăng nhập là bắt buộc'),
+  full_name: yup.string().required('Họ tên là bắt buộc'),
+  phone: yup.string().required('Số điện thoại là bắt buộc'),
   password: yup
     .string()
     .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
@@ -28,7 +36,7 @@ const step2Schema = yup.object({
     .required('Xác nhận mật khẩu là bắt buộc'),
 });
 
-const step3Schema = yup.object({
+const step4Schema = yup.object({
   dob: yup.string().required('Ngày sinh là bắt buộc'),
   gender: yup.string().required('Giới tính là bắt buộc'),
   address: yup.string().required('Địa chỉ là bắt buộc'),
@@ -38,14 +46,18 @@ const step3Schema = yup.object({
 type Step1Data = yup.InferType<typeof step1Schema>;
 type Step2Data = yup.InferType<typeof step2Schema>;
 type Step3Data = yup.InferType<typeof step3Schema>;
+type Step4Data = yup.InferType<typeof step4Schema>;
 
 const RegisterPage = () => {
-  const { register: registerUser, isLoading, error, clearError } = useAuth();
+  const { register: registerUser, sendVerificationCode, isLoading, error, clearError } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data>>({});
+  const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data & Step4Data>>({});
   const [step1Submitted, setStep1Submitted] = useState(false);
   const [step2Submitted, setStep2Submitted] = useState(false);
   const [step3Submitted, setStep3Submitted] = useState(false);
+  const [step4Submitted, setStep4Submitted] = useState(false);
+  const [isVerificationSent, setIsVerificationSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   const step1Form = useForm<Step1Data>({
     resolver: yupResolver(step1Schema) as any,
@@ -53,10 +65,7 @@ const RegisterPage = () => {
     reValidateMode: 'onSubmit',
     shouldFocusError: false,
     defaultValues: {
-      username: formData.username || '',
-      full_name: formData.full_name || '',
       email: formData.email || '',
-      phone: formData.phone || '',
     },
   });
 
@@ -65,13 +74,25 @@ const RegisterPage = () => {
     mode: 'onSubmit',
     reValidateMode: 'onSubmit',
     defaultValues: {
-      password: formData.password || '',
-      confirmPassword: formData.confirmPassword || '',
+      verificationCode: formData.verificationCode || '',
     },
   });
 
   const step3Form = useForm<Step3Data>({
     resolver: yupResolver(step3Schema) as any,
+    mode: 'onSubmit',
+    reValidateMode: 'onSubmit',
+    defaultValues: {
+      username: formData.username || '',
+      full_name: formData.full_name || '',
+      phone: formData.phone || '',
+      password: formData.password || '',
+      confirmPassword: formData.confirmPassword || '',
+    },
+  });
+
+  const step4Form = useForm<Step4Data>({
+    resolver: yupResolver(step4Schema) as any,
     mode: 'onSubmit',
     reValidateMode: 'onSubmit',
     defaultValues: {
@@ -89,50 +110,73 @@ const RegisterPage = () => {
     step1Form.clearErrors();
     step2Form.clearErrors();
     step3Form.clearErrors();
+    step4Form.clearErrors();
     // Reset submitted states
     setStep1Submitted(false);
     setStep2Submitted(false);
     setStep3Submitted(false);
-  }, [clearError, step1Form, step2Form, step3Form]);
+    setStep4Submitted(false);
+  }, [clearError, step1Form, step2Form, step3Form, step4Form]);
+
+  // Countdown timer for resend verification code
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   // Update form values when formData changes
   useEffect(() => {
     step1Form.reset({
-      username: formData.username || '',
-      full_name: formData.full_name || '',
       email: formData.email || '',
-      phone: formData.phone || '',
     });
-  }, [formData.username, formData.full_name, formData.email, formData.phone, step1Form]);
+  }, [formData.email, step1Form]);
 
   useEffect(() => {
     step2Form.reset({
-      password: formData.password || '',
-      confirmPassword: formData.confirmPassword || '',
+      verificationCode: formData.verificationCode || '',
     });
-  }, [formData.password, formData.confirmPassword, step2Form]);
+  }, [formData.verificationCode, step2Form]);
 
   useEffect(() => {
     step3Form.reset({
+      username: formData.username || '',
+      full_name: formData.full_name || '',
+      phone: formData.phone || '',
+      password: formData.password || '',
+      confirmPassword: formData.confirmPassword || '',
+    });
+  }, [formData.username, formData.full_name, formData.phone, formData.password, formData.confirmPassword, step3Form]);
+
+  useEffect(() => {
+    step4Form.reset({
       dob: formData.dob || '',
       gender: formData.gender || '',
       address: formData.address || '',
       agreeToTerms: formData.agreeToTerms || false,
     });
-  }, [formData.dob, formData.gender, formData.address, formData.agreeToTerms, step3Form]);
+  }, [formData.dob, formData.gender, formData.address, formData.agreeToTerms, step4Form]);
 
   const steps = [
-    { number: 1, title: 'Thông tin cơ bản', description: 'Nhập thông tin cá nhân' },
-    { number: 2, title: 'Bảo mật', description: 'Tạo mật khẩu an toàn' },
-    { number: 3, title: 'Hoàn tất', description: 'Xác nhận và đăng ký' },
+    { number: 1, title: 'Xác thực Email', description: 'Nhập email để nhận mã xác thực' },
+    { number: 2, title: 'Nhập mã xác thực', description: 'Nhập mã 6 chữ số từ email' },
+    { number: 3, title: 'Thông tin tài khoản', description: 'Tạo tên đăng nhập và mật khẩu' },
+    { number: 4, title: 'Thông tin cá nhân', description: 'Hoàn tất thông tin cá nhân' },
   ];
 
-  const handleStep1Submit = (data: Step1Data) => {
-    setFormData(prev => ({ ...prev, ...data }));
-    setCurrentStep(2);
-    setStep1Submitted(false); // Reset submitted state
-    // Clear any errors when moving to next step
-    step1Form.clearErrors();
+  const handleStep1Submit = async (data: Step1Data) => {
+    try {
+      setFormData(prev => ({ ...prev, ...data }));
+      await sendVerificationCode(data.email);
+      setIsVerificationSent(true);
+      setCountdown(120); // 2 minutes countdown
+      setCurrentStep(2);
+      showNotification.success('Mã xác thực đã được gửi đến email của bạn!');
+    } catch (error) {
+      showNotification.error('Không thể gửi mã xác thực. Vui lòng thử lại.');
+    }
   };
 
   const handleStep1FormSubmit = (e: React.FormEvent) => {
@@ -144,11 +188,16 @@ const RegisterPage = () => {
   const handleStep2Submit = (data: Step2Data) => {
     setFormData(prev => ({ ...prev, ...data }));
     setCurrentStep(3);
-    // Clear any errors when moving to next step
     step2Form.clearErrors();
   };
 
-  const handleStep3Submit = async (data: Step3Data) => {
+  const handleStep3Submit = (data: Step3Data) => {
+    setFormData(prev => ({ ...prev, ...data }));
+    setCurrentStep(4);
+    step3Form.clearErrors();
+  };
+
+  const handleStep4Submit = async (data: Step4Data) => {
     try {
       const finalData = { ...formData, ...data };
       await registerUser({
@@ -160,10 +209,23 @@ const RegisterPage = () => {
         address: finalData.address,
         dob: finalData.dob,
         gender: finalData.gender,
+        verificationCode: finalData.verificationCode!,
       });
-      showNotification.success('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
+      showNotification.success('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
     } catch (error) {
       showNotification.error('Đăng ký thất bại');
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (countdown > 0) return;
+    
+    try {
+      await sendVerificationCode(formData.email!);
+      setCountdown(120);
+      showNotification.success('Mã xác thực mới đã được gửi!');
+    } catch (error) {
+      showNotification.error('Không thể gửi lại mã xác thực. Vui lòng thử lại.');
     }
   };
 
@@ -175,28 +237,16 @@ const RegisterPage = () => {
 
   const renderStep1 = () => (
     <form onSubmit={handleStep1FormSubmit} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Tên đăng nhập
-        </label>
-        <Input
-          {...step1Form.register('username')}
-          placeholder="nguyenvana"
-          error={step1Submitted && !!step1Form.formState.errors.username}
-          helperText={step1Submitted && step1Form.formState.errors.username ? step1Form.formState.errors.username.message : undefined}
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Họ và tên
-        </label>
-        <Input
-          {...step1Form.register('full_name')}
-          placeholder="Nguyễn Văn A"
-          error={step1Submitted && !!step1Form.formState.errors.full_name}
-          helperText={step1Submitted && step1Form.formState.errors.full_name ? step1Form.formState.errors.full_name.message : undefined}
-        />
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Xác thực Email</h3>
+        <p className="text-muted-foreground text-sm">
+          Chúng tôi sẽ gửi mã xác thực 6 chữ số đến email của bạn
+        </p>
       </div>
 
       <div>
@@ -212,56 +262,68 @@ const RegisterPage = () => {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Số điện thoại
-        </label>
-        <Input
-          {...step1Form.register('phone')}
-          type="tel"
-          placeholder="0123456789"
-          error={step1Submitted && !!step1Form.formState.errors.phone}
-          helperText={step1Submitted && step1Form.formState.errors.phone ? step1Form.formState.errors.phone.message : undefined}
-        />
-      </div>
-
-      <Button variant="primary" size="lg" className="w-full" htmlType="submit">
-        Tiếp tục
+      <Button 
+        variant="primary" 
+        size="lg" 
+        className="w-full" 
+        htmlType="submit"
+        loading={isLoading}
+      >
+        Gửi mã xác thực
       </Button>
     </form>
   );
 
   const renderStep2 = () => (
     <form onSubmit={step2Form.handleSubmit(handleStep2Submit)} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Mật khẩu
-        </label>
-        <Input
-          {...step2Form.register('password')}
-          type="password"
-          placeholder="••••••••"
-          error={!!step2Form.formState.errors.password}
-          helperText={step2Form.formState.errors.password?.message}
-        />
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Nhập mã xác thực</h3>
+        <p className="text-muted-foreground text-sm">
+          Vui lòng nhập mã 6 chữ số đã được gửi đến <strong>{formData.email}</strong>
+        </p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
-          Xác nhận mật khẩu
+          Mã xác thực
         </label>
         <Input
-          {...step2Form.register('confirmPassword')}
-          type="password"
-          placeholder="••••••••"
-          error={!!step2Form.formState.errors.confirmPassword}
-          helperText={step2Form.formState.errors.confirmPassword?.message}
+          {...step2Form.register('verificationCode')}
+          type="text"
+          placeholder="123456"
+          maxLength={6}
+          className="text-center text-2xl tracking-widest w-full"
+          error={!!step2Form.formState.errors.verificationCode}
+          helperText={step2Form.formState.errors.verificationCode?.message}
         />
       </div>
 
-      <div className="space-y-4">
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground mb-2">
+          Không nhận được mã?
+        </p>
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={countdown > 0}
+          className={`text-sm font-medium ${
+            countdown > 0 
+              ? 'text-muted-foreground cursor-not-allowed' 
+              : 'text-primary hover:text-primary/80'
+          }`}
+        >
+          {countdown > 0 ? `Gửi lại sau ${countdown}s` : 'Gửi lại mã'}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-6">
         <Button variant="primary" size="lg" className="w-full" htmlType="submit">
-          Tiếp tục
+          Xác thực
         </Button>
         <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
           Quay lại
@@ -272,15 +334,115 @@ const RegisterPage = () => {
 
   const renderStep3 = () => (
     <form onSubmit={step3Form.handleSubmit(handleStep3Submit)} className="space-y-6">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Thông tin tài khoản</h3>
+        <p className="text-muted-foreground text-sm">
+          Tạo tên đăng nhập và mật khẩu cho tài khoản của bạn
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Tên đăng nhập
+        </label>
+        <Input
+          {...step3Form.register('username')}
+          placeholder="nguyenvana"
+          error={!!step3Form.formState.errors.username}
+          helperText={step3Form.formState.errors.username?.message}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Họ và tên
+        </label>
+        <Input
+          {...step3Form.register('full_name')}
+          placeholder="Nguyễn Văn A"
+          error={!!step3Form.formState.errors.full_name}
+          helperText={step3Form.formState.errors.full_name?.message}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Số điện thoại
+        </label>
+        <Input
+          {...step3Form.register('phone')}
+          type="tel"
+          placeholder="0123456789"
+          error={!!step3Form.formState.errors.phone}
+          helperText={step3Form.formState.errors.phone?.message}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Mật khẩu
+        </label>
+        <Input
+          {...step3Form.register('password')}
+          type="password"
+          placeholder="••••••••"
+          error={!!step3Form.formState.errors.password}
+          helperText={step3Form.formState.errors.password?.message}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Xác nhận mật khẩu
+        </label>
+        <Input
+          {...step3Form.register('confirmPassword')}
+          type="password"
+          placeholder="••••••••"
+          error={!!step3Form.formState.errors.confirmPassword}
+          helperText={step3Form.formState.errors.confirmPassword?.message}
+        />
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <Button variant="primary" size="lg" className="w-full" htmlType="submit">
+          Tiếp tục
+        </Button>
+        <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
+          Quay lại
+        </Button>
+      </div>
+    </form>
+  );
+
+  const renderStep4 = () => (
+    <form onSubmit={step4Form.handleSubmit(handleStep4Submit)} className="space-y-6">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Thông tin cá nhân</h3>
+        <p className="text-muted-foreground text-sm">
+          Hoàn tất thông tin cá nhân để hoàn thành đăng ký
+        </p>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           Ngày sinh
         </label>
         <Input
-          {...step3Form.register('dob')}
+          {...step4Form.register('dob')}
           type="date"
-          error={!!step3Form.formState.errors.dob}
-          helperText={step3Form.formState.errors.dob?.message}
+          error={!!step4Form.formState.errors.dob}
+          helperText={step4Form.formState.errors.dob?.message}
         />
       </div>
 
@@ -289,7 +451,7 @@ const RegisterPage = () => {
           Giới tính
         </label>
         <select
-          {...step3Form.register('gender')}
+          {...step4Form.register('gender')}
           className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="">Chọn giới tính</option>
@@ -297,8 +459,8 @@ const RegisterPage = () => {
           <option value="female">Nữ</option>
           <option value="other">Khác</option>
         </select>
-        {step3Form.formState.errors.gender && (
-          <p className="text-sm text-destructive mt-1">{step3Form.formState.errors.gender.message}</p>
+        {step4Form.formState.errors.gender && (
+          <p className="text-sm text-destructive mt-1">{step4Form.formState.errors.gender.message}</p>
         )}
       </div>
 
@@ -307,16 +469,16 @@ const RegisterPage = () => {
           Địa chỉ
         </label>
         <Input
-          {...step3Form.register('address')}
+          {...step4Form.register('address')}
           placeholder="123 Đường ABC, Quận XYZ, TP.HCM"
-          error={!!step3Form.formState.errors.address}
-          helperText={step3Form.formState.errors.address?.message}
+          error={!!step4Form.formState.errors.address}
+          helperText={step4Form.formState.errors.address?.message}
         />
       </div>
 
       <div className="flex items-start">
         <input
-          {...step3Form.register('agreeToTerms')}
+          {...step4Form.register('agreeToTerms')}
           type="checkbox"
           className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2 mt-1"
         />
@@ -331,11 +493,11 @@ const RegisterPage = () => {
           </Link>
         </label>
       </div>
-      {step3Form.formState.errors.agreeToTerms && (
-        <p className="text-sm text-destructive">{step3Form.formState.errors.agreeToTerms.message}</p>
+      {step4Form.formState.errors.agreeToTerms && (
+        <p className="text-sm text-destructive">{step4Form.formState.errors.agreeToTerms.message}</p>
       )}
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-6">
         <Button 
           variant="primary" 
           size="lg" 
@@ -343,7 +505,7 @@ const RegisterPage = () => {
           loading={isLoading}
           htmlType="submit"
         >
-          Đăng ký
+          Hoàn tất đăng ký
         </Button>
         <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
           Quay lại
@@ -430,6 +592,7 @@ const RegisterPage = () => {
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
             {currentStep === 3 && renderStep3()}
+            {currentStep === 4 && renderStep4()}
           </Card>
 
           {/* Login Link */}

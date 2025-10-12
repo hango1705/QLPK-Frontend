@@ -36,6 +36,7 @@ export const useAuth = () => {
     address?: string;
     dob?: string;
     gender?: string;
+    verificationCode: string;
   }) => {
     return dispatch(registerUser(userData));
   }, [dispatch]);

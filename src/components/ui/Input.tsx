@@ -10,7 +10,7 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, variant = 'default', size = 'md', error, helperText, type = 'text', ...props }, ref) => {
-    const baseClasses = 'transition-all duration-300 focus:outline-none rounded-md border';
+    const baseClasses = 'w-full transition-all duration-300 focus:outline-none rounded-md border';
     
     const variantClasses = {
       default: 'border-border bg-background hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20',
