@@ -71,10 +71,14 @@ const AboutSection = () => {
               </span>
               <h2 className="text-4xl font-bold text-foreground mb-4">
                 Cam kết mang đến{' '}
-                <span className="bg-gradient-primary bg-clip-text text-transparent">dịch vụ nha khoa xuất sắc</span>
+                <span className="bg-gradient-primary bg-clip-text text-transparent">
+                  dịch vụ nha khoa xuất sắc
+                </span>
               </h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Với hơn 15 năm kinh nghiệm, phòng khám của chúng tôi luôn mang đến dịch vụ nha khoa chất lượng cho cộng đồng. Chúng tôi kết hợp công nghệ mới nhất với sự tận tâm để mỗi lần thăm khám đều thoải mái và hiệu quả.
+                Với hơn 15 năm kinh nghiệm, phòng khám của chúng tôi luôn mang đến dịch vụ nha khoa
+                chất lượng cho cộng đồng. Chúng tôi kết hợp công nghệ mới nhất với sự tận tâm để mỗi
+                lần thăm khám đều thoải mái và hiệu quả.
               </p>
             </div>
 

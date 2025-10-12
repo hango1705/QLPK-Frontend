@@ -1,6 +1,7 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Card, Carousel } from 'antd';
+import { Card } from '@/components/ui';
+import { Carousel } from 'antd';
 // 1. Import các icon từ @ant-design/icons
 import { LinkedinFilled, TwitterOutlined, MailOutlined } from '@ant-design/icons';
 import doctor1 from '@/assets/doctor-1.jpg';
@@ -11,43 +12,41 @@ const DoctorsSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
 
-  const doctors = [
-    // ... mảng doctors giữ nguyên
-    {
-      name: 'Dr. Sarah Johnson',
-      specialty: 'General & Cosmetic Dentistry',
-      image: doctor1,
-      description: 'Over 12 years of experience in creating beautiful, healthy smiles.',
-      social: {
-        linkedin: '#',
-        twitter: '#',
-        email: 'sarah.johnson@dentalcare.com',
-      },
+const doctors = [
+  {
+    name: 'BS. Nguyễn Thị Minh',
+    specialty: 'Nha khoa tổng quát & Thẩm mỹ',
+    image: doctor1,
+    description: 'Hơn 12 năm kinh nghiệm trong việc mang lại nụ cười khỏe đẹp cho khách hàng.',
+    social: {
+      linkedin: '#',
+      twitter: '#',
+      email: 'minh.nguyen@dentalcare.vn',
     },
-    {
-      name: 'Dr. Michael Chen',
-      specialty: 'Orthodontics & Pediatric Care',
-      image: doctor2,
-      description: 'Specialized in orthodontics with a gentle approach for all ages.',
-      social: {
-        linkedin: '#',
-        twitter: '#',
-        email: 'michael.chen@dentalcare.com',
-      },
+  },
+  {
+    name: 'BS. Trần Quốc Huy',
+    specialty: 'Chỉnh nha & Nha khoa trẻ em',
+    image: doctor2,
+    description: 'Chuyên sâu về chỉnh nha với phong cách nhẹ nhàng, thân thiện cho mọi lứa tuổi.',
+    social: {
+      linkedin: '#',
+      twitter: '#',
+      email: 'huy.tran@dentalcare.vn',
     },
-    {
-      name: 'Dr. Emily Rodriguez',
-      specialty: 'Oral Surgery & Implantology',
-      image: doctor3,
-      description: 'Expert in advanced surgical procedures and dental implants.',
-      social: {
-        linkedin: '#',
-        twitter: '#',
-        email: 'emily.rodriguez@dentalcare.com',
-      },
+  },
+  {
+    name: 'BS. Lê Thu Hà',
+    specialty: 'Phẫu thuật răng hàm mặt & Cấy ghép Implant',
+    image: doctor3,
+    description: 'Giàu kinh nghiệm trong các ca phẫu thuật chuyên sâu và cấy ghép implant nha khoa.',
+    social: {
+      linkedin: '#',
+      twitter: '#',
+      email: 'ha.le@dentalcare.vn',
     },
-  ];
-
+  },
+];
   return (
     <section id="doctors" ref={ref} className="py-20 bg-gradient-fresh">
       <div className="container mx-auto px-4">
@@ -63,10 +62,13 @@ const DoctorsSection = () => {
           </span>
           <h2 className="text-4xl font-bold text-foreground mb-4">
             Gặp gỡ{' '}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">các bác sĩ chuyên môn</span>
+            <span className="bg-gradient-primary bg-clip-text text-transparent">
+              các bác sĩ chuyên môn
+            </span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Đội ngũ bác sĩ giàu kinh nghiệm luôn tận tâm mang đến cho bạn dịch vụ xuất sắc và phác đồ điều trị cá nhân hóa.
+            Đội ngũ bác sĩ giàu kinh nghiệm luôn tận tâm mang đến cho bạn dịch vụ xuất sắc và phác
+            đồ điều trị cá nhân hóa.
           </p>
         </motion.div>
 
@@ -81,8 +83,10 @@ const DoctorsSection = () => {
               whileHover={{ y: -8 }}
             >
               <Card
-                className="border-border hover:shadow-medium transition-all duration-300 overflow-hidden"
-                bodyStyle={{ padding: '0' }}
+                variant="elevated"
+                hoverable
+                className="overflow-hidden"
+                padding="none"
               >
                 <div className="relative overflow-hidden group">
                   <img
@@ -130,7 +134,7 @@ const DoctorsSection = () => {
           <Carousel autoplay dotPosition="bottom" className="pb-8">
             {doctors.map((doctor) => (
               <div key={doctor.name} className="px-2">
-                <Card className="border-border shadow-medium" bodyStyle={{ padding: '0' }}>
+                <Card variant="elevated" padding="none">
                   <img src={doctor.image} alt={doctor.name} className="w-full h-80 object-cover" />
                   <div className="p-6 space-y-3">
                     <h3 className="text-xl font-bold text-foreground">{doctor.name}</h3>

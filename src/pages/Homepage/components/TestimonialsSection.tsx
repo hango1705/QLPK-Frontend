@@ -1,6 +1,7 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Card, Carousel, Rate } from 'antd';
+import { Card } from '@/components/ui';
+import { Carousel, Rate } from 'antd';
 // 1. Import icon từ @ant-design/icons
 import { MessageOutlined } from '@ant-design/icons';
 
@@ -85,8 +86,10 @@ const TestimonialsSection = () => {
             {testimonials.map((testimonial, index) => (
               <div key={index} className="px-3">
                 <Card
-                  className="border-border hover:shadow-medium transition-all duration-300 h-full"
-                  bodyStyle={{ padding: '32px' }}
+                  variant="elevated"
+                  hoverable
+                  className="h-full"
+                  padding="lg"
                 >
                   <div className="space-y-4">
                     {/* 2. Thay thế Quote icon */}

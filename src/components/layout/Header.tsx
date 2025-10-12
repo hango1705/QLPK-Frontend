@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 // 1. Import Button từ antd
-import { Button } from 'antd';
+import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import { MenuOutlined, CloseOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,6 +14,8 @@ const Header = () => {
     { label: 'Dịch vụ', href: '#services' },
     { label: 'Bác sĩ', href: '#doctors' },
     { label: 'Giới thiệu', href: '#about' },
+    { label: 'Components', href: '/components' },
+    { label: 'State Management', href: '/state-management' },
     { label: 'Liên hệ', href: '#contact' },
   ];
 
@@ -59,9 +61,9 @@ const Header = () => {
           </div>
 
           {/* 4. Thay thế CTA Button */}
-          <div className="hidden md:block">
-            <Button type="primary" size="large">
-              Đặt lịch hẹn
+          <div className="hidden md:flex items-center gap-3">
+            <Button variant="primary" size="lg">
+              <Link to="/login">Đặt lịch hẹn</Link>
             </Button>
           </div>
 
@@ -96,9 +98,11 @@ const Header = () => {
                   </a>
                 ))}
                 {/* 6. Thay thế Button trong mobile menu */}
-                <Button type="primary" size="large" className="w-full mt-2">
-                  Đặt lịch hẹn
-                </Button>
+                <div className="flex flex-col gap-2 mt-2">
+                  <Button variant="primary" size="lg" className="w-full">
+                    <Link to="/login">Đặt lịch hẹn</Link>
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}

@@ -1,7 +1,7 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-// 1. Import Button từ antd
-import { Button } from 'antd';
+// 1. Import Button từ custom components
+import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import {
   CalendarOutlined,
@@ -55,19 +55,20 @@ const AppointmentSection = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Sẵn sàng thay đổi nụ cười của bạn?</h2>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Sẵn sàng thay đổi nụ cười của bạn?
+            </h2>
             <p className="text-xl text-white/90 mb-8">
               Hẹn lịch ngay hôm nay để bắt đầu hành trình hướng tới nụ cười khỏe đẹp và tự tin hơn.
             </p>
-            {/* 4. Thay thế Button của shadcn bằng Button của antd */}
+            {/* 4. Sử dụng custom Button component */}
             <Button
-              type="default" // type="default" của antd có nền trắng
-              size="large" // size="lg" tương đương size="large"
-              icon={<CalendarOutlined />}
-              // Thêm 'flex items-center' để căn chỉnh icon và text khi có padding lớn
+              variant="secondary"
+              size="lg"
               className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-6 h-auto shadow-glow flex items-center justify-center"
             >
-              Đặt lịch ngay
+              <CalendarOutlined />
+              <span className="ml-2">Đặt lịch ngay</span>
             </Button>
           </motion.div>
 

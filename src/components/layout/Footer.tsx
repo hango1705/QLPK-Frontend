@@ -152,8 +152,12 @@ const Footer = () => {
               © {currentYear} Nha Khoa. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
-              <a href="#" className="text-background/60 hover:text-primary transition-colors">Chính sách bảo mật</a>
-              <a href="#" className="text-background/60 hover:text-primary transition-colors">Điều khoản</a>
+              <a href="#" className="text-background/60 hover:text-primary transition-colors">
+                Chính sách bảo mật
+              </a>
+              <a href="#" className="text-background/60 hover:text-primary transition-colors">
+                Điều khoản
+              </a>
             </div>
           </div>
         </div>

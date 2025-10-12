@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-// 1. Import Button từ antd
-import { Button } from 'antd';
+// 1. Import Button từ custom components
+import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import heroImage from '@/assets/hero-dental.jpg';
@@ -52,8 +52,8 @@ const HeroSection = () => {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="text-lg text-muted-foreground leading-relaxed"
             >
-              Trải nghiệm dịch vụ nha khoa đẳng cấp cùng đội ngũ chuyên gia giàu kinh nghiệm. Chúng tôi
-              kết hợp công nghệ hiện đại với sự tận tâm để mang đến cho bạn nụ cười rạng rỡ.
+              Trải nghiệm dịch vụ nha khoa đẳng cấp cùng đội ngũ chuyên gia giàu kinh nghiệm. Chúng
+              tôi kết hợp công nghệ hiện đại với sự tận tâm để mang đến cho bạn nụ cười rạng rỡ.
             </motion.p>
 
             <motion.div
@@ -62,17 +62,17 @@ const HeroSection = () => {
               transition={{ delay: 0.5, duration: 0.6 }}
               className="flex flex-col sm:flex-row gap-4 pt-4"
             >
-              {/* 3. Thay thế các Buttons */}
+              {/* 3. Sử dụng custom Button components */}
               <Button
-                type="primary"
-                size="large"
-                className="text-lg px-8 shadow-medium flex items-center justify-center group" // Thêm flex để căn chỉnh
+                variant="primary"
+                size="lg"
+                className="text-lg px-8 shadow-medium flex items-center justify-center group"
               >
                 <CalendarOutlined />
                 <span className="mx-2">Đặt lịch hẹn</span>
                 <ArrowRightOutlined className="group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="large" className="text-lg px-8 border-2 hover:bg-primary/5">
+              <Button variant="outline" size="lg" className="text-lg px-8">
                 Tìm hiểu thêm
               </Button>
             </motion.div>
@@ -127,7 +127,9 @@ const HeroSection = () => {
                 </div>
                 <div>
                   <div className="font-semibold text-foreground">Công nghệ tiên tiến</div>
-                  <div className="text-sm text-muted-foreground">Trang thiết bị nha khoa hiện đại</div>
+                  <div className="text-sm text-muted-foreground">
+                    Trang thiết bị nha khoa hiện đại
+                  </div>
                 </div>
               </div>
             </motion.div>

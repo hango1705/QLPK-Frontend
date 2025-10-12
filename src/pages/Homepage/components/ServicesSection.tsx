@@ -1,7 +1,7 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-// 1. Import Card và Button từ antd
-import { Card, Button } from 'antd';
+// 1. Import Card và Button từ custom components
+import { Card, Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import {
   SmileOutlined,
@@ -21,8 +21,7 @@ const ServicesSection = () => {
     {
       icon: SmileOutlined,
       title: 'Nha khoa tổng quát',
-      description:
-        'Khám tổng quát, làm sạch răng và các điều trị phòng ngừa toàn diện.',
+      description: 'Khám tổng quát, làm sạch răng và các điều trị phòng ngừa toàn diện.',
       color: 'bg-primary/10',
       iconColor: 'text-primary',
     },
@@ -78,10 +77,13 @@ const ServicesSection = () => {
           </span>
           <h2 className="text-4xl font-bold text-foreground mb-4">
             Giải pháp{' '}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">nha khoa toàn diện</span>
+            <span className="bg-gradient-primary bg-clip-text text-transparent">
+              nha khoa toàn diện
+            </span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Từ khám định kỳ đến các thủ thuật chuyên sâu, chúng tôi cung cấp đầy đủ dịch vụ để giữ gìn nụ cười khỏe đẹp.
+            Từ khám định kỳ đến các thủ thuật chuyên sâu, chúng tôi cung cấp đầy đủ dịch vụ để giữ
+            gìn nụ cười khỏe đẹp.
           </p>
         </motion.div>
 
@@ -97,8 +99,10 @@ const ServicesSection = () => {
               className="h-full"
             >
               <Card
-                className="h-full border-border hover:shadow-medium transition-all duration-300 cursor-pointer"
-                bodyStyle={{ padding: '32px' }}
+                variant="elevated"
+                hoverable
+                className="h-full"
+                padding="lg"
               >
                 <div className="space-y-4 flex flex-col h-full">
                   <div
@@ -111,9 +115,9 @@ const ServicesSection = () => {
                     {service.description}
                   </p>
 
-                  {/* 4. Thay thế button bằng Button của Ant Design */}
+                  {/* 4. Sử dụng custom Button component */}
                   <Button
-                    type="link"
+                    variant="ghost"
                     className="p-0 h-auto self-start font-semibold group flex items-center gap-1"
                   >
                     Tìm hiểu thêm
