@@ -7,6 +7,10 @@ import {
   logoutUser, 
   getCurrentUser,
   sendVerificationCode,
+  forgotPassword,
+  verifyResetPassword,
+  resetPassword,
+  introspectToken,
   clearError as clearAuthError,
   resetLoading
 } from '@/store/slices/authSlice';
@@ -30,19 +34,36 @@ export const useAuth = () => {
   const register = useCallback((userData: { 
     username: string;
     password: string;
-    full_name: string;
+    fullName: string;
     email: string;
     phone?: string;
     address?: string;
     dob?: string;
     gender?: string;
-    verificationCode: string;
+    verifiedCode: string;
+    createAt: string;
   }) => {
     return dispatch(registerUser(userData));
   }, [dispatch]);
 
   const sendVerification = useCallback((email: string) => {
     return dispatch(sendVerificationCode(email));
+  }, [dispatch]);
+
+  const forgotPasswordAction = useCallback((username: string) => {
+    return dispatch(forgotPassword(username));
+  }, [dispatch]);
+
+  const verifyResetPasswordAction = useCallback((id: string) => {
+    return dispatch(verifyResetPassword(id));
+  }, [dispatch]);
+
+  const resetPasswordAction = useCallback((id: string, newPassword: string) => {
+    return dispatch(resetPassword({ id, newPassword }));
+  }, [dispatch]);
+
+  const introspectTokenAction = useCallback((token: string) => {
+    return dispatch(introspectToken(token));
   }, [dispatch]);
 
   const logout = useCallback(() => {
@@ -66,6 +87,10 @@ export const useAuth = () => {
     login,
     register,
     sendVerificationCode: sendVerification,
+    forgotPassword: forgotPasswordAction,
+    verifyResetPassword: verifyResetPasswordAction,
+    resetPassword: resetPasswordAction,
+    introspectToken: introspectTokenAction,
     logout,
     getCurrentUserInfo,
     clearError,

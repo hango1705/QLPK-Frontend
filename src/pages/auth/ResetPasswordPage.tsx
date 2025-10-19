@@ -24,7 +24,7 @@ const resetPasswordSchema = yup.object({
 type ResetPasswordFormData = yup.InferType<typeof resetPasswordSchema>;
 
 const ResetPasswordPage = () => {
-  const { clearError } = useAuth();
+  const { clearError, resetPassword } = useAuth();
   const [searchParams] = useSearchParams();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +36,7 @@ const ResetPasswordPage = () => {
     clearError();
   }, [clearError]);
 
-  const token = searchParams.get('token');
+  const id = searchParams.get('id');
   const email = searchParams.get('email');
 
   const {
@@ -52,18 +52,15 @@ const ResetPasswordPage = () => {
   });
 
   const onSubmit = async (data: ResetPasswordFormData) => {
-    if (!token) {
-      showNotification.error('Token không hợp lệ');
+    if (!id) {
+      showNotification.error('ID không hợp lệ');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // In real app, call reset password API
-      // await authAPI.resetPassword(token, data.password);
+      // Call reset password API
+      await resetPassword(id, data.password);
       
       setIsSubmitted(true);
       showNotification.success('Mật khẩu đã được đặt lại thành công!');
@@ -74,7 +71,7 @@ const ResetPasswordPage = () => {
     }
   };
 
-  if (!token) {
+  if (!id) {
     return (
       <div className="min-h-screen flex">
         {/* Left Panel - Visual/Marketing Section */}

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 // 1. Import Button từ custom components
 import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
@@ -6,6 +7,15 @@ import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import heroImage from '@/assets/hero-dental.jpg';
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+
+  const handleBookAppointment = () => {
+    navigate('/login');
+  };
+
+  const handleLearnMore = () => {
+    navigate('/#about');
+  };
   return (
     <section className="relative min-h-screen flex items-center bg-gradient-hero overflow-hidden pt-20">
       {/* Background decoration (giữ nguyên) */}
@@ -67,12 +77,18 @@ const HeroSection = () => {
                 variant="primary"
                 size="lg"
                 className="text-lg px-8 shadow-medium flex items-center justify-center group"
+                onClick={handleBookAppointment}
               >
                 <CalendarOutlined />
                 <span className="mx-2">Đặt lịch hẹn</span>
                 <ArrowRightOutlined className="group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="text-lg px-8"
+                onClick={handleLearnMore}
+              >
                 Tìm hiểu thêm
               </Button>
             </motion.div>

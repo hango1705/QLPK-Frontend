@@ -8,18 +8,35 @@ export interface LoginCredentials {
 export interface RegisterData {
   username: string;
   password: string;
-  full_name: string;
+  fullName: string;
   email: string;
   phone?: string;
   address?: string;
   dob?: string;
   gender?: string;
-  verificationCode: string;
+  verifiedCode: string;
+  createAt: string;
 }
 
 export interface AuthResponse {
-  token: string;
-  message?: string;
+  code: number;
+  result: {
+    authenticated: boolean;
+    token: string;
+  };
+}
+
+export interface UserResponse {
+  id: string;
+  username: string;
+  email?: string;
+  full_name?: string;
+  phone?: string;
+  address?: string;
+  dob?: string;
+  gender?: string;
+  disable: boolean;
+  role?: 'admin' | 'doctor' | 'nurse' | 'patient';
 }
 
 export interface VerificationResponse {
@@ -31,6 +48,13 @@ export interface RefreshTokenResponse {
   refreshToken: string;
 }
 
+export interface TokenIntrospectResponse {
+  code: number;
+  result: {
+    valid: boolean;
+  };
+}
+
 export const authAPI = {
   login: (credentials: LoginCredentials) =>
     apiClient.post<AuthResponse>('/api/v1/auth/login', credentials),
@@ -40,29 +64,36 @@ export const authAPI = {
     apiClient.post<VerificationResponse>(`/api/v1/auth/verifiedCode/${email}`),
     
   // Bước 2: Hoàn tất đăng ký với mã xác thực
-  register: (userData: RegisterData & { verificationCode: string }) =>
-    apiClient.post<AuthResponse>('/api/v1/auth/createPatient', userData),
+  register: (userData: RegisterData) =>
+    apiClient.post<AuthResponse>('/api/v1/auth/register/patient', userData),
     
   logout: (token: string) =>
-    apiClient.post('/auth/logout', { token }),
+    apiClient.post('/api/v1/auth/logout', { token }),
     
   refreshToken: (refreshToken: string) =>
-    apiClient.post<RefreshTokenResponse>('/auth/refresh', { refreshToken }),
+    apiClient.post<RefreshTokenResponse>('/api/v1/auth/refresh', { refreshToken }),
     
   getCurrentUser: (token: string) =>
-    apiClient.get('/auth/me', {
+    apiClient.get<UserResponse>('/api/v1/auth/me', {
       headers: { Authorization: `Bearer ${token}` }
     }),
     
-  forgotPassword: (email: string) =>
-    apiClient.post('/auth/forgot-password', { email }),
+  forgotPassword: (username: string) =>
+    apiClient.post('/api/v1/auth/forgotPassword', { username }),
     
-  resetPassword: (token: string, password: string) =>
-    apiClient.post('/auth/reset-password', { token, password }),
+  verifyResetPassword: (id: string) =>
+    apiClient.post(`/api/v1/auth/verifyResetPassword/${id}`),
+    
+  resetPassword: (id: string, newPassword: string) =>
+    apiClient.post('/api/v1/auth/resetPassword', { id, newPassword }),
     
   verifyEmail: (token: string) =>
-    apiClient.post('/auth/verify-email', { token }),
+    apiClient.post('/api/v1/auth/verify-email', { token }),
     
   resendVerification: (email: string) =>
-    apiClient.post('/auth/resend-verification', { email }),
+    apiClient.post('/api/v1/auth/resend-verification', { email }),
+    
+  // Token Introspection API
+  introspectToken: (token: string) =>
+    apiClient.post<TokenIntrospectResponse>('/api/v1/auth/introspect', { token }),
 };

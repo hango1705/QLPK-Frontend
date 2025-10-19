@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 // 1. Import Button từ antd
 import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
@@ -8,6 +8,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleBookAppointment = () => {
+    navigate('/login');
+    setIsMenuOpen(false); // Close mobile menu if open
+  };
 
   const menuItems = [
     { label: 'Trang chủ', href: '/' },
@@ -62,8 +68,8 @@ const Header = () => {
 
           {/* 4. Thay thế CTA Button */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="primary" size="lg">
-              <Link to="/login">Đặt lịch hẹn</Link>
+            <Button variant="primary" size="lg" onClick={handleBookAppointment}>
+              Đặt lịch hẹn
             </Button>
           </div>
 
@@ -99,8 +105,8 @@ const Header = () => {
                 ))}
                 {/* 6. Thay thế Button trong mobile menu */}
                 <div className="flex flex-col gap-2 mt-2">
-                  <Button variant="primary" size="lg" className="w-full">
-                    <Link to="/login">Đặt lịch hẹn</Link>
+                  <Button variant="primary" size="lg" className="w-full" onClick={handleBookAppointment}>
+                    Đặt lịch hẹn
                   </Button>
                 </div>
               </div>

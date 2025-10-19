@@ -10,16 +10,16 @@ import authPageImg from '@/assets/auth_page_img.png';
 
 // Validation schema
 const forgotPasswordSchema = yup.object({
-  email: yup
+  username: yup
     .string()
-    .email('Email không hợp lệ')
-    .required('Email là bắt buộc'),
+    .min(3, 'Tên đăng nhập phải có ít nhất 3 ký tự')
+    .required('Tên đăng nhập là bắt buộc'),
 });
 
 type ForgotPasswordFormData = yup.InferType<typeof forgotPasswordSchema>;
 
 const ForgotPasswordPage = () => {
-  const { clearError, sendVerificationCode } = useAuth();
+  const { clearError, forgotPassword } = useAuth();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,18 +35,18 @@ const ForgotPasswordPage = () => {
   } = useForm<ForgotPasswordFormData>({
     resolver: yupResolver(forgotPasswordSchema) as any,
     defaultValues: {
-      email: '',
+      username: '',
     },
   });
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true);
     try {
-      // Call send verification code API
-      await sendVerificationCode(data.email);
+      // Call forgot password API
+      await forgotPassword(data.username);
       
       setIsSubmitted(true);
-      showNotification.success('Mã xác thực đã được gửi đến email của bạn!');
+      showNotification.success('Link khôi phục mật khẩu đã được gửi!');
     } catch (error) {
       showNotification.error('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -90,7 +90,7 @@ const ForgotPasswordPage = () => {
               </svg>
             </div>
             
-            <h2 className="text-3xl font-bold text-foreground mb-4">Email đã được gửi!</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-4">Link đã được gửi!</h2>
             <p className="text-muted-foreground mb-8">
               Chúng tôi đã gửi link khôi phục mật khẩu đến email của bạn. 
               Vui lòng kiểm tra hộp thư và làm theo hướng dẫn.
@@ -155,7 +155,7 @@ const ForgotPasswordPage = () => {
             </div>
             <h2 className="text-4xl font-bold text-foreground mb-2">Quên mật khẩu?</h2>
             <p className="text-muted-foreground">
-              Nhập email của bạn để nhận link khôi phục mật khẩu
+              Nhập tên đăng nhập của bạn để nhận link khôi phục mật khẩu
             </p>
           </div>
 
@@ -163,22 +163,21 @@ const ForgotPasswordPage = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Email
+                Tên đăng nhập
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <Input
-                  {...register('email')}
-                  type="email"
-                  placeholder="nguyenvana@email.com"
+                  {...register('username')}
+                  type="text"
+                  placeholder="Tên đăng nhập"
                   className="pl-10"
-                  error={!!errors.email}
-                  helperText={errors.email?.message}
+                  error={!!errors.username}
+                  helperText={errors.username?.message}
                 />
               </div>
             </div>

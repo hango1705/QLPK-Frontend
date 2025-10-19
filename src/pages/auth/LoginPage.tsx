@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks';
 import { showNotification } from '@/components/ui';
 import { loginUser } from '@/store/slices/authSlice';
 import { loginSchema, type LoginFormData } from '@/schemas/auth';
+import RoleBasedRedirect from '@/components/auth/RoleBasedRedirect';
 import authPageImg from '@/assets/auth_page_img.png';
 
 const LoginPage = () => {
@@ -65,11 +66,14 @@ const LoginPage = () => {
       console.log('🔄 Login result:', result);
       
       // Check if login was successful
-      if (loginUser.fulfilled.match(result)) {
+      if (result.type === 'auth/login/fulfilled') {
         showNotification.success('Đăng nhập thành công!');
         console.log('✅ Login process completed successfully');
-        // Don't navigate automatically, let user see the success message
-      } else {
+        
+        // Không cần fetch user info vì backend không có API /auth/me
+        // Chuyển hướng sẽ được xử lý bởi RoleBasedRedirect component
+        console.log('🔄 Login successful, redirect will be handled by RoleBasedRedirect');
+      } else if (result.type === 'auth/login/rejected') {
         showNotification.error('Đăng nhập thất bại');
         console.error('❌ Login process failed:', result.payload);
       }
@@ -84,7 +88,8 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <RoleBasedRedirect>
+      <div className="min-h-screen flex">
       {/* Left Panel - Visual/Marketing Section */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         <div className="absolute inset-0">
@@ -288,7 +293,8 @@ const LoginPage = () => {
         </div>
        </div>
      </div>
-   );
+    </RoleBasedRedirect>
+  );
  };
 
 export default LoginPage;

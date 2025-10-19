@@ -18,18 +18,18 @@ export const registerSchema = yup.object().shape({
   username: yup
     .string()
     .required('Tên đăng nhập là bắt buộc')
-    .min(3, 'Tên đăng nhập phải có ít nhất 3 ký tự')
+    .min(8, 'Tên đăng nhập phải có ít nhất 8 ký tự')
     .max(20, 'Tên đăng nhập không được quá 20 ký tự'),
   password: yup
     .string()
     .required('Mật khẩu là bắt buộc')
-    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự')
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
     .max(50, 'Mật khẩu không được quá 50 ký tự'),
   confirmPassword: yup
     .string()
     .required('Xác nhận mật khẩu là bắt buộc')
     .oneOf([yup.ref('password')], 'Mật khẩu xác nhận không khớp'),
-  full_name: yup
+  fullName: yup
     .string()
     .required('Họ và tên là bắt buộc')
     .min(2, 'Họ và tên phải có ít nhất 2 ký tự'),
@@ -41,8 +41,19 @@ export const registerSchema = yup.object().shape({
     .string()
     .matches(/^[0-9]{10,11}$/, 'Số điện thoại phải có 10-11 chữ số'),
   address: yup.string(),
-  dob: yup.string(),
+  dob: yup
+    .string()
+    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Ngày sinh phải có định dạng yyyy-MM-dd'),
   gender: yup.string().oneOf(['male', 'female', 'other'], 'Giới tính không hợp lệ'),
+  verifiedCode: yup
+    .string()
+    .required('Mã xác thực là bắt buộc')
+    .length(6, 'Mã xác thực phải có 6 chữ số')
+    .matches(/^\d{6}$/, 'Mã xác thực chỉ được chứa số'),
+  createAt: yup
+    .string()
+    .required('Ngày tạo là bắt buộc')
+    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Ngày tạo phải có định dạng yyyy-MM-dd'),
 });
 
 // Forgot password schema

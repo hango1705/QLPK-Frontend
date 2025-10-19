@@ -1,5 +1,6 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 // 1. Import Button từ custom components
 import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
@@ -13,6 +14,11 @@ import {
 const AppointmentSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const navigate = useNavigate();
+
+  const handleBookAppointment = () => {
+    navigate('/login');
+  };
 
   // 3. Cập nhật mảng features để sử dụng icon của Ant Design
   const features = [
@@ -66,6 +72,7 @@ const AppointmentSection = () => {
               variant="secondary"
               size="lg"
               className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-6 h-auto shadow-glow flex items-center justify-center"
+              onClick={handleBookAppointment}
             >
               <CalendarOutlined />
               <span className="ml-2">Đặt lịch ngay</span>

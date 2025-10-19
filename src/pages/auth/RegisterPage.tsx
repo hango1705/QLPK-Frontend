@@ -14,7 +14,7 @@ const step1Schema = yup.object({
 });
 
 const step2Schema = yup.object({
-  verificationCode: yup
+  verifiedCode: yup
     .string()
     .length(6, 'Mã xác thực phải có 6 chữ số')
     .matches(/^\d{6}$/, 'Mã xác thực chỉ được chứa số')
@@ -22,8 +22,11 @@ const step2Schema = yup.object({
 });
 
 const step3Schema = yup.object({
-  username: yup.string().required('Tên đăng nhập là bắt buộc'),
-  full_name: yup.string().required('Họ tên là bắt buộc'),
+  username: yup
+    .string()
+    .required('Tên đăng nhập là bắt buộc')
+    .min(8, 'Tên đăng nhập phải có ít nhất 8 ký tự'),
+  fullName: yup.string().required('Họ tên là bắt buộc'),
   phone: yup.string().required('Số điện thoại là bắt buộc'),
   password: yup
     .string()
@@ -37,7 +40,10 @@ const step3Schema = yup.object({
 });
 
 const step4Schema = yup.object({
-  dob: yup.string().required('Ngày sinh là bắt buộc'),
+  dob: yup
+    .string()
+    .required('Ngày sinh là bắt buộc')
+    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Ngày sinh phải có định dạng yyyy-MM-dd'),
   gender: yup.string().required('Giới tính là bắt buộc'),
   address: yup.string().required('Địa chỉ là bắt buộc'),
   agreeToTerms: yup.boolean().oneOf([true], 'Bạn phải đồng ý với điều khoản'),
@@ -74,7 +80,7 @@ const RegisterPage = () => {
     mode: 'onSubmit',
     reValidateMode: 'onSubmit',
     defaultValues: {
-      verificationCode: formData.verificationCode || '',
+      verifiedCode: formData.verifiedCode || '',
     },
   });
 
@@ -84,7 +90,7 @@ const RegisterPage = () => {
     reValidateMode: 'onSubmit',
     defaultValues: {
       username: formData.username || '',
-      full_name: formData.full_name || '',
+      fullName: formData.fullName || '',
       phone: formData.phone || '',
       password: formData.password || '',
       confirmPassword: formData.confirmPassword || '',
@@ -136,19 +142,19 @@ const RegisterPage = () => {
 
   useEffect(() => {
     step2Form.reset({
-      verificationCode: formData.verificationCode || '',
+      verifiedCode: formData.verifiedCode || '',
     });
-  }, [formData.verificationCode, step2Form]);
+  }, [formData.verifiedCode, step2Form]);
 
   useEffect(() => {
     step3Form.reset({
       username: formData.username || '',
-      full_name: formData.full_name || '',
+      fullName: formData.fullName || '',
       phone: formData.phone || '',
       password: formData.password || '',
       confirmPassword: formData.confirmPassword || '',
     });
-  }, [formData.username, formData.full_name, formData.phone, formData.password, formData.confirmPassword, step3Form]);
+  }, [formData.username, formData.fullName, formData.phone, formData.password, formData.confirmPassword, step3Form]);
 
   useEffect(() => {
     step4Form.reset({
@@ -200,16 +206,19 @@ const RegisterPage = () => {
   const handleStep4Submit = async (data: Step4Data) => {
     try {
       const finalData = { ...formData, ...data };
+      const createAt = new Date().toISOString().split('T')[0]; // Get current date in yyyy-MM-dd format
+      
       await registerUser({
         username: finalData.username!,
         password: finalData.password!,
-        full_name: finalData.full_name!,
+        fullName: finalData.fullName!,
         email: finalData.email!,
         phone: finalData.phone,
         address: finalData.address,
         dob: finalData.dob,
         gender: finalData.gender,
-        verificationCode: finalData.verificationCode!,
+        verifiedCode: finalData.verifiedCode!,
+        createAt: createAt,
       });
       showNotification.success('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
     } catch (error) {
@@ -293,13 +302,13 @@ const RegisterPage = () => {
           Mã xác thực
         </label>
         <Input
-          {...step2Form.register('verificationCode')}
+          {...step2Form.register('verifiedCode')}
           type="text"
           placeholder="123456"
           maxLength={6}
           className="text-center text-2xl tracking-widest w-full"
-          error={!!step2Form.formState.errors.verificationCode}
-          helperText={step2Form.formState.errors.verificationCode?.message}
+          error={!!step2Form.formState.errors.verifiedCode}
+          helperText={step2Form.formState.errors.verifiedCode?.message}
         />
       </div>
 
@@ -363,10 +372,10 @@ const RegisterPage = () => {
           Họ và tên
         </label>
         <Input
-          {...step3Form.register('full_name')}
+          {...step3Form.register('fullName')}
           placeholder="Nguyễn Văn A"
-          error={!!step3Form.formState.errors.full_name}
-          helperText={step3Form.formState.errors.full_name?.message}
+          error={!!step3Form.formState.errors.fullName}
+          helperText={step3Form.formState.errors.fullName?.message}
         />
       </div>
 
