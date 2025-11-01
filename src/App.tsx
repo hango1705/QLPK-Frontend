@@ -10,7 +10,6 @@ import { PublicRoute, PrivateRoute } from '@/components/auth/RouteGuards';
 import RoleBasedRoute from '@/components/auth/RoleBasedRoute';
 import AuthInitializer from '@/components/auth/AuthInitializer';
 import { createLazyPage } from '@/utils/lazyLoading';
-import DebugAuth from '@/components/DebugAuth';
 
 // Lazy load pages for code splitting
 const HomePage = createLazyPage(() => import('./pages/Homepage/index'));
@@ -52,7 +51,6 @@ const App = () => (
           >
             <AntApp>
               <AuthInitializer>
-                <DebugAuth />
                 <BrowserRouter>
                 <Routes>
                   {/* Public routes */}
@@ -94,7 +92,7 @@ const App = () => (
                     } 
                   />
                   <Route 
-                    path="/reset-password" 
+                    path="/reset-password/:id"
                     element={
                       <PublicRoute redirectTo="/">
                         <ResetPasswordPage />
@@ -216,6 +214,8 @@ const App = () => (
                       </PrivateRoute>
                     } 
                   />
+
+                  {/* Appointment booking integrated in patient dashboard */}
                   
                   {/* Error pages */}
                   <Route path="/unauthorized" element={<UnauthorizedPage />} />

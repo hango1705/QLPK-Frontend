@@ -5,7 +5,7 @@ export { Input } from './Input';
 export { Modal } from './Modal';
 export { Loading, Spinner } from './Loading';
 export { Alert } from './Alert';
-export { showNotification } from './Notification';
+export { showNotification, useNotification } from './Notification';
 export { Table } from './Table';
 
 // Types

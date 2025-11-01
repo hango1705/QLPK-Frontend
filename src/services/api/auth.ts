@@ -7,7 +7,7 @@ export interface LoginCredentials {
 
 export interface RegisterData {
   username: string;
-  password: string;
+  password: string; // phải là 'password'
   fullName: string;
   email: string;
   phone?: string;
@@ -23,6 +23,7 @@ export interface AuthResponse {
   result: {
     authenticated: boolean;
     token: string;
+    refreshToken?: string;
   };
 }
 

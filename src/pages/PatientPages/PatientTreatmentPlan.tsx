@@ -1,84 +1,54 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert } from '@/components/ui';
 import { showNotification } from '@/components/ui';
+import apiClient from '@/services/api/client';
 
-interface TreatmentPlan {
+interface TreatmentPlanApi {
   id: string;
   title: string;
-  doctor: string;
-  date: string;
   description: string;
-  procedures: string[];
-  medications: string[];
   duration: string;
-  status: 'active' | 'completed' | 'paused';
   notes: string;
+  status: string; // free text from BE
+  totalCost?: number;
+  doctorFullname?: string;
+  createAt?: string; // dd/MM/yyyy
 }
 
 const PatientTreatmentPlan = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [treatmentPlans, setTreatmentPlans] = useState<TreatmentPlanApi[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
-  // Mock data - in real app, this would come from API
-  const [treatmentPlans, setTreatmentPlans] = useState<TreatmentPlan[]>([
-    {
-      id: '1',
-      title: 'Điều trị viêm nướu',
-      doctor: 'BS. Nguyễn Văn A',
-      date: '2024-01-15',
-      description: 'Kế hoạch điều trị viêm nướu cấp tính',
-      procedures: [
-        'Làm sạch răng chuyên nghiệp',
-        'Điều trị bằng laser',
-        'Hướng dẫn vệ sinh răng miệng'
-      ],
-      medications: [
-        'Thuốc kháng viêm: Ibuprofen 400mg',
-        'Nước súc miệng: Chlorhexidine 0.12%',
-        'Kem đánh răng: Sensodyne'
-      ],
-      duration: '2 tuần',
-      status: 'active',
-      notes: 'Cần tái khám sau 1 tuần để đánh giá tiến triển'
-    },
-    {
-      id: '2',
-      title: 'Trám răng sâu',
-      doctor: 'BS. Trần Thị B',
-      date: '2024-01-20',
-      description: 'Kế hoạch trám răng hàm dưới bên trái',
-      procedures: [
-        'Gây tê cục bộ',
-        'Loại bỏ mô sâu',
-        'Trám composite',
-        'Đánh bóng bề mặt'
-      ],
-      medications: [
-        'Thuốc tê: Lidocaine 2%',
-        'Thuốc giảm đau: Paracetamol 500mg'
-      ],
-      duration: '1 ngày',
-      status: 'completed',
-      notes: 'Trám răng hoàn thành, cần theo dõi'
-    }
-  ]);
+  useEffect(() => {
+    setFetching(true);
+    setError(null);
+    apiClient.get('/api/v1/patient/myTreatmentPlans')
+      .then(res => setTreatmentPlans(res.data.result || res.data || []))
+      .catch(() => setError('Không thể tải phác đồ điều trị'))
+      .finally(() => setFetching(false));
+  }, []);
 
-  const handleAddPlan = async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      showNotification.success('Thêm phác đồ điều trị thành công!');
-      setIsAdding(false);
-    } catch (error) {
-      showNotification.error('Có lỗi xảy ra khi thêm phác đồ');
-    } finally {
-      setIsLoading(false);
-    }
+  const normalizedStatus = (s?: string) => {
+    const v = (s || '').toLowerCase();
+    if (v.includes('hoàn')) return 'completed';
+    if (v.includes('tạm')) return 'paused';
+    return 'active';
   };
 
+  const total = treatmentPlans.length;
+  const activeCount = useMemo(() => treatmentPlans.filter(p => normalizedStatus(p.status) === 'active').length, [treatmentPlans]);
+  const completedCount = useMemo(() => treatmentPlans.filter(p => normalizedStatus(p.status) === 'completed').length, [treatmentPlans]);
+  const pausedCount = useMemo(() => treatmentPlans.filter(p => normalizedStatus(p.status) === 'paused').length, [treatmentPlans]);
+
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const n = normalizedStatus(status);
+    switch (n) {
       case 'active':
         return 'bg-green-100 text-green-800';
       case 'completed':
@@ -90,24 +60,45 @@ const PatientTreatmentPlan = () => {
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'Đang thực hiện';
-      case 'completed':
-        return 'Hoàn thành';
-      case 'paused':
-        return 'Tạm dừng';
-      default:
-        return 'Không xác định';
+  const getStatusText = (status: string) => status || 'Không xác định';
+
+  const handleAddPlan = async () => {
+    setIsLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      showNotification.success('Thêm phác đồ điều trị thành công!');
+      setIsAdding(false);
+    } catch (error) {
+      showNotification.error('Có lỗi xảy ra khi thêm phác đồ');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const avatarOf = (name?: string) => {
+    const ch = (name || '?').trim().charAt(0).toUpperCase();
+    return ch || 'U';
+  };
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return treatmentPlans.slice(start, start + pageSize);
+  }, [treatmentPlans, page]);
+  const totalPages = Math.ceil(treatmentPlans.length / pageSize) || 1;
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="pl-4 sm:pl-6 lg:pl-8 pr-0">
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Phác đồ điều trị</h1>
@@ -115,88 +106,48 @@ const PatientTreatmentPlan = () => {
                 Kế hoạch điều trị được bác sĩ chỉ định
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                onClick={() => setIsAdding(true)} 
-                variant="primary"
-              >
-                Thêm phác đồ
-              </Button>
-            </div>
+            {/* Ẩn nút thêm phác đồ theo yêu cầu */}
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-0 py-8">
+        {error && <Alert variant="error" message={error} className="mb-6" />}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <span className="text-2xl">📝</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Tổng phác đồ</p>
-                <p className="text-2xl font-bold text-gray-900">{treatmentPlans.length}</p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Tổng phác đồ</p>
+            <p className="text-2xl font-bold text-gray-900">{total}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <span className="text-2xl">🔄</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Đang thực hiện</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {treatmentPlans.filter(p => p.status === 'active').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Đang thực hiện</p>
+            <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <span className="text-2xl">✅</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Hoàn thành</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {treatmentPlans.filter(p => p.status === 'completed').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Hoàn thành</p>
+            <p className="text-2xl font-bold text-gray-900">{completedCount}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <span className="text-2xl">⏸️</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Tạm dừng</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {treatmentPlans.filter(p => p.status === 'paused').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Tạm dừng</p>
+            <p className="text-2xl font-bold text-gray-900">{pausedCount}</p>
           </Card>
         </div>
 
         {/* Treatment Plans */}
         <div className="space-y-6">
-          {treatmentPlans.map((plan) => (
+          {!fetching && paginated.map((plan) => (
             <Card key={plan.id} className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
                     {plan.title}
                   </h3>
-                  <p className="text-gray-600">
-                    Bác sĩ: {plan.doctor} • Ngày: {plan.date}
+                  <p className="text-gray-600 flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">
+                      {avatarOf(plan.doctorFullname)}
+                    </span>
+                    Bác sĩ: {plan.doctorFullname || '-'} • Ngày: {plan.createAt || '-'}
                   </p>
                 </div>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(plan.status)}`}>
@@ -204,62 +155,51 @@ const PatientTreatmentPlan = () => {
                 </span>
               </div>
 
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-900 mb-2">Mô tả</h4>
-                <p className="text-gray-700 text-sm">{plan.description}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Quy trình điều trị</h4>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    {plan.procedures.map((procedure, index) => (
-                      <li key={index} className="flex items-center">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                        {procedure}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Thuốc điều trị</h4>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    {plan.medications.map((medication, index) => (
-                      <li key={index} className="flex items-center">
-                        <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                        {medication}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Thời gian điều trị</h4>
-                  <p className="text-gray-700 text-sm">{plan.duration}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Ghi chú</h4>
-                  <p className="text-gray-700 text-sm">{plan.notes}</p>
-                </div>
-              </div>
+              {expandedIds.has(plan.id) ? (
+                <>
+                  <div className="mb-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Mô tả</h4>
+                    <p className="text-gray-700 text-sm">{plan.description || '-'}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Thời gian điều trị</h4>
+                      <p className="text-gray-700 text-sm">{plan.duration || '-'}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Ghi chú</h4>
+                      <p className="text-gray-700 text-sm">{plan.notes || '-'}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-700 text-sm">{plan.description || '-'}</div>
+              )}
 
               <div className="pt-4 border-t border-gray-200">
-                <div className="flex justify-end space-x-3">
-                  <Button variant="outline" size="sm">
-                    Xem chi tiết
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" size="sm" onClick={() => toggleExpand(plan.id)}>
+                    {expandedIds.has(plan.id) ? 'Thu gọn' : 'Mở rộng'}
                   </Button>
-                  <Button variant="primary" size="sm">
-                    Tải xuống
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm">Xem chi tiết</Button>
+                    <Button variant="primary" size="sm">Tải xuống</Button>
+                  </div>
                 </div>
               </div>
             </Card>
           ))}
+          {fetching && <Card className="p-6">Đang tải phác đồ...</Card>}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}>Trước</Button>
+            <span className="text-sm text-gray-600">Trang {page}/{totalPages}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages}>Sau</Button>
+          </div>
+        )}
 
         {/* Add New Treatment Plan Modal */}
         {isAdding && (
@@ -305,28 +245,6 @@ const PatientTreatmentPlan = () => {
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Mô tả phác đồ điều trị..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Quy trình điều trị
-                    </label>
-                    <textarea
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Liệt kê các bước điều trị..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Thuốc điều trị
-                    </label>
-                    <textarea
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Danh sách thuốc..."
                     />
                   </div>
 

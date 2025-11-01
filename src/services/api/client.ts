@@ -4,13 +4,11 @@ import { refreshToken, clearCredentials } from '@/store/slices/authSlice';
 
 // Base URL configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-console.log('🔧 API_BASE_URL loaded:', API_BASE_URL);
-console.log('🔧 import.meta.env.VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,15 +20,6 @@ apiClient.interceptors.request.use(
     const state = store.getState();
     const token = state.auth.token;
     
-    // Log outgoing requests
-    console.log('🚀 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      data: config.data
-    });
-    
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -38,7 +27,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error: AxiosError) => {
-    console.error('❌ Request Error:', error);
+    console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -46,12 +35,6 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
-    // Log successful responses
-    console.log('✅ API Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data
-    });
     return response;
   },
   async (error: AxiosError) => {
@@ -75,19 +58,19 @@ apiClient.interceptors.response.use(
         } else {
           // Refresh failed, logout user
           store.dispatch(clearCredentials());
-          console.log('🔄 Token refresh failed, user logged out');
+          console.log('Token refresh failed, user logged out');
           return Promise.reject(error);
         }
       } catch (refreshError) {
         // Refresh failed, logout user
         store.dispatch(clearCredentials());
-        console.log('🔄 Token refresh error, user logged out');
+        console.log('Token refresh error, user logged out');
         return Promise.reject(refreshError);
       }
     }
     
     // Log error responses
-    console.error('❌ API Error:', {
+    console.error('API Error:', {
       status: error.response?.status,
       url: error.config?.url,
       message: error.message,

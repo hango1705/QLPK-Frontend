@@ -37,7 +37,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           hoverClasses,
           className
         )}
-        bodyStyle={{ padding: padding === 'none' ? 0 : undefined }}
+        styles={{ body: { padding: padding === 'none' ? 0 : undefined } }}
         {...props}
       >
         {children}

@@ -45,6 +45,7 @@ export const loginUser = createAsyncThunk(
       if (response.data.code === 1000 && response.data.result.authenticated) {
         return {
           token: response.data.result.token,
+          refreshToken: response.data.result.refreshToken || null,
           authenticated: response.data.result.authenticated
         };
       } else {

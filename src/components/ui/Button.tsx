@@ -33,6 +33,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <AntButton
         ref={ref}
         type={antType as AntButtonProps['type']}
+        htmlType={props.type || 'button'}
         size={size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'middle'}
         loading={loading}
         className={cn(

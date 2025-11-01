@@ -5,7 +5,11 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Input, Card } from '@/components/ui';
 import { useAuth } from '@/hooks';
-import { showNotification } from '@/components/ui';
+import { useDispatch, useSelector } from 'react-redux';
+import { sendVerificationCode as sendVerificationCodeAction } from '@/store/slices/authSlice';
+import { setCurrentStep, setFormData, setCountdown, resetRegisterState } from '@/store/slices/registerStepSlice';
+import { RootState } from '@/store';
+import { useNotification } from '@/components/ui';
 import authPageImg from '@/assets/auth_page_img.png';
 
 // Validation schemas for each step
@@ -55,15 +59,26 @@ type Step3Data = yup.InferType<typeof step3Schema>;
 type Step4Data = yup.InferType<typeof step4Schema>;
 
 const RegisterPage = () => {
-  const { register: registerUser, sendVerificationCode, isLoading, error, clearError } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data & Step4Data>>({});
+  const dispatch = useDispatch();
+  const registerStep = useSelector((state: RootState) => state.registerStep);
+  const { currentStep, formData, countdown } = registerStep;
+  const { register: registerUser, isLoading, error, clearError } = useAuth();
+  const notification = useNotification();
+  
+  // Debug component mount
+  useEffect(() => {
+    return () => {
+    };
+  }, []);
+
+  // Debug currentStep changes
+  useEffect(() => {
+  }, [currentStep]);
   const [step1Submitted, setStep1Submitted] = useState(false);
   const [step2Submitted, setStep2Submitted] = useState(false);
   const [step3Submitted, setStep3Submitted] = useState(false);
   const [step4Submitted, setStep4Submitted] = useState(false);
   const [isVerificationSent, setIsVerificationSent] = useState(false);
-  const [countdown, setCountdown] = useState(0);
 
   const step1Form = useForm<Step1Data>({
     resolver: yupResolver(step1Schema) as any,
@@ -122,29 +137,29 @@ const RegisterPage = () => {
     setStep2Submitted(false);
     setStep3Submitted(false);
     setStep4Submitted(false);
-  }, [clearError, step1Form, step2Form, step3Form, step4Form]);
+  }, []); // Remove clearError from dependencies to prevent re-runs
 
   // Countdown timer for resend verification code
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      timer = setTimeout(() => dispatch(setCountdown(countdown - 1)), 1000);
     }
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, dispatch]);
 
   // Update form values when formData changes
   useEffect(() => {
     step1Form.reset({
       email: formData.email || '',
     });
-  }, [formData.email, step1Form]);
+  }, [formData.email]);
 
   useEffect(() => {
     step2Form.reset({
       verifiedCode: formData.verifiedCode || '',
     });
-  }, [formData.verifiedCode, step2Form]);
+  }, [formData.verifiedCode]);
 
   useEffect(() => {
     step3Form.reset({
@@ -154,7 +169,7 @@ const RegisterPage = () => {
       password: formData.password || '',
       confirmPassword: formData.confirmPassword || '',
     });
-  }, [formData.username, formData.fullName, formData.phone, formData.password, formData.confirmPassword, step3Form]);
+  }, [formData.username, formData.fullName, formData.phone, formData.password, formData.confirmPassword]);
 
   useEffect(() => {
     step4Form.reset({
@@ -163,7 +178,7 @@ const RegisterPage = () => {
       address: formData.address || '',
       agreeToTerms: formData.agreeToTerms || false,
     });
-  }, [formData.dob, formData.gender, formData.address, formData.agreeToTerms, step4Form]);
+  }, [formData.dob, formData.gender, formData.address, formData.agreeToTerms]);
 
   const steps = [
     { number: 1, title: 'Xác thực Email', description: 'Nhập email để nhận mã xác thực' },
@@ -174,14 +189,20 @@ const RegisterPage = () => {
 
   const handleStep1Submit = async (data: Step1Data) => {
     try {
-      setFormData(prev => ({ ...prev, ...data }));
-      await sendVerificationCode(data.email);
-      setIsVerificationSent(true);
-      setCountdown(120); // 2 minutes countdown
-      setCurrentStep(2);
-      showNotification.success('Mã xác thực đã được gửi đến email của bạn!');
-    } catch (error) {
-      showNotification.error('Không thể gửi mã xác thực. Vui lòng thử lại.');
+      const result = await dispatch(sendVerificationCodeAction(data.email));
+      
+      // Check if the action was fulfilled (successful) using Redux Toolkit pattern
+      if (sendVerificationCodeAction.fulfilled.match(result)) {
+        dispatch(setFormData(data));
+        setIsVerificationSent(true);
+        dispatch(setCountdown(120)); // 2 minutes countdown
+        dispatch(setCurrentStep(2));
+        notification.success('Mã xác thực đã được gửi đến email của bạn!');
+      } else if (sendVerificationCodeAction.rejected.match(result)) {
+        notification.error((result.payload as string) || 'Không thể gửi mã xác thực. Vui lòng thử lại.');
+      }
+    } catch (error: any) {
+      notification.error(error.message || 'Không thể gửi mã xác thực. Vui lòng thử lại.');
     }
   };
 
@@ -192,37 +213,36 @@ const RegisterPage = () => {
   };
 
   const handleStep2Submit = (data: Step2Data) => {
-    setFormData(prev => ({ ...prev, ...data }));
-    setCurrentStep(3);
+    dispatch(setFormData(data));
+    dispatch(setCurrentStep(3));
     step2Form.clearErrors();
   };
 
   const handleStep3Submit = (data: Step3Data) => {
-    setFormData(prev => ({ ...prev, ...data }));
-    setCurrentStep(4);
+    dispatch(setFormData(data));
+    dispatch(setCurrentStep(4));
     step3Form.clearErrors();
   };
 
   const handleStep4Submit = async (data: Step4Data) => {
     try {
-      const finalData = { ...formData, ...data };
-      const createAt = new Date().toISOString().split('T')[0]; // Get current date in yyyy-MM-dd format
-      
+      const finalData: any = { ...formData, ...data };
+      const createAt = new Date().toISOString().split('T')[0]; // yyyy-MM-dd
       await registerUser({
-        username: finalData.username!,
-        password: finalData.password!,
-        fullName: finalData.fullName!,
-        email: finalData.email!,
+        username: finalData.username,
+        password: finalData.password,
+        fullName: finalData.fullName,
+        email: finalData.email,
         phone: finalData.phone,
         address: finalData.address,
         dob: finalData.dob,
         gender: finalData.gender,
-        verifiedCode: finalData.verifiedCode!,
+        verifiedCode: finalData.verifiedCode,
         createAt: createAt,
       });
-      showNotification.success('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
+      notification.success('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
     } catch (error) {
-      showNotification.error('Đăng ký thất bại');
+      notification.error('Đăng ký thất bại');
     }
   };
 
@@ -230,17 +250,23 @@ const RegisterPage = () => {
     if (countdown > 0) return;
     
     try {
-      await sendVerificationCode(formData.email!);
-      setCountdown(120);
-      showNotification.success('Mã xác thực mới đã được gửi!');
-    } catch (error) {
-      showNotification.error('Không thể gửi lại mã xác thực. Vui lòng thử lại.');
+      const result = await dispatch(sendVerificationCodeAction(formData.email!));
+      
+      // Check if the action was fulfilled (successful) using Redux Toolkit pattern
+      if (sendVerificationCodeAction.fulfilled.match(result)) {
+        dispatch(setCountdown(120));
+        notification.success('Mã xác thực mới đã được gửi!');
+      } else if (sendVerificationCodeAction.rejected.match(result)) {
+        notification.error((result.payload as string) || 'Không thể gửi lại mã xác thực. Vui lòng thử lại.');
+      }
+    } catch (error: any) {
+      notification.error(error.message || 'Không thể gửi lại mã xác thực. Vui lòng thử lại.');
     }
   };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      dispatch(setCurrentStep(currentStep - 1));
     }
   };
 

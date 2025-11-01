@@ -1,13 +1,32 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert } from '@/components/ui';
 import { showNotification } from '@/components/ui';
+import apiClient from '@/services/api/client';
+
+interface TreatmentPhasesApi {
+  id: string;
+  phaseNumber: string;
+  description: string;
+  status: string; // Inprogress/Completed
+  startDate?: string; // dd/MM/yyyy
+  endDate?: string;
+  nextAppointment?: string; // ISO string
+  listImage?: Array<{ publicId?: string; url: string }>; // from BE
+}
+
+interface TreatmentPlanApi {
+  id: string;
+  title: string;
+  notes?: string;
+  doctorFullname?: string;
+}
 
 interface TreatmentProgress {
   id: string;
   date: string;
   treatmentPlan: string;
   doctor: string;
-  progress: number; // 0-100
+  progress: number; // 0-100 (approx)
   status: 'ongoing' | 'completed' | 'delayed';
   description: string;
   nextAppointment?: string;
@@ -18,59 +37,57 @@ interface TreatmentProgress {
 const PatientTreatmentProgress = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - in real app, this would come from API
-  const [progressRecords, setProgressRecords] = useState<TreatmentProgress[]>([
-    {
-      id: '1',
-      date: '2024-01-15',
-      treatmentPlan: 'Điều trị viêm nướu',
-      doctor: 'BS. Nguyễn Văn A',
-      progress: 30,
-      status: 'ongoing',
-      description: 'Bắt đầu điều trị viêm nướu, làm sạch răng chuyên nghiệp',
-      nextAppointment: '2024-01-22',
-      notes: 'Bệnh nhân hợp tác tốt, cần tiếp tục điều trị',
-      attachments: ['xray_1.jpg', 'photo_1.jpg']
-    },
-    {
-      id: '2',
-      date: '2024-01-22',
-      treatmentPlan: 'Điều trị viêm nướu',
-      doctor: 'BS. Nguyễn Văn A',
-      progress: 60,
-      status: 'ongoing',
-      description: 'Tiếp tục điều trị, sử dụng laser trị liệu',
-      nextAppointment: '2024-01-29',
-      notes: 'Tình trạng cải thiện rõ rệt, nướu đã bớt sưng',
-      attachments: ['photo_2.jpg']
-    },
-    {
-      id: '3',
-      date: '2024-01-20',
-      treatmentPlan: 'Trám răng sâu',
-      doctor: 'BS. Trần Thị B',
-      progress: 100,
-      status: 'completed',
-      description: 'Hoàn thành trám răng hàm dưới bên trái',
-      notes: 'Trám răng thành công, cần theo dõi',
-      attachments: ['xray_2.jpg', 'photo_3.jpg']
-    }
-  ]);
+  const [progressRecords, setProgressRecords] = useState<TreatmentProgress[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
-  const handleAddProgress = async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      showNotification.success('Thêm tiến trình điều trị thành công!');
-      setIsAdding(false);
-    } catch (error) {
-      showNotification.error('Có lỗi xảy ra khi thêm tiến trình');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      setFetching(true); setError(null);
+      try {
+        const plansRes = await apiClient.get('/api/v1/patient/myTreatmentPlans');
+        const plans: TreatmentPlanApi[] = plansRes.data.result || plansRes.data || [];
+        const allPhases: TreatmentProgress[] = [];
+        for (const plan of plans) {
+          try {
+            const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${plan.id}`);
+            const phases: TreatmentPhasesApi[] = phasesRes.data.result || phasesRes.data || [];
+            phases.forEach(ph => {
+              const statusNorm = (ph.status || '').toLowerCase().includes('inprogress') ? 'ongoing' : 'completed';
+              allPhases.push({
+                id: ph.id,
+                date: ph.startDate || '-',
+                treatmentPlan: plan.title,
+                doctor: plan.doctorFullname || '-',
+                progress: statusNorm === 'completed' ? 100 : 50,
+                status: statusNorm as 'ongoing' | 'completed' | 'delayed',
+                description: ph.description || '',
+                nextAppointment: ph.nextAppointment,
+                notes: plan.notes || '',
+                attachments: (ph.listImage || []).map(img => img.url).filter(Boolean),
+              });
+            });
+          } catch (e) {
+            // ignore per-plan errors
+          }
+        }
+        setProgressRecords(allPhases);
+      } catch (e) {
+        setError('Không thể tải tiến trình điều trị');
+      } finally {
+        setFetching(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const completedCount = useMemo(() => progressRecords.filter(p => p.status === 'completed').length, [progressRecords]);
+  const ongoingCount = useMemo(() => progressRecords.filter(p => p.status === 'ongoing').length, [progressRecords]);
+  const delayedCount = useMemo(() => progressRecords.filter(p => p.status === 'delayed').length, [progressRecords]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -104,11 +121,32 @@ const PatientTreatmentProgress = () => {
     return 'bg-red-500';
   };
 
+  const total = progressRecords.length;
+
+  const avatarOf = (name?: string) => {
+    const ch = (name || '?').trim().charAt(0).toUpperCase();
+    return ch || 'U';
+  };
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return progressRecords.slice(start, start + pageSize);
+  }, [progressRecords, page]);
+  const totalPages = Math.ceil(progressRecords.length / pageSize) || 1;
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="pl-4 sm:pl-6 lg:pl-8 pr-0">
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Tiến trình điều trị</h1>
@@ -116,88 +154,49 @@ const PatientTreatmentProgress = () => {
                 Theo dõi quá trình điều trị và tiến độ phục hồi
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                onClick={() => setIsAdding(true)} 
-                variant="primary"
-              >
-                Thêm tiến trình
-              </Button>
-            </div>
+            {/* Ẩn nút thêm tiến trình */}
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-0 py-8">
+        {error && <Alert variant="error" message={error} className="mb-6" />}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <span className="text-2xl">📊</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Tổng tiến trình</p>
-                <p className="text-2xl font-bold text-gray-900">{progressRecords.length}</p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Tổng tiến trình</p>
+            <p className="text-2xl font-bold text-gray-900">{total}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <span className="text-2xl">✅</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Hoàn thành</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {progressRecords.filter(p => p.status === 'completed').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Hoàn thành</p>
+            <p className="text-2xl font-bold text-gray-900">{completedCount}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <span className="text-2xl">🔄</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Đang thực hiện</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {progressRecords.filter(p => p.status === 'ongoing').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Đang thực hiện</p>
+            <p className="text-2xl font-bold text-gray-900">{ongoingCount}</p>
           </Card>
-          
           <Card className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <span className="text-2xl">⚠️</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Chậm tiến độ</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {progressRecords.filter(p => p.status === 'delayed').length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500">Chậm tiến độ</p>
+            <p className="text-2xl font-bold text-gray-900">{delayedCount}</p>
           </Card>
         </div>
 
         {/* Progress Timeline */}
         <div className="space-y-6">
-          {progressRecords.map((record, index) => (
+          {!fetching && paginated.map((record) => (
             <Card key={record.id} className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
                     {record.treatmentPlan}
                   </h3>
-                  <p className="text-gray-600">
-                    Ngày: {record.date} • Bác sĩ: {record.doctor}
+                  <p className="text-gray-600 flex items-center gap-2">
+                    Ngày: {record.date} • 
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">
+                      {avatarOf(record.doctor)}
+                    </span>
+                    Bác sĩ: {record.doctor}
                   </p>
                 </div>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
@@ -205,71 +204,78 @@ const PatientTreatmentProgress = () => {
                 </span>
               </div>
 
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Tiến độ</span>
-                  <span className="text-sm font-bold text-gray-900">{record.progress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full ${getProgressColor(record.progress)}`}
-                    style={{ width: `${record.progress}%` }}
-                  ></div>
-                </div>
-              </div>
+              {expandedIds.has(record.id) ? (
+                <>
+                  {/* Progress Bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Tiến độ</span>
+                      <span className="text-sm font-bold text-gray-900">{record.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${getProgressColor(record.progress)}`}
+                        style={{ width: `${record.progress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Mô tả tiến trình</h4>
+                    <p className="text-gray-700 text-sm">{record.description}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Ghi chú</h4>
+                      <p className="text-gray-700 text-sm">{record.notes}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Lịch hẹn tiếp theo</h4>
+                      <p className="text-gray-700 text-sm">
+                        {record.nextAppointment ? record.nextAppointment : 'Chưa có lịch hẹn'}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-700 text-sm">{record.description}</div>
+              )}
 
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-900 mb-2">Mô tả tiến trình</h4>
-                <p className="text-gray-700 text-sm">{record.description}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Ghi chú</h4>
-                  <p className="text-gray-700 text-sm">{record.notes}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Lịch hẹn tiếp theo</h4>
-                  <p className="text-gray-700 text-sm">
-                    {record.nextAppointment ? record.nextAppointment : 'Chưa có lịch hẹn'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Attachments */}
-              {record.attachments.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Tài liệu đính kèm</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {record.attachments.map((attachment, idx) => (
-                      <span 
-                        key={idx}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                      >
-                        📎 {attachment}
-                      </span>
+              {expandedIds.has(record.id) && record.attachments && record.attachments.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Hình ảnh</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {record.attachments.map((url, idx) => (
+                      <a key={idx} href={url} target="_blank" rel="noreferrer" className="block group">
+                        <div className="aspect-[4/3] overflow-hidden rounded-md border">
+                          <img src={url} alt={`Ảnh tiến trình ${idx+1}`} className="w-full h-full object-cover group-hover:opacity-90" />
+                        </div>
+                      </a>
                     ))}
                   </div>
                 </div>
               )}
-
               <div className="pt-4 border-t border-gray-200">
-                <div className="flex justify-end space-x-3">
-                  <Button variant="outline" size="sm">
-                    Xem chi tiết
-                  </Button>
-                  <Button variant="primary" size="sm">
-                    Tải xuống
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" size="sm" onClick={() => toggleExpand(record.id)}>
+                    {expandedIds.has(record.id) ? 'Thu gọn' : 'Mở rộng'}
                   </Button>
                 </div>
               </div>
             </Card>
           ))}
+          {fetching && <Card className="p-6">Đang tải tiến trình...</Card>}
         </div>
 
-        {/* Add New Progress Modal */}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}>Trước</Button>
+            <span className="text-sm text-gray-600">Trang {page}/{totalPages}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages}>Sau</Button>
+          </div>
+        )}
+
+        {/* Add New Progress Modal (ẩn header trigger) */}
         {isAdding && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -392,7 +398,7 @@ const PatientTreatmentProgress = () => {
                       Hủy
                     </Button>
                     <Button 
-                      onClick={handleAddProgress}
+                      onClick={() => setIsAdding(false)} 
                       variant="primary"
                       loading={isLoading}
                     >
