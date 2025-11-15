@@ -5,13 +5,23 @@ import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import { MenuOutlined, CloseOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
-  const handleBookAppointment = () => {
-    navigate('/login');
+  const handleBookAppointment = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    // Nếu đã đăng nhập, chuyển đến trang đặt lịch của patient
+    // Nếu chưa đăng nhập, chuyển đến trang login
+    if (isAuthenticated) {
+      navigate('/patient', { state: { section: 'appointment' } });
+    } else {
+      navigate('/login');
+    }
     setIsMenuOpen(false); // Close mobile menu if open
   };
 
@@ -68,7 +78,7 @@ const Header = () => {
 
           {/* 4. Thay thế CTA Button */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="primary" size="lg" onClick={handleBookAppointment}>
+            <Button variant="primary" size="lg" htmlType="button" onClick={handleBookAppointment}>
               Đặt lịch hẹn
             </Button>
           </div>
@@ -105,7 +115,7 @@ const Header = () => {
                 ))}
                 {/* 6. Thay thế Button trong mobile menu */}
                 <div className="flex flex-col gap-2 mt-2">
-                  <Button variant="primary" size="lg" className="w-full" onClick={handleBookAppointment}>
+                  <Button variant="primary" size="lg" htmlType="button" className="w-full" onClick={handleBookAppointment}>
                     Đặt lịch hẹn
                   </Button>
                 </div>

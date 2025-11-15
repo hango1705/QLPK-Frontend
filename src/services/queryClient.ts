@@ -59,10 +59,44 @@ export const queryKeys = {
     byId: (id: string) => ['services', id] as const,
     categories: ['services', 'categories'] as const,
   },
+
+  // Doctor workspace queries
+  doctor: {
+    profile: ['doctor', 'profile'] as const,
+    appointments: (scope: string) => ['doctor', 'appointments', scope] as const,
+    examinations: ['doctor', 'examinations'] as const,
+    examinationDetail: (id: string) => ['doctor', 'examination', id] as const,
+    examinationByAppointment: (appointmentId: string) => ['doctor', 'examination', 'byAppointment', appointmentId] as const,
+    treatmentPlans: ['doctor', 'treatmentPlans'] as const,
+    treatmentPhases: (planId: string) => ['doctor', 'treatmentPhases', planId] as const,
+    catalog: ['doctor', 'catalog'] as const,
+    doctorDirectory: ['doctor', 'directory'] as const,
+  },
   
   // Notification queries
   notifications: {
     all: (userId: string) => ['notifications', userId] as const,
     unread: (userId: string) => ['notifications', userId, 'unread'] as const,
+  },
+
+  // Admin queries
+  admin: {
+    profile: ['admin', 'profile'] as const,
+    users: ['admin', 'users'] as const,
+    user: (userId: string) => ['admin', 'user', userId] as const,
+    roles: ['admin', 'roles'] as const,
+    permissions: ['admin', 'permissions'] as const,
+    auditLogs: ['admin', 'auditLogs'] as const,
+    categories: ['admin', 'categories'] as const,
+    services: ['admin', 'services'] as const,
+    prescriptions: ['admin', 'prescriptions'] as const,
+  },
+
+  // Patient queries
+  patient: {
+    byId: (patientId: string) => ['patient', patientId] as const,
+    myInfo: ['patient', 'myInfo'] as const,
+    bookingDateTime: (doctorId: string) => ['patient', 'bookingDateTime', doctorId] as const,
+    treatmentPlans: (patientId: string) => ['patient', 'treatmentPlans', patientId] as const,
   },
 } as const;

@@ -1,4 +1,7 @@
-export { default as PatientDashboard } from './PatientDashboard';
+// Main dashboard - exported as default to match AdminPages/DoctorPages pattern
+export { default } from './PatientDashboard';
+
+// Other patient pages
 export { default as PatientBasicInfo } from './PatientBasicInfo';
 export { default as PatientInitialExamination } from './PatientInitialExamination';
 export { default as PatientTreatmentPlan } from './PatientTreatmentPlan';

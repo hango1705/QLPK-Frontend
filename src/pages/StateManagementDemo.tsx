@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Card, Input, Alert, Loading } from '@/components/ui';
+import { Button, Card, Input, Alert, AlertTitle, AlertDescription, Loading } from '@/components/ui';
 import { useAuth, useUser } from '@/hooks';
 import { showNotification } from '@/components/ui';
 
@@ -104,7 +104,10 @@ const StateManagementDemo = () => {
                   Login
                 </Button>
                 {error && (
-                  <Alert variant="error" message={error} closable onClose={clearError} />
+                  <Alert variant="destructive">
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
               </div>
             </Card>
@@ -262,11 +265,10 @@ const StateManagementDemo = () => {
                 <p className="text-sm text-muted-foreground">
                   Global error boundary catches and handles React errors gracefully
                 </p>
-                <Alert 
-                  variant="info" 
-                  message="Error Boundary Active" 
-                  description="This app is wrapped with ErrorBoundary component"
-                />
+                <Alert variant="default">
+                  <AlertTitle>Error Boundary Active</AlertTitle>
+                  <AlertDescription>This app is wrapped with ErrorBoundary component</AlertDescription>
+                </Alert>
               </div>
             </Card>
 

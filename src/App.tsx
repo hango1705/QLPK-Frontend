@@ -32,6 +32,8 @@ const PatientInitialExamination = createLazyPage(() => import('./pages/PatientPa
 const PatientTreatmentPlan = createLazyPage(() => import('./pages/PatientPages/PatientTreatmentPlan'));
 const PatientTreatmentProgress = createLazyPage(() => import('./pages/PatientPages/PatientTreatmentProgress'));
 const PatientPayment = createLazyPage(() => import('./pages/PatientPages/PatientPayment'));
+const DoctorWorkspace = createLazyPage(() => import('./pages/DoctorPages'));
+const AdminWorkspace = createLazyPage(() => import('./pages/AdminPages'));
 
 const App = () => (
   <ErrorBoundary>
@@ -118,7 +120,7 @@ const App = () => (
                     element={
                       <PrivateRoute>
                         <RoleBasedRoute allowedRoles={['admin']}>
-                          <div>Admin Panel (Admin Only)</div>
+                          <AdminWorkspace />
                         </RoleBasedRoute>
                       </PrivateRoute>
                     } 
@@ -130,7 +132,7 @@ const App = () => (
                     element={
                       <PrivateRoute>
                         <RoleBasedRoute allowedRoles={['doctor', 'admin']}>
-                          <div>Doctor Panel (Doctor/Admin Only)</div>
+                          <DoctorWorkspace />
                         </RoleBasedRoute>
                       </PrivateRoute>
                     } 

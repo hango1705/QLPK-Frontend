@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Alert, showNotification } from '@/components/ui/Alert';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/Alert';
+import { showNotification } from '@/components/ui/Notification';
 import { Button } from '@/components/ui/Button';
+import { AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 
 const meta: Meta<typeof Alert> = {
   title: 'UI/Alert',
@@ -12,14 +14,7 @@ const meta: Meta<typeof Alert> = {
   argTypes: {
     variant: {
       control: { type: 'select' },
-      options: ['success', 'info', 'warning', 'error'],
-    },
-    size: {
-      control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
-    },
-    closable: {
-      control: { type: 'boolean' },
+      options: ['default', 'destructive'],
     },
   },
 };
@@ -27,102 +22,84 @@ const meta: Meta<typeof Alert> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Success: Story = {
+export const Default: Story = {
   args: {
-    variant: 'success',
-    message: 'Thành công!',
-    description: 'Dữ liệu đã được lưu thành công.',
+    variant: 'default',
+    children: (
+      <>
+        <CheckCircle className="size-4" />
+        <AlertTitle>Success</AlertTitle>
+        <AlertDescription>
+          Your changes have been saved successfully.
+        </AlertDescription>
+      </>
+    ),
   },
 };
 
-export const Info: Story = {
+export const Destructive: Story = {
   args: {
-    variant: 'info',
-    message: 'Thông tin',
-    description: 'Đây là thông tin quan trọng bạn cần biết.',
+    variant: 'destructive',
+    children: (
+      <>
+        <AlertCircle className="size-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          There was a problem with your request. Please try again.
+        </AlertDescription>
+      </>
+    ),
   },
 };
 
-export const Warning: Story = {
-  args: {
-    variant: 'warning',
-    message: 'Cảnh báo',
-    description: 'Vui lòng kiểm tra lại thông tin trước khi tiếp tục.',
-  },
-};
-
-export const Error: Story = {
-  args: {
-    variant: 'error',
-    message: 'Lỗi',
-    description: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
-  },
-};
-
-export const WithoutDescription: Story = {
-  args: {
-    variant: 'success',
-    message: 'Thành công!',
-  },
-};
-
-export const NotClosable: Story = {
-  args: {
-    variant: 'info',
-    message: 'Thông báo quan trọng',
-    description: 'Thông báo này không thể đóng.',
-    closable: false,
-  },
-};
-
-export const Sizes: Story = {
+export const WithIcon: Story = {
   render: () => (
     <div className="space-y-4 w-96">
-      <Alert 
-        variant="info" 
-        size="sm" 
-        message="Small alert" 
-        description="This is a small alert"
-      />
-      <Alert 
-        variant="info" 
-        size="md" 
-        message="Medium alert" 
-        description="This is a medium alert"
-      />
-      <Alert 
-        variant="info" 
-        size="lg" 
-        message="Large alert" 
-        description="This is a large alert"
-      />
+      <Alert variant="default">
+        <CheckCircle className="size-4" />
+        <AlertTitle>Success</AlertTitle>
+        <AlertDescription>
+          Operation completed successfully.
+        </AlertDescription>
+      </Alert>
+      <Alert variant="destructive">
+        <AlertCircle className="size-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          Something went wrong. Please contact support.
+        </AlertDescription>
+      </Alert>
+      <Alert variant="default">
+        <Info className="size-4" />
+        <AlertTitle>Information</AlertTitle>
+        <AlertDescription>
+          Here's some important information you should know.
+        </AlertDescription>
+      </Alert>
+      <Alert variant="default">
+        <AlertTriangle className="size-4" />
+        <AlertTitle>Warning</AlertTitle>
+        <AlertDescription>
+          Please review your input before proceeding.
+        </AlertDescription>
+      </Alert>
     </div>
   ),
 };
 
-export const AllVariants: Story = {
+export const WithoutTitle: Story = {
   render: () => (
     <div className="space-y-4 w-96">
-      <Alert 
-        variant="success" 
-        message="Thành công" 
-        description="Dữ liệu đã được lưu thành công."
-      />
-      <Alert 
-        variant="info" 
-        message="Thông tin" 
-        description="Đây là thông tin quan trọng."
-      />
-      <Alert 
-        variant="warning" 
-        message="Cảnh báo" 
-        description="Vui lòng kiểm tra lại thông tin."
-      />
-      <Alert 
-        variant="error" 
-        message="Lỗi" 
-        description="Đã xảy ra lỗi. Vui lòng thử lại."
-      />
+      <Alert variant="default">
+        <AlertDescription>
+          This is an alert without a title.
+        </AlertDescription>
+      </Alert>
+      <Alert variant="destructive">
+        <AlertDescription>
+          This is a destructive alert without a title.
+        </AlertDescription>
+      </Alert>
     </div>
   ),
 };

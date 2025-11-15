@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Button, Input, Alert } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import apiClient from '@/services/api/client';
 
@@ -182,7 +182,12 @@ const PatientPayment = () => {
 
       {/* Main Content */}
       <div className="px-0 py-8">
-        {error && <Alert variant="error" message={error} className="mb-6" />}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">

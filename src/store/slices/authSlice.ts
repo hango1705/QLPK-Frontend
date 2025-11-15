@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from '@/services/api/auth';
+import { decodeTokenPayload, extractRoleFromToken } from '@/utils/auth';
 
 export interface User {
   id: string;
@@ -100,10 +101,31 @@ export const refreshToken = createAsyncThunk(
   async (_, { getState, rejectWithValue }) => {
     try {
       const state = getState() as { auth: AuthState };
+      const currentToken = state.auth.token;
       const refreshTokenValue = state.auth.refreshToken;
       
       if (!refreshTokenValue) {
         throw new Error('No refresh token available');
+      }
+      
+      // Validate current token before refresh (optional check)
+      if (currentToken) {
+        try {
+          const introspectResponse = await authAPI.introspectToken(currentToken);
+          const isValid = introspectResponse.data?.code === 1000 && introspectResponse.data?.result?.valid;
+          
+          // If token is still valid, no need to refresh
+          if (isValid) {
+            console.log('Token is still valid, skipping refresh');
+            return {
+              token: currentToken,
+              refreshToken: refreshTokenValue,
+            };
+          }
+        } catch (introspectError) {
+          // Introspect failed, continue with refresh
+          console.warn('Token introspection failed during refresh, continuing with refresh:', introspectError);
+        }
       }
       
       const response = await authAPI.refreshToken(refreshTokenValue);
@@ -245,13 +267,13 @@ const authSlice = createSlice({
         state.refreshToken = action.payload.refreshToken || null;
         state.isAuthenticated = true;
         state.error = null;
-        // Không cần fetch user info vì backend không có API /auth/me
-        // Mặc định set user role là 'patient' nếu cần
+        const payload = decodeTokenPayload<{ sub?: string }>(action.payload.token);
+        const derivedRole = extractRoleFromToken(action.payload.token);
         state.user = {
-          id: 'temp-id',
-          username: 'user',
+          id: payload?.sub ?? 'unknown',
+          username: payload?.sub ?? 'user',
           disable: false,
-          role: 'patient' // Mặc định là patient
+          role: derivedRole,
         };
       })
       .addCase(loginUser.rejected, (state, action) => {

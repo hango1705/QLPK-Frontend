@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Button, Input, Alert } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import apiClient from '@/services/api/client';
 
@@ -161,7 +161,12 @@ const PatientTreatmentProgress = () => {
 
       {/* Main Content */}
       <div className="px-0 py-8">
-        {error && <Alert variant="error" message={error} className="mb-6" />}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
@@ -235,24 +240,23 @@ const PatientTreatmentProgress = () => {
                       </p>
                     </div>
                   </div>
+                  {record.attachments && record.attachments.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Hình ảnh</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {record.attachments.map((url, idx) => (
+                          <a key={idx} href={url} target="_blank" rel="noreferrer" className="block group">
+                            <div className="aspect-[4/3] overflow-hidden rounded-md border">
+                              <img src={url} alt={`Ảnh tiến trình ${idx+1}`} className="w-full h-full object-cover group-hover:opacity-90" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-gray-700 text-sm">{record.description}</div>
-              )}
-
-              {expandedIds.has(record.id) && record.attachments && record.attachments.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Hình ảnh</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {record.attachments.map((url, idx) => (
-                      <a key={idx} href={url} target="_blank" rel="noreferrer" className="block group">
-                        <div className="aspect-[4/3] overflow-hidden rounded-md border">
-                          <img src={url} alt={`Ảnh tiến trình ${idx+1}`} className="w-full h-full object-cover group-hover:opacity-90" />
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
               )}
               <div className="pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">

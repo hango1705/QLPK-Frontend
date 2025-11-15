@@ -18,6 +18,36 @@ export interface RegisterData {
   createAt: string;
 }
 
+export interface DoctorCreateRequest {
+  username: string;
+  password: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  gender?: string;
+  dob?: string;
+  createAt: string;
+  specialization: string;
+  licenseNumber: string;
+  yearsExperience: number;
+  verifiedCode: string;
+}
+
+export interface NurseCreateRequest {
+  username: string;
+  password: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  gender?: string;
+  dob?: string;
+  createAt: string;
+  department: string;
+  verifiedCode: string;
+}
+
 export interface AuthResponse {
   code: number;
   result: {
@@ -97,4 +127,12 @@ export const authAPI = {
   // Token Introspection API
   introspectToken: (token: string) =>
     apiClient.post<TokenIntrospectResponse>('/api/v1/auth/introspect', { token }),
+  
+  // Register Doctor (Admin only)
+  registerDoctor: (userData: DoctorCreateRequest) =>
+    apiClient.post<{ code: number; result: string }>('/api/v1/auth/register/doctor', userData),
+  
+  // Register Nurse (Admin only)
+  registerNurse: (userData: NurseCreateRequest) =>
+    apiClient.post<{ code: number; result: string }>('/api/v1/auth/register/nurse', userData),
 };

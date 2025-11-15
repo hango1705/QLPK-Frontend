@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Button, Input, Alert } from '@/components/ui';
+import { Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { useAuth } from '@/hooks';
 import { useNotification } from '@/components/ui';
 // loginUser không được sử dụng, có thể xóa nếu không cần
@@ -10,19 +10,7 @@ import { useNotification } from '@/components/ui';
 import { loginSchema, type LoginFormData } from '@/schemas/auth';
 import RoleBasedRedirect from '@/components/auth/RoleBasedRedirect';
 import authPageImg from '@/assets/auth_page_img.png';
-
-const getUserRoleFromToken = (token: string): string | null => {
-  if (!token) return null;
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-  try {
-    // atob sẽ throw nếu không hợp lệ base64
-    const decoded = JSON.parse(atob(payload));
-    return decoded.scope || null;
-  } catch {
-    return null;
-  }
-};
+import { extractRoleFromToken, getDefaultRouteForRole } from '@/utils/auth';
 
 const LoginPage = () => {
   const { login, isLoading, error, clearError, resetLoading } = useAuth();
@@ -75,16 +63,9 @@ const LoginPage = () => {
       if (result.type === 'auth/login/fulfilled') {
         const token = result.payload && (result.payload as any).token;
         if (token) {
-          const scope = getUserRoleFromToken(token);
-          if (scope && scope.includes('ROLE_PATIENT')) {
-            // Điều hướng bệnh nhân
-            navigate('/patient');
-          } else {
-            // Thông báo cho các role khác (admin, doctor, staff...)
+          const role = extractRoleFromToken(token);
+          navigate(getDefaultRouteForRole(role));
             notification.success('Đăng nhập thành công!');
-            // Lưu ý: Component <RoleBasedRedirect> bọc bên ngoài
-            // cũng sẽ tự động điều hướng nếu user đã login (cho các role khác)
-          }
         } else {
           // Lỗi logic: Đăng nhập thành công nhưng không có token
           notification.error('Không lấy được token!');
@@ -145,12 +126,12 @@ const LoginPage = () => {
             {/* Error Alert */}
             {error && (
               <Alert
-                variant="error"
-                message={error} // Lỗi này từ useAuth, có thể không cần nếu đã handle trong onSubmit
-                closable
-                onClose={clearError}
+                variant="destructive"
                 className="mb-6"
-              />
+              >
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
             {/* Login Form */}
@@ -250,7 +231,7 @@ const LoginPage = () => {
               <div className="mt-8">
                 <Button
                   htmlType="submit"
-                  type="primary"
+                  variant="primary"
                   size="lg"
                   loading={isSubmitting} // isSubmitting từ react-hook-form là đủ
                   disabled={isSubmitting}

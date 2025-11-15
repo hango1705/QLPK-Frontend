@@ -10,14 +10,24 @@ import {
   PhoneOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
+import { useAuth } from '@/hooks';
 
 const AppointmentSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
-  const handleBookAppointment = () => {
-    navigate('/login');
+  const handleBookAppointment = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    // Nếu đã đăng nhập, chuyển đến trang đặt lịch của patient
+    // Nếu chưa đăng nhập, chuyển đến trang login
+    if (isAuthenticated) {
+      navigate('/patient', { state: { section: 'appointment' } });
+    } else {
+      navigate('/login');
+    }
   };
 
   // 3. Cập nhật mảng features để sử dụng icon của Ant Design
@@ -71,6 +81,7 @@ const AppointmentSection = () => {
             <Button
               variant="secondary"
               size="lg"
+              htmlType="button"
               className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-6 h-auto shadow-glow flex items-center justify-center"
               onClick={handleBookAppointment}
             >

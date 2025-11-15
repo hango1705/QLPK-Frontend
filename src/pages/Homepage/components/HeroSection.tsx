@@ -5,12 +5,22 @@ import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import heroImage from '@/assets/hero-dental.jpg';
+import { useAuth } from '@/hooks';
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
-  const handleBookAppointment = () => {
-    navigate('/login');
+  const handleBookAppointment = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    // Nếu đã đăng nhập, chuyển đến trang đặt lịch của patient
+    // Nếu chưa đăng nhập, chuyển đến trang login
+    if (isAuthenticated) {
+      navigate('/patient', { state: { section: 'appointment' } });
+    } else {
+      navigate('/login');
+    }
   };
 
   const handleLearnMore = () => {
@@ -76,6 +86,7 @@ const HeroSection = () => {
               <Button
                 variant="primary"
                 size="lg"
+                htmlType="button"
                 className="text-lg px-8 shadow-medium flex items-center justify-center group"
                 onClick={handleBookAppointment}
               >

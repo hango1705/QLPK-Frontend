@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks';
+import { getDefaultRouteForRole } from '@/utils/auth';
 import { Loading } from '@/components/ui';
 
 interface AuthGuardProps {
@@ -54,7 +55,7 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
   children,
   redirectTo = '/'
 }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -66,7 +67,10 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
   }
 
   if (isAuthenticated) {
-    const from = location.state?.from?.pathname || redirectTo;
+    const from =
+      location.state?.from?.pathname ||
+      getDefaultRouteForRole(user?.role) ||
+      redirectTo;
     return <Navigate to={from} replace />;
   }
 

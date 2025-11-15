@@ -1,75 +1,68 @@
-import React from 'react';
-import { Alert as AntAlert, AlertProps as AntAlertProps, notification } from 'antd';
-import { cn } from '@/utils/cn';
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
-export interface AlertProps extends Omit<AntAlertProps, 'type'> {
-  variant?: 'success' | 'info' | 'warning' | 'error';
-  size?: 'sm' | 'md' | 'lg';
-  closable?: boolean;
+import { cn } from "@/lib/utils"
+
+const alertVariants = cva(
+  "relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  {
+    variants: {
+      variant: {
+        default: "bg-card text-card-foreground",
+        destructive:
+          "text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function Alert({
+  className,
+  variant,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+  return (
+    <div
+      data-slot="alert"
+      role="alert"
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
+  )
 }
 
-const Alert = React.forwardRef<any, AlertProps>(
-  ({ className, variant = 'info', size = 'md', closable = true, ...props }, ref) => {
-    const baseClasses = 'transition-all duration-300';
-    
-    const sizeClasses = {
-      sm: 'text-sm py-2 px-3',
-      md: 'text-base py-3 px-4',
-      lg: 'text-lg py-4 px-5',
-    };
+function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-title"
+      className={cn(
+        "col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight",
+        className
+      )}
+      {...props}
+    />
+  )
+}
 
-    return (
-      <AntAlert
-        ref={ref}
-        type={variant}
-        closable={closable}
-        className={cn(
-          baseClasses,
-          sizeClasses[size],
-          className
-        )}
-        {...props}
-      />
-    );
-  }
-);
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-description"
+      className={cn(
+        "text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed",
+        className
+      )}
+      {...props}
+    />
+  )
+}
 
-Alert.displayName = 'Alert';
+export { Alert, AlertTitle, AlertDescription }
 
-// Notification utility functions
-export const showNotification = {
-  success: (message: string, description?: string) => {
-    notification.success({
-      message,
-      description,
-      placement: 'topRight',
-      duration: 4.5,
-    });
-  },
-  error: (message: string, description?: string) => {
-    notification.error({
-      message,
-      description,
-      placement: 'topRight',
-      duration: 4.5,
-    });
-  },
-  warning: (message: string, description?: string) => {
-    notification.warning({
-      message,
-      description,
-      placement: 'topRight',
-      duration: 4.5,
-    });
-  },
-  info: (message: string, description?: string) => {
-    notification.info({
-      message,
-      description,
-      placement: 'topRight',
-      duration: 4.5,
-    });
-  },
-};
-
-export { Alert };
+export type AlertProps = React.ComponentProps<typeof Alert> & VariantProps<typeof alertVariants>

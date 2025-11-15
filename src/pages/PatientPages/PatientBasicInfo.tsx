@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Input, Alert, showNotification } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, showNotification } from '@/components/ui';
 import { Select } from 'antd';
 import { UserOutlined, PhoneOutlined, HeartOutlined, SafetyCertificateOutlined, SaveOutlined, MailOutlined, HomeOutlined, ManOutlined, CalendarOutlined } from '@ant-design/icons';
 import apiClient from '@/services/api/client';
@@ -145,8 +145,18 @@ const PatientBasicInfo = () => {
         </div>
       </div>
       <div className="py-8">
-        {msg && <Alert variant="success" message={msg} className="mb-2" />}
-        {error && <Alert variant="error" message={error} className="mb-2" />}
+        {msg && (
+          <Alert variant="default" className="mb-2">
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>{msg}</AlertDescription>
+          </Alert>
+        )}
+        {error && (
+          <Alert variant="destructive" className="mb-2">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-6">
             <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><UserOutlined /> Thông tin cá nhân</div>

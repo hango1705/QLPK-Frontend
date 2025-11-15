@@ -5,7 +5,9 @@ import {
   Input, 
   Modal, 
   Loading, 
-  Alert, 
+  Alert,
+  AlertTitle,
+  AlertDescription, 
   Table,
   showNotification 
 } from '@/components/ui';
@@ -142,10 +144,22 @@ const ComponentsDemo = () => {
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-foreground mb-8">Alerts & Notifications</h2>
           <div className="space-y-4 mb-8">
-            <Alert variant="success" message="Success!" description="Operation completed successfully." />
-            <Alert variant="info" message="Information" description="Here's some important information." />
-            <Alert variant="warning" message="Warning" description="Please check your input before proceeding." />
-            <Alert variant="error" message="Error" description="Something went wrong. Please try again." />
+            <Alert variant="default">
+              <AlertTitle>Success!</AlertTitle>
+              <AlertDescription>Operation completed successfully.</AlertDescription>
+            </Alert>
+            <Alert variant="default">
+              <AlertTitle>Information</AlertTitle>
+              <AlertDescription>Here's some important information.</AlertDescription>
+            </Alert>
+            <Alert variant="default">
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>Please check your input before proceeding.</AlertDescription>
+            </Alert>
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>Something went wrong. Please try again.</AlertDescription>
+            </Alert>
           </div>
           <div className="flex gap-4">
             <Button onClick={() => handleShowNotification('success')}>Success Notification</Button>

@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Alert, Button } from '@/components/ui';
+import { Alert, AlertTitle, AlertDescription, Button } from '@/components/ui';
 import { ReloadOutlined, HomeOutlined } from '@ant-design/icons';
 
 interface Props {
@@ -82,9 +82,10 @@ class ErrorBoundary extends Component<Props, State> {
 
             <div className="space-y-4">
               <Alert
-                variant="error"
-                message="Error Details"
-                description={
+                variant="destructive"
+              >
+                <AlertTitle>Error Details</AlertTitle>
+                <AlertDescription>
                   <div className="mt-2">
                     <p className="text-sm font-mono bg-muted/30 p-2 rounded">
                       {this.state.error?.message || 'Unknown error occurred'}
@@ -100,8 +101,8 @@ class ErrorBoundary extends Component<Props, State> {
                       </details>
                     )}
                   </div>
-                }
-              />
+                </AlertDescription>
+              </Alert>
 
               <div className="flex gap-3">
                 <Button
