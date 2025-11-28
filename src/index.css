@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+/* Custom dark variant for targeting dark mode elements */
+@custom-variant dark (&:is(.dark *));
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+/* Tailwind v4 theme configuration */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(199 89% 48%);
+  --color-chart-2: hsl(158 64% 52%);
+  --color-chart-3: hsl(142 76% 73%);
+  --color-chart-4: hsl(199 95% 74%);
+  --color-chart-5: hsl(158 73% 75%);
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+}
+
+@layer base {
+  :root {
+    /* Dental Clinic Theme - Light & Fresh */
+    --background: 0 0% 100%;
+    --foreground: 215 25% 27%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 27%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 27%;
+
+    /* Dental Blue - Professional & Trustworthy */
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 199 95% 74%;
+    --primary-glow: 199 100% 88%;
+
+    /* Mint Green - Fresh & Healthy */
+    --secondary: 158 64% 52%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 158 73% 75%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16.3% 46.9%;
+
+    --accent: 142 76% 73%;
+    --accent-foreground: 215 25% 27%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.625rem;
+
+    /* Chart colors */
+    --chart-1: 199 89% 48%;
+    --chart-2: 158 64% 52%;
+    --chart-3: 142 76% 73%;
+    --chart-4: 199 95% 74%;
+    --chart-5: 158 73% 75%;
+
+    /* Custom gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(199 89% 48%), hsl(199 95% 74%));
+    --gradient-hero: linear-gradient(135deg, hsl(199 95% 95%), hsl(158 73% 95%));
+    --gradient-fresh: linear-gradient(180deg, hsl(0 0% 100%), hsl(199 95% 98%));
+
+    /* Shadows - Modern 2024-2025 style */
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-medium: 0 4px 24px rgba(0, 0, 0, 0.04);
+    --shadow-glow: 0 0 40px hsl(199 95% 74% / 0.2);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 215 28% 17%;
+    --foreground: 0 0% 100%;
+
+    --card: 215 28% 20%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 215 28% 20%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 199 95% 74%;
+    --primary-glow: 199 100% 88%;
+
+    --secondary: 158 64% 52%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 158 73% 75%;
+
+    --muted: 215 28% 25%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 142 76% 73%;
+    --accent-foreground: 215 25% 27%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 28% 25%;
+    --input: 215 28% 25%;
+    --ring: 199 89% 48%;
+
+    /* Chart colors for dark mode */
+    --chart-1: 199 89% 48%;
+    --chart-2: 158 64% 52%;
+    --chart-3: 142 76% 73%;
+    --chart-4: 199 95% 74%;
+    --chart-5: 158 73% 75%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Map design tokens to utility classes (Tailwind v4 custom utilities) */
+@layer utilities {
+  /* Colors */
+  .text-foreground {
+    color: hsl(var(--foreground));
+  }
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+  .text-accent {
+    color: hsl(var(--accent));
+  }
+
+  .bg-background {
+    background-color: hsl(var(--background));
+  }
+  .bg-primary {
+    background-color: hsl(var(--primary));
+  }
+  .bg-primary-glow {
+    background-color: hsl(var(--primary-glow));
+  }
+  .bg-secondary {
+    background-color: hsl(var(--secondary));
+  }
+  .bg-secondary-light {
+    background-color: hsl(var(--secondary-light));
+  }
+  .bg-popover {
+    background-color: hsl(var(--popover));
+  }
+
+  .border-border {
+    border-color: hsl(var(--border));
+  }
+
+  /* Shadows */
+  .shadow-medium {
+    box-shadow: var(--shadow-medium);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Gradients */
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+  .bg-gradient-hero {
+    background-image: var(--gradient-hero);
+  }
+  .bg-gradient-fresh {
+    background-image: var(--gradient-fresh);
+  }
+}
