@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertTitle, AlertDescription, Button, Input, Card, CardContent } from '@/components/ui';
 import { Eye, EyeOff } from 'lucide-react';
-import apiClient from '@/services/api/client';
+import { adminAPI } from '@/services/api/admin';
 import type { AccountPanelProps } from '../types';
 
 const AccountPanel: React.FC<AccountPanelProps> = ({
@@ -34,8 +34,8 @@ const AccountPanel: React.FC<AccountPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/api/v1/users/myInfo');
-      setUser(res.data.result || res.data || null);
+      const userData = await adminAPI.getMyInfo();
+      setUser(userData);
     } catch {
       setError('Không tải được thông tin tài khoản');
     } finally {
@@ -71,9 +71,9 @@ const AccountPanel: React.FC<AccountPanelProps> = ({
     setError(null);
     setPwdSuccess(null);
     try {
-      await apiClient.put(`/api/v1/users/updatePassword/${user.id}`, {
+      await adminAPI.updatePassword(user.id, {
         oldPassword: passwords.currentPassword,
-        newPassword: passwords.newPassword,
+        password: passwords.newPassword,
       });
       setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setFieldErrors({});

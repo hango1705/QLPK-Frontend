@@ -105,6 +105,8 @@ export interface ContentSectionProps {
   onEditPhase: (plan: TreatmentPlan, phase: TreatmentPhase) => void;
   onCreatePlan: (examination?: ExaminationSummary) => void;
   onUpdatePlanStatus: (plan: TreatmentPlan, status: string) => void;
+  onPhaseClick?: (planId: string, phaseId: string) => void;
+  onAddPhase?: () => void;
 }
 
 export interface RightRailProps {

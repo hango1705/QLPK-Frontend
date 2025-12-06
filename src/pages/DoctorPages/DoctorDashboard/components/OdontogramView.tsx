@@ -3,15 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Button } from '@/components/ui';
 import { Smile } from 'lucide-react';
 import { Odontogram } from 'react-odontogram';
+import { patientAPI, type ToothResponse } from '@/services/api/patient';
+import { showNotification } from '@/components/ui';
 
 interface ToothData {
   number: number;
   status: string;
   condition?: string;
+  id?: string; // Tooth ID from backend
 }
 
 interface OdontogramViewProps {
-  teeth: ToothData[];
+  patientId?: string; // Patient ID for API calls
+  teeth?: ToothData[]; // Optional initial teeth data (for backward compatibility)
   onToothClick?: (toothNumber: number) => void;
   onToothStatusChange?: (toothNumber: number, status: string) => void;
 }
@@ -26,13 +30,18 @@ const TOOTH_STATUSES = [
   { value: 'root_canal', label: 'Điều trị tủy', color: '#fee2e2', borderColor: '#ef4444', bgColor: 'bg-red-100' },
 ] as const;
 
-const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, onToothStatusChange }) => {
-  // State quản lý tình trạng của từng răng (toothNumber -> status)
-  const [toothStatusMap, setToothStatusMap] = useState<Record<number, string>>(() => {
-    const initialMap: Record<number, string> = {};
-    teeth.forEach((tooth) => {
+const OdontogramView: React.FC<OdontogramViewProps> = ({ 
+  patientId, 
+  teeth: initialTeeth = [], 
+  onToothClick, 
+  onToothStatusChange 
+}) => {
+  // State quản lý tình trạng của từng răng (toothNumber -> { status, id })
+  const [toothStatusMap, setToothStatusMap] = useState<Record<number, { status: string; id?: string }>>(() => {
+    const initialMap: Record<number, { status: string; id?: string }> = {};
+    initialTeeth.forEach((tooth) => {
       if (tooth.status) {
-        initialMap[tooth.number] = tooth.status;
+        initialMap[tooth.number] = { status: tooth.status, id: tooth.id };
       }
     });
     return initialMap;
@@ -41,14 +50,43 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
   // State quản lý răng đang được chọn để hiển thị dialog
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Load teeth data from API when patientId is provided
+  useEffect(() => {
+    if (!patientId) return;
+
+    const loadTeeth = async () => {
+      setLoading(true);
+      try {
+        const teethData = await patientAPI.getPatientTeeth(patientId);
+        const newMap: Record<number, { status: string; id?: string }> = {};
+        teethData.forEach((tooth) => {
+          const toothNumber = parseInt(tooth.toothNumber, 10);
+          if (!isNaN(toothNumber)) {
+            newMap[toothNumber] = { status: tooth.status, id: tooth.id };
+          }
+        });
+        setToothStatusMap(newMap);
+      } catch (error) {
+        console.error('Error loading teeth data:', error);
+        showNotification.error('Lỗi', 'Không thể tải dữ liệu răng');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTeeth();
+  }, [patientId]);
 
   // Convert teeth data to initialSelected format (array of tooth IDs)
   // Format: "teeth-{FDI_number}" (e.g., "teeth-21", "teeth-12")
   const initialSelected = useMemo(() => {
     return Object.keys(toothStatusMap)
       .filter((toothNumber) => {
-        const status = toothStatusMap[parseInt(toothNumber, 10)];
-        return status && status !== 'normal';
+        const toothData = toothStatusMap[parseInt(toothNumber, 10)];
+        return toothData && toothData.status && toothData.status !== 'normal';
       })
       .map((toothNumber) => `teeth-${toothNumber}`);
   }, [toothStatusMap]);
@@ -103,19 +141,45 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
     }
   }, [initialSelected, onToothClick]);
 
-  // Handle status selection
-  const handleStatusSelect = useCallback((status: string) => {
-    if (selectedTooth !== null) {
-      const toothNumber = selectedTooth; // Save before resetting
+  // Handle status selection - Save to backend
+  const handleStatusSelect = useCallback(async (status: string) => {
+    if (selectedTooth === null || !patientId) {
+      setIsDialogOpen(false);
+      setSelectedTooth(null);
+      return;
+    }
+
+    setSaving(true);
+    const toothNumber = selectedTooth;
+    const existingTooth = toothStatusMap[toothNumber];
+
+    try {
+      let updatedTooth: ToothResponse;
+
+      if (existingTooth?.id) {
+        // Update existing tooth status
+        updatedTooth = await patientAPI.updateToothStatus(existingTooth.id, { status });
+      } else {
+        // Create new tooth status
+        updatedTooth = await patientAPI.createToothStatus(patientId, {
+          toothNumber: toothNumber.toString(),
+          status,
+        });
+      }
+
+      // Update local state
       const newStatusMap = { ...toothStatusMap };
       if (status === 'normal') {
         // Nếu chọn "Bình thường", xóa khỏi map
         delete newStatusMap[toothNumber];
       } else {
-        newStatusMap[toothNumber] = status;
+        newStatusMap[toothNumber] = { status, id: updatedTooth.id };
       }
       setToothStatusMap(newStatusMap);
       onToothStatusChange?.(toothNumber, status);
+      
+      showNotification.success('Thành công', `Đã cập nhật tình trạng răng ${toothNumber}`);
+      
       setIsDialogOpen(false);
       setSelectedTooth(null);
       
@@ -147,8 +211,13 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
           }
         }
       }, 300);
+    } catch (error: any) {
+      console.error('Error saving tooth status:', error);
+      showNotification.error('Lỗi', error.response?.data?.message || 'Không thể lưu tình trạng răng');
+    } finally {
+      setSaving(false);
     }
-  }, [selectedTooth, toothStatusMap, onToothStatusChange]);
+  }, [selectedTooth, toothStatusMap, onToothStatusChange, patientId]);
 
   // Colors configuration - sẽ được override bằng CSS cho từng răng
   const colors = useMemo(() => ({
@@ -162,7 +231,8 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
   // Generate CSS để highlight từng răng với màu tương ứng
   const toothColorStyles = useMemo(() => {
     return Object.entries(toothStatusMap)
-      .map(([toothNumber, status]) => {
+      .map(([toothNumber, toothData]) => {
+        const status = toothData.status;
         const statusConfig = TOOTH_STATUSES.find((s) => s.value === status);
         if (!statusConfig || status === 'normal') return '';
         return `
@@ -198,8 +268,9 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
       if (!svg) return false;
 
       // Apply colors to each tooth based on status
-      Object.entries(toothStatusMap).forEach(([toothNumberStr, status]) => {
+      Object.entries(toothStatusMap).forEach(([toothNumberStr, toothData]) => {
         const toothNumber = parseInt(toothNumberStr, 10);
+        const status = toothData.status;
         const statusConfig = TOOTH_STATUSES.find((s) => s.value === status);
         
         // Find the correct group by aria-label
@@ -334,9 +405,11 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
           <Dialog 
             open={isDialogOpen} 
             onOpenChange={(open) => {
+              if (!saving) {
               setIsDialogOpen(open);
               if (!open) {
                 setSelectedTooth(null);
+                }
               }
             }}
           >
@@ -352,8 +425,9 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
                   <Button
                     key={status.value}
                     variant="outline"
+                    disabled={saving}
                     className={`h-auto flex-col items-start p-3 ${
-                      selectedTooth !== null && toothStatusMap[selectedTooth] === status.value
+                      selectedTooth !== null && toothStatusMap[selectedTooth]?.status === status.value
                         ? 'border-2 border-primary bg-primary/5'
                         : ''
                     }`}
@@ -403,15 +477,22 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
             </div>
           </div>
 
+          {/* Loading indicator */}
+          {loading && (
+            <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-center">
+              <p className="text-sm text-gray-600">Đang tải dữ liệu răng...</p>
+            </div>
+          )}
+
           {/* Selected Teeth Info */}
-          {Object.keys(toothStatusMap).length > 0 && (
+          {!loading && Object.keys(toothStatusMap).length > 0 && (
             <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200">
               <p className="text-sm font-semibold text-blue-900 mb-2">
                 Răng đã được đánh dấu: {Object.keys(toothStatusMap).length} răng
               </p>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(toothStatusMap).map(([toothNumber, status]) => {
-                  const statusConfig = TOOTH_STATUSES.find((s) => s.value === status);
+                {Object.entries(toothStatusMap).map(([toothNumber, toothData]) => {
+                  const statusConfig = TOOTH_STATUSES.find((s) => s.value === toothData.status);
                   return (
                     <span
                       key={toothNumber}
@@ -421,7 +502,7 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({ teeth, onToothClick, on
                         backgroundColor: statusConfig?.color || '#ffffff',
                       }}
                     >
-                      Răng {toothNumber} - {statusConfig?.label || status}
+                      Răng {toothNumber} - {statusConfig?.label || toothData.status}
                     </span>
                   );
                 })}

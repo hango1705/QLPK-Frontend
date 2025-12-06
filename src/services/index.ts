@@ -9,3 +9,5 @@ export { authAPI } from './api/auth';
 export { userAPI } from './api/user';
 export { doctorAPI } from './api/doctor';
 export { adminAPI } from './api/admin';
+export { nurseAPI } from './api/nurse';
+export { patientAPI } from './api/patient';

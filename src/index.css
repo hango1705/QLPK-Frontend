@@ -230,3 +230,78 @@ All colors MUST be HSL.
     background-image: var(--gradient-fresh);
   }
 }
+
+/* FullCalendar v6 Styles */
+.fc {
+  font-family: inherit;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border-color: hsl(var(--border));
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: hsl(var(--border));
+}
+
+.fc-button {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 0.5rem 1rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.fc-button:hover {
+  background-color: hsl(var(--primary) / 0.9);
+  border-color: hsl(var(--primary) / 0.9);
+}
+
+.fc-button:active {
+  background-color: hsl(var(--primary) / 0.8);
+}
+
+.fc-button-primary:not(:disabled):active,
+.fc-button-primary:not(:disabled).fc-button-active {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+.fc-toolbar-title {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.fc-daygrid-day-number {
+  color: hsl(var(--foreground));
+}
+
+.fc-col-header-cell-cushion {
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+
+.fc-timegrid-slot-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.fc-event {
+  border-radius: calc(var(--radius) - 2px);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.fc-event:hover {
+  opacity: 0.9;
+}
+
+.fc-event-time {
+  font-weight: 500;
+}
+
+.fc-event-title {
+  font-weight: 500;
+}

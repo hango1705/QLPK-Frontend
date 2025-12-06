@@ -63,16 +63,21 @@ const DoctorDashboard: React.FC = () => {
     queryFn: doctorAPI.getMyExaminations,
   });
 
-  const { data: treatmentPlans = [], isLoading: loadingPlans } = useQuery({
+  const { data: treatmentPlans = [], isLoading: loadingPlans, error: treatmentPlansError } = useQuery({
     queryKey: queryKeys.doctor.treatmentPlans,
     queryFn: doctorAPI.getMyTreatmentPlans,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
+  // Chỉ query phases nếu có treatmentPlans (tránh query khi API fail)
   const phaseQueries = useQueries({
-    queries: (treatmentPlans ?? []).map((plan) => ({
+    queries: (treatmentPlans && treatmentPlans.length > 0 ? treatmentPlans : []).map((plan) => ({
       queryKey: queryKeys.doctor.treatmentPhases(plan.id),
       queryFn: () => doctorAPI.getTreatmentPhases(plan.id),
       enabled: !!plan.id,
+      retry: false, // Không retry để tránh spam
     })),
   }) as UseQueryResult<TreatmentPhase[]>[];
 
@@ -248,7 +253,6 @@ const DoctorDashboard: React.FC = () => {
     try {
       await apiClient.post('/api/v1/auth/logout', {});
     } catch (error) {
-      console.error('Logout request failed', error);
     } finally {
       logout();
     }
@@ -265,8 +269,14 @@ const DoctorDashboard: React.FC = () => {
   );
   const activePhases = useMemo(() => aggregatePhases(treatmentPlans, phasesByPlan), [treatmentPlans, phasesByPlan]);
 
+  // Chỉ block loading nếu các API quan trọng đang load
+  // Nếu treatmentPlans fail, vẫn cho phép render (với empty array)
   const isLoadingPage =
-    loadingProfile || loadingScheduled || loadingAppointments || loadingExaminations || loadingPlans;
+    loadingProfile || 
+    loadingScheduled || 
+    loadingAppointments || 
+    loadingExaminations || 
+    (loadingPlans && !treatmentPlansError); // Chỉ block nếu đang load và chưa có error
 
   return (
     <div className="flex min-h-screen bg-gradient-fresh text-foreground">
@@ -336,6 +346,31 @@ const DoctorDashboard: React.FC = () => {
                     onEditPhase={(plan, phase) => setPhaseDialog({ mode: 'update', plan, phase })}
                     onCreatePlan={(examination) => setPlanDialog({ open: true, examination })}
                     onUpdatePlanStatus={handlePlanStatusChange}
+                    onPhaseClick={(planId, phaseId) => {
+                      // Chuyển đến section treatment
+                      setActiveSection('treatment');
+                      // Tìm plan và phase tương ứng
+                      const plan = treatmentPlans.find((p) => p.id === planId);
+                      const phases = phasesByPlan[planId] || [];
+                      const phase = phases.find((p) => p.id === phaseId);
+                      if (plan && phase) {
+                        // Mở modal với phase tương ứng
+                        setPhaseDialog({ mode: 'update', plan, phase });
+                      }
+                    }}
+                    onAddPhase={() => {
+                      // Chuyển đến section treatment
+                      setActiveSection('treatment');
+                      // Tìm plan đầu tiên để tạo phase mới
+                      // Nếu có nhiều plans, lấy plan đầu tiên
+                      // Nếu không có plan, có thể cần tạo plan trước
+                      if (treatmentPlans.length > 0) {
+                        const firstPlan = treatmentPlans[0];
+                        setPhaseDialog({ mode: 'create', plan: firstPlan });
+                      } else {
+                        showNotification.info('Vui lòng tạo phác đồ điều trị trước khi thêm tiến trình');
+                      }
+                    }}
                   />
                 )}
               </div>

@@ -3,6 +3,8 @@ import { Alert, AlertTitle, AlertDescription, Button, Input } from '@/components
 import { Select as AntSelect } from 'antd';
 import apiClient from '@/services/api/client';
 import { patientAPI } from '@/services/api/patient';
+import { doctorAPI } from '@/services';
+import { adminAPI } from '@/services/api/admin';
 import type { AppointmentFormProps } from '../types';
 import { formatBackendDateTime, normalizeDateTime } from '../utils';
 
@@ -23,15 +25,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     let mounted = true;
     (async () => {
       try {
-        const res = await apiClient.get('/api/v1/doctor/doctors');
-        const list = res.data.result || res.data || [];
+        const list = await doctorAPI.getDoctorDirectory();
         if (mounted) setDoctors(list);
       } catch {
         // silent; dropdown will be empty
       }
       try {
-        const resS = await apiClient.get('/api/v1/dentalService');
-        const listS = resS.data.result || resS.data || [];
+        const listS = await adminAPI.getAllServices();
         if (mounted) setServices(listS);
       } catch {}
     })();
@@ -62,15 +62,14 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
         console.error('Error fetching booked slots:', e);
         // Fallback to old API if new one fails
         try {
-          const res = await apiClient.get(`/api/v1/doctor/appointment/${doctorId}`);
-          const list = res.data.result || res.data || [];
-          const scheduledList = list.filter((x: any) => {
+          const list = await doctorAPI.getAppointmentsByDoctor(doctorId, 'all');
+          const scheduledList = list.filter((x) => {
             const status = (x.status || '').toLowerCase().trim();
             return status === 'scheduled';
           });
           const s = new Set<string>(
             scheduledList
-              .map((x: any) => normalizeDateTime(x.dateTime || ''))
+              .map((x) => normalizeDateTime(x.dateTime || ''))
               .filter(Boolean),
           );
           if (mounted) setBookedSet(s);
@@ -92,12 +91,12 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     setError(null);
     setMsg(null);
     try {
-      await apiClient.post('/api/v1/patient/appointment/booking', {
+      await patientAPI.bookAppointment({
         doctorId,
         dateTime: payloadDate,
         type,
         notes,
-        listDentalServicesEntity: services.filter((s) => s.name === type).slice(0, 1).map((s) => ({ id: s.id })),
+        listDentalServicesEntity: services.filter((s) => s.name === type).slice(0, 1).map((s) => ({ id: s.id! })),
       });
       setMsg('Đặt lịch thành công!');
       onBooked();

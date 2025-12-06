@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@/components/ui';
-import { Clock, CheckCircle2, Hourglass, Activity, FileText, User } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from '@/components/ui';
+import { Clock, CheckCircle2, Hourglass, Activity, FileText, User, Plus } from 'lucide-react';
 import { formatDate, formatDateTime } from '../utils';
 // Note: Install react-vertical-timeline-component if available: npm install react-vertical-timeline-component
 // For now using custom vertical timeline implementation
@@ -14,13 +14,17 @@ interface TreatmentHistoryItem {
   notes?: string;
   status: 'done' | 'pending' | 'in-progress';
   type: 'examination' | 'phase';
+  planId?: string; // ID của treatment plan (nếu là phase)
+  phaseId?: string; // ID của phase (nếu là phase)
 }
 
 interface TreatmentHistoryTimelineProps {
   treatments: TreatmentHistoryItem[];
+  onPhaseClick?: (planId: string, phaseId: string) => void;
+  onAddPhase?: () => void;
 }
 
-const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ treatments }) => {
+const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ treatments, onPhaseClick, onAddPhase }) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'done':
@@ -94,9 +98,22 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
 
   return (
     <Card className="border-none bg-white/90 shadow-medium rounded-2xl">
-      <CardHeader>
-        <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
-        <CardDescription>Timeline các lần khám và điều trị</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
+          <CardDescription>Timeline các lần khám và điều trị</CardDescription>
+        </div>
+        {onAddPhase && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onAddPhase}
+            className="border-primary/40 text-primary hover:bg-primary/10"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Thêm
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="relative">
@@ -116,7 +133,16 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
 
                 {/* Content */}
                 <div className="flex-1 pb-6">
-                  <div className="rounded-xl border border-border/70 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div 
+                    className={`rounded-xl border border-border/70 bg-white p-4 shadow-sm transition-shadow ${
+                      treatment.type === 'phase' && onPhaseClick ? 'hover:shadow-md cursor-pointer hover:border-primary/50' : 'hover:shadow-md'
+                    }`}
+                    onClick={() => {
+                      if (treatment.type === 'phase' && treatment.planId && treatment.phaseId && onPhaseClick) {
+                        onPhaseClick(treatment.planId, treatment.phaseId);
+                      }
+                    }}
+                  >
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1">

@@ -60,6 +60,10 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
     queryKey: queryKeys.doctor.examinationByAppointment(context?.appointment?.id ?? ''),
     queryFn: () => doctorAPI.getExaminationByAppointment(context!.appointment!.id),
     enabled: !!context?.appointment?.id && context.mode === 'create' && open,
+    retry: false, // Không retry nếu appointment chưa có examination
+    onError: () => {
+      // Appointment chưa có examination là bình thường, không cần xử lý lỗi
+    },
   });
 
   useEffect(() => {

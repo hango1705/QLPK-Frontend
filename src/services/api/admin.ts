@@ -45,17 +45,18 @@ export const adminAPI = {
     return unwrap<User>(response);
   },
 
-  disableUser: async (userId: string): Promise<string> => {
-    const response = await apiClient.delete(`/api/v1/users/${userId}`);
+  updatePassword: async (userId: string, data: { oldPassword: string; password: string }): Promise<string> => {
+    const response = await apiClient.put(`/api/v1/users/updatePassword/${userId}`, data);
     return unwrap<string>(response);
   },
 
-  // Note: Backend has enableUser in service but no endpoint exposed
-  // TODO: Add PUT /api/v1/users/{userId}/enable endpoint in backend
+  disableUser: async (userId: string): Promise<string> => {
+    const response = await apiClient.put(`/api/v1/users/disableUser/${userId}`);
+    return unwrap<string>(response);
+  },
+
   enableUser: async (userId: string): Promise<string> => {
-    // For now, we'll use updateInfo to set disable=false if needed
-    // Or backend disableUser might toggle, so we can call it again
-    const response = await apiClient.delete(`/api/v1/users/${userId}`);
+    const response = await apiClient.put(`/api/v1/users/enableUser/${userId}`);
     return unwrap<string>(response);
   },
 

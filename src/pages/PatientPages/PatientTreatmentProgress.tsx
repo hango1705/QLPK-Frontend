@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
+import { doctorAPI } from '@/services';
 
 interface TreatmentPhasesApi {
   id: string;
@@ -49,13 +50,11 @@ const PatientTreatmentProgress = () => {
     const fetchData = async () => {
       setFetching(true); setError(null);
       try {
-        const plansRes = await apiClient.get('/api/v1/patient/myTreatmentPlans');
-        const plans: TreatmentPlanApi[] = plansRes.data.result || plansRes.data || [];
+        const plans = await patientAPI.getMyTreatmentPlans();
         const allPhases: TreatmentProgress[] = [];
         for (const plan of plans) {
           try {
-            const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${plan.id}`);
-            const phases: TreatmentPhasesApi[] = phasesRes.data.result || phasesRes.data || [];
+            const phases = await doctorAPI.getTreatmentPhases(plan.id);
             phases.forEach(ph => {
               const statusNorm = (ph.status || '').toLowerCase().includes('inprogress') ? 'ongoing' : 'completed';
               allPhases.push({

@@ -186,9 +186,17 @@ export const doctorAPI = {
     return unwrap<ExaminationSummary>(response.data);
   },
 
-  getExaminationByAppointment: async (appointmentId: string): Promise<ExaminationSummary> => {
-    const response = await apiClient.get(`/api/v1/doctor/${appointmentId}/examination`);
-    return unwrap<ExaminationSummary>(response.data);
+  getExaminationByAppointment: async (appointmentId: string): Promise<ExaminationSummary | null> => {
+    try {
+      const response = await apiClient.get(`/api/v1/doctor/${appointmentId}/examination`);
+      return unwrap<ExaminationSummary>(response.data);
+    } catch (error: any) {
+      // Nếu appointment chưa có examination (404 hoặc 400), trả về null
+      if (error.response?.status === 404 || error.response?.status === 400) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   createExamination: async (appointmentId: string, payload: ExaminationRequestPayload) => {
@@ -208,8 +216,14 @@ export const doctorAPI = {
   },
 
   getMyTreatmentPlans: async (): Promise<TreatmentPlan[]> => {
-    const response = await apiClient.get('/api/v1/doctor/myTreatmentPlans');
-    return unwrap<TreatmentPlan[]>(response.data);
+    try {
+      const response = await apiClient.get('/api/v1/doctor/myTreatmentPlans');
+      return unwrap<TreatmentPlan[]>(response.data);
+    } catch (error: any) {
+      // Trả về empty array thay vì throw error để app không crash
+      // Component có thể handle empty array và vẫn hiển thị patients từ examinations
+      return [];
+    }
   },
 
   getAllTreatmentPlans: async (): Promise<TreatmentPlan[]> => {

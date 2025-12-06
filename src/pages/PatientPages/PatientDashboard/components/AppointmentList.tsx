@@ -7,8 +7,9 @@ import {
   CloseCircleOutlined,
   HourglassOutlined,
 } from '@ant-design/icons';
-import apiClient from '@/services/api/client';
 import { patientAPI } from '@/services/api/patient';
+import { doctorAPI } from '@/services';
+import { adminAPI } from '@/services/api/admin';
 import type { AppointmentListProps } from '../types';
 import { normalizeDateTime, formatDateTime } from '../utils';
 
@@ -52,18 +53,16 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiClient.get('/api/v1/doctor/doctors');
-        const list = res.data.result || res.data || [];
+        const list = await doctorAPI.getDoctorDirectory();
         const map = new Map<string, string>();
-        list.forEach((d: any) => {
+        list.forEach((d) => {
           if (d.fullName) map.set(d.fullName, d.id);
         });
         setDoctorsMap(map);
       } catch {}
       try {
-        const resS = await apiClient.get('/api/v1/dentalService');
-        const listS = resS.data.result || resS.data || [];
-        setServices(listS.map((s: any) => ({ id: s.id, name: s.name })));
+        const listS = await adminAPI.getAllServices();
+        setServices(listS.map((s) => ({ id: s.id!, name: s.name })));
       } catch {}
     })();
   }, []);
@@ -126,16 +125,15 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
       } catch (e) {
         console.error('Error fetching booked slots for reschedule:', e);
         try {
-          const res = await apiClient.get(`/api/v1/doctor/appointment/${rescheduleDoctorId}`);
-          const list = res.data.result || res.data || [];
-          const scheduledList = list.filter((x: any) => {
+          const list = await doctorAPI.getAppointmentsByDoctor(rescheduleDoctorId, 'all');
+          const scheduledList = list.filter((x) => {
             const status = (x.status || '').toLowerCase().trim();
             return status === 'scheduled';
           });
-          const otherScheduled = scheduledList.filter((x: any) => x.id !== rescheduleId);
+          const otherScheduled = scheduledList.filter((x) => x.id !== rescheduleId);
           setBookedSet(
             new Set<string>(
-              otherScheduled.map((x: any) => normalizeDateTime(x.dateTime || '')).filter(Boolean),
+              otherScheduled.map((x) => normalizeDateTime(x.dateTime || '')).filter(Boolean),
             ),
           );
         } catch (fallbackError) {
@@ -172,7 +170,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   const confirmCancel = async () => {
     if (!cancelConfirmId) return;
     try {
-      await apiClient.put(`/api/v1/patient/appointment/booking/cancel/${cancelConfirmId}`);
+      await patientAPI.cancelAppointment(cancelConfirmId);
       setCancelConfirmId(null);
       onBookNew(); // Trigger refresh
     } catch {
@@ -246,7 +244,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         ? services.filter((s) => s.name === currentAppointment.type).slice(0, 1).map((s) => ({ id: s.id }))
         : currentAppointment.listDentalServicesEntity || [];
 
-      await apiClient.put(`/api/v1/patient/appointment/booking/update/${rescheduleId}`, {
+      await patientAPI.updateAppointment(rescheduleId, {
         doctorId: rescheduleDoctorId,
         dateTime,
         type: currentAppointment.type || '',
@@ -269,8 +267,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     setDetailOpenId(appointmentId);
     setExamDetail(null);
     try {
-      const res = await apiClient.get(`/api/v1/doctor/${appointmentId}/examination`);
-      const detail = res.data.result || res.data || null;
+      const detail = await doctorAPI.getExaminationByAppointment(appointmentId);
       setExamDetail(detail);
     } catch {
       setExamDetail({ error: 'Không tải được hồ sơ khám' });

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { FileTextOutlined, TeamOutlined, HistoryOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { showNotification } from '@/components/ui';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
 
 interface ExaminationListItem {
   id: string;
@@ -36,9 +36,9 @@ const PatientInitialExamination = () => {
   useEffect(() => {
     setFetching(true);
     setError(null);
-    apiClient.get('/api/v1/patient/myExamination')
-      .then(res => {
-        setExaminations(res.data.result || res.data || []);
+    patientAPI.getMyExaminations()
+      .then(data => {
+        setExaminations(data);
       })
       .catch(() => setError('Không thể tải hồ sơ khám ban đầu'))
       .finally(() => setFetching(false));
@@ -68,8 +68,8 @@ const PatientInitialExamination = () => {
     setDetailId(id);
     setDetail(null);
     setDetailLoading(true);
-    apiClient.get(`/api/v1/patient/examination/${id}`)
-      .then(res => setDetail(res.data.result || res.data))
+    patientAPI.getExaminationById(id)
+      .then(data => setDetail(data))
       .catch(() => showNotification.error('Không thể tải chi tiết hồ sơ'))
       .finally(() => setDetailLoading(false));
   };

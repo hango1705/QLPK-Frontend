@@ -102,6 +102,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
+    // Don't retry on 400 Bad Request errors (client errors)
+    if (error.response?.status === 400) {
+      return Promise.reject(error);
+    }
+    
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;

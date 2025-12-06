@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
 
 interface TreatmentPlanApi {
   id: string;
@@ -28,8 +28,8 @@ const PatientTreatmentPlan = () => {
   useEffect(() => {
     setFetching(true);
     setError(null);
-    apiClient.get('/api/v1/patient/myTreatmentPlans')
-      .then(res => setTreatmentPlans(res.data.result || res.data || []))
+    patientAPI.getMyTreatmentPlans()
+      .then(data => setTreatmentPlans(data))
       .catch(() => setError('Không thể tải phác đồ điều trị'))
       .finally(() => setFetching(false));
   }, []);

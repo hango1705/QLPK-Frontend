@@ -10,6 +10,9 @@ interface PatientsSectionProps {
   treatmentPlans: TreatmentPlan[];
   appointments: AppointmentSummary[];
   phasesByPlan?: Record<string, TreatmentPhase[]>;
+  onPhaseClick?: (planId: string, phaseId: string) => void;
+  onBackFromDetail?: () => void;
+  onAddPhase?: () => void;
 }
 
 interface PatientInfo {
@@ -29,6 +32,9 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
   treatmentPlans,
   appointments,
   phasesByPlan = {},
+  onPhaseClick,
+  onBackFromDetail,
+  onAddPhase,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedPatientId, setSelectedPatientId] = React.useState<string | null>(null);
@@ -37,13 +43,113 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
   const patientsMap = useMemo(() => {
     const map = new Map<string, PatientInfo>();
 
-    // Process examinations
+    // BƯỚC 1: Xử lý treatmentPlans TRƯỚC (vì treatmentPlans có patientId chắc chắn)
+    // Lưu ý: Nếu API treatmentPlans fail (400 error do null nurse), sẽ bỏ qua bước này
+    const validTreatmentPlans = treatmentPlans || [];
+    
+    validTreatmentPlans.forEach((plan) => {
+      const patientId = (plan as any).patientId;
+      
+      if (patientId && patientId !== 'unknown' && String(patientId).trim() !== '') {
+        if (!map.has(patientId)) {
+          map.set(patientId, {
+            patientId,
+            patientName: (plan as any).patientName || (plan as any).patient?.fullName,
+            totalExaminations: 0,
+            activePlans: 0,
+            totalPlans: 0,
+            totalCost: 0,
+          });
+        }
+        const patient = map.get(patientId)!;
+        patient.totalPlans += 1;
+        patient.totalCost += plan.totalCost || 0;
+        
+        if (plan.status?.toLowerCase() === 'inprogress') {
+          patient.activePlans += 1;
+        }
+      }
+    });
+
+    // BƯỚC 2: Nếu không có treatmentPlans, thử lấy patientId từ appointments
+    if (validTreatmentPlans.length === 0 && appointments.length > 0) {
+      appointments.forEach((appointment: any) => {
+        const patientId = (appointment as any).patientId || (appointment as any).patient?.id;
+        if (patientId && patientId !== 'unknown') {
+          if (!map.has(patientId)) {
+            map.set(patientId, {
+              patientId,
+              patientName: (appointment as any).patientName || 
+                          (appointment as any).patient?.fullName ||
+                          (appointment as any).patientFullName,
+              totalExaminations: 0,
+              activePlans: 0,
+              totalPlans: 0,
+              totalCost: 0,
+            });
+          }
+        }
+      });
+    }
+
+    // BƯỚC 3: Xử lý examinations và match với patients đã có
+    const uniquePatientIdsFromPlans = new Set(
+      Array.from(map.keys()).filter(id => id !== 'unknown')
+    );
+
     examinations.forEach((exam) => {
-      const patientId = (exam as any).patientId || (exam as any).patient?.id || 'unknown';
+      // Ưu tiên lấy patientId từ các field có thể có
+      let patientId = (exam as any).patientId || 
+                      (exam as any).patient?.id || 
+                      (exam as any).patient?.patientId;
+      
+      // Nếu không có patientId trực tiếp, thử lấy từ appointment
+      if (!patientId && (exam as any).appointmentId) {
+        const appointment = appointments.find((a: any) => a.id === (exam as any).appointmentId);
+        patientId = (appointment as any)?.patientId || (appointment as any)?.patient?.id;
+      }
+      
+      // Nếu vẫn không có, thử match với patients đã có (từ treatmentPlans hoặc appointments)
+      if (!patientId) {
+        // Nếu chỉ có 1 patient duy nhất, gán examination cho patient đó
+        if (uniquePatientIdsFromPlans.size === 1) {
+          patientId = Array.from(uniquePatientIdsFromPlans)[0];
+        } else if (uniquePatientIdsFromPlans.size > 1) {
+          // Nếu có nhiều patients, thử match với appointment bằng thời gian
+          // Tìm appointment có thời gian gần với examination
+          if (exam.createAt || exam.examined_at) {
+            const examDate = new Date(exam.createAt || exam.examined_at || '');
+            const relatedAppointment = appointments.find((app: any) => {
+              if (!app.dateTime) return false;
+              const appDate = new Date(app.dateTime);
+              // Match nếu cùng ngày (có thể examination được tạo từ appointment)
+              return examDate.toDateString() === appDate.toDateString();
+            });
+            
+            if (relatedAppointment) {
+              patientId = (relatedAppointment as any)?.patientId || (relatedAppointment as any)?.patient?.id;
+            }
+          }
+          
+          // Nếu vẫn không match được, set thành 'unknown'
+          if (!patientId) {
+            patientId = 'unknown';
+          }
+        } else {
+          // Không có patient nào từ treatmentPlans hoặc appointments
+          patientId = 'unknown';
+        }
+      }
+      
       if (!map.has(patientId)) {
         map.set(patientId, {
           patientId,
-          patientName: (exam as any).patientName || (exam as any).patient?.fullName,
+          patientName: (exam as any).patientName || 
+                      (exam as any).patient?.fullName ||
+                      (appointments.find((a: any) => 
+                        (a as any).patientId === patientId || 
+                        (a as any).patient?.id === patientId
+                      ) as any)?.patientFullName,
           totalExaminations: 0,
           activePlans: 0,
           totalPlans: 0,
@@ -62,27 +168,7 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
       }
     });
 
-    // Process treatment plans
-    treatmentPlans.forEach((plan) => {
-      const patientId = (plan as any).patientId || (plan as any).patient?.id || 'unknown';
-      if (!map.has(patientId)) {
-        map.set(patientId, {
-          patientId,
-          patientName: (plan as any).patientName || (plan as any).patient?.fullName,
-          totalExaminations: 0,
-          activePlans: 0,
-          totalPlans: 0,
-          totalCost: 0,
-        });
-      }
-      const patient = map.get(patientId)!;
-      patient.totalPlans += 1;
-      patient.totalCost += plan.totalCost || 0;
-      
-      if (plan.status?.toLowerCase() === 'inprogress') {
-        patient.activePlans += 1;
-      }
-    });
+    // BƯỚC 3: Xử lý appointments để tìm next appointments cho patients đã có
 
     // Process appointments to find next appointments
     appointments.forEach((appointment) => {
@@ -125,16 +211,75 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
   // Get selected patient data
   const selectedPatient = React.useMemo(() => {
     if (!selectedPatientId) return null;
-    const patient = patients.find((p) => p.patientId === selectedPatientId);
-    if (!patient) return null;
+    
+    let actualPatientId = selectedPatientId;
+    
+    // Nếu selectedPatientId là 'unknown', thử tìm patientId thực sự từ treatmentPlans
+    if (selectedPatientId === 'unknown') {
+      if (treatmentPlans && treatmentPlans.length > 0) {
+        // Tìm tất cả patientIds từ treatmentPlans
+        const allPatientIds = treatmentPlans
+          .map((plan) => {
+            const pid = (plan as any).patientId;
+            return pid;
+          })
+          .filter((pid) => pid && pid !== 'unknown' && String(pid).trim() !== '');
+        
+        if (allPatientIds.length > 0) {
+          const uniquePatientIds = new Set(allPatientIds);
+          
+          if (uniquePatientIds.size === 1) {
+            actualPatientId = Array.from(uniquePatientIds)[0];
+          } else if (uniquePatientIds.size > 1) {
+            // Lấy patientId đầu tiên làm fallback
+            actualPatientId = Array.from(uniquePatientIds)[0];
+          }
+        }
+      }
+    }
+    
+    // Tìm patient trong list (có thể là 'unknown' hoặc actualPatientId)
+    let patient = patients.find((p) => p.patientId === selectedPatientId);
+    
+    // Nếu không tìm thấy với selectedPatientId, thử tìm với actualPatientId
+    if (!patient && actualPatientId !== selectedPatientId) {
+      patient = patients.find((p) => p.patientId === actualPatientId);
+    }
+    
+    if (!patient) {
+      // Nếu không tìm thấy trong list nhưng có actualPatientId, tạo patient object mới
+      if (actualPatientId !== 'unknown') {
+        patient = {
+          patientId: actualPatientId,
+          patientName: undefined,
+          totalExaminations: examinations.length,
+          activePlans: treatmentPlans.filter((p) => p.status?.toLowerCase() === 'inprogress').length,
+          totalPlans: treatmentPlans.length,
+          totalCost: 0,
+        };
+      } else {
+        return null;
+      }
+    }
 
     // Try to get patient info from examinations
     const patientExam = examinations.find(
-      (e) => ((e as any).patientId === selectedPatientId || !selectedPatientId || selectedPatientId === 'unknown')
+      (e) => {
+        const examPatientId = (e as any).patientId || 
+                             (e as any).patient?.id || 
+                             (e as any).patient?.patientId;
+        // Nếu examination có appointmentId, check appointment
+        if (!examPatientId && (e as any).appointmentId) {
+          const appointment = appointments.find((a: any) => a.id === (e as any).appointmentId);
+          const appPatientId = (appointment as any)?.patientId || (appointment as any)?.patient?.id;
+          return appPatientId === actualPatientId || appPatientId === selectedPatientId;
+        }
+        return examPatientId === actualPatientId || examPatientId === selectedPatientId;
+      }
     );
     
     return {
-      patientId: patient.patientId,
+      patientId: actualPatientId, // Dùng actualPatientId thay vì selectedPatientId
       patientName: patient.patientName,
       patientData: {
         fullName: patient.patientName,
@@ -144,7 +289,7 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
         avatar: (patientExam as any)?.patient?.avatar || (patientExam as any)?.avatar,
       },
     };
-  }, [selectedPatientId, patients, examinations]);
+  }, [selectedPatientId, patients, examinations, appointments, treatmentPlans]);
 
   // If patient is selected, show detail page
   if (selectedPatient) {
@@ -160,7 +305,34 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
           (p) => ((p as any).patientId === selectedPatient.patientId || !selectedPatient.patientId || selectedPatient.patientId === 'unknown')
         )}
         phasesByPlan={phasesByPlan}
-        onBack={() => setSelectedPatientId(null)}
+        onBack={() => {
+          setSelectedPatientId(null);
+          if (onBackFromDetail) {
+            onBackFromDetail();
+          }
+        }}
+        onPhaseClick={(planId, phaseId) => {
+          // Quay lại danh sách patients trước
+          setSelectedPatientId(null);
+          // Sau đó gọi callback để chuyển section và mở modal
+          if (onPhaseClick) {
+            // Delay một chút để đảm bảo UI đã update
+            setTimeout(() => {
+              onPhaseClick(planId, phaseId);
+            }, 100);
+          }
+        }}
+        onAddPhase={() => {
+          // Quay lại danh sách patients trước
+          setSelectedPatientId(null);
+          // Sau đó gọi callback để chuyển section và mở modal
+          if (onAddPhase) {
+            // Delay một chút để đảm bảo UI đã update
+            setTimeout(() => {
+              onAddPhase();
+            }, 100);
+          }
+        }}
       />
     );
   }

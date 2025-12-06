@@ -1,11 +1,15 @@
 import React from 'react';
-import { Button } from '@/components/ui';
-import { Shield, Menu } from 'lucide-react';
-import { SECTION_CONFIG } from '../constants';
-import type { AdminSidebarProps, Section } from '../types';
+import { Menu } from 'lucide-react';
+import { SECTION_CONFIG, SECTION_ORDER } from '../constants';
+import type { NurseSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
 
-const AdminSidebar: React.FC<AdminSidebarProps> = ({
+interface SidebarProps extends NurseSidebarProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+const NurseSidebar: React.FC<SidebarProps> = ({
   activeSection,
   onSectionChange,
   isCollapsed,
@@ -20,12 +24,25 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
     <div className="flex items-center justify-between px-6 py-5">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Shield className="h-5 w-5" />
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
         </div>
         {!isCollapsed && (
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">DentalCARE</p>
-            <p className="text-base font-semibold text-foreground">Admin Panel</p>
+            <p className="text-base font-semibold text-foreground">Nurse Workspace</p>
           </div>
         )}
       </div>
@@ -39,7 +56,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
     </div>
 
     <div className="flex-1 space-y-1 px-3">
-      {(Object.keys(SECTION_CONFIG) as Section[]).map((section) => {
+      {SECTION_ORDER.map((section) => {
         const { label } = SECTION_CONFIG[section];
         const isActive = activeSection === section;
         return (
@@ -49,13 +66,17 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
             onClick={() => onSectionChange(section)}
             className={cn(
               'group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200',
-              isActive ? 'bg-primary text-white shadow-glow' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+              isActive
+                ? 'bg-primary text-white shadow-glow'
+                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
             )}
           >
             <span
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-xl border',
-                isActive ? 'border-white/40 bg-white/10' : 'border-border/80 bg-white text-muted-foreground group-hover:text-foreground',
+                isActive
+                  ? 'border-white/40 bg-white/10'
+                  : 'border-border/80 bg-white text-muted-foreground group-hover:text-foreground',
               )}
             >
               {SECTION_CONFIG[section].icon}
@@ -68,16 +89,14 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
       })}
     </div>
 
-    {!isCollapsed && (
-      <div className="border-t border-border/60 p-4">
-        <div className="rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-dashed border-primary/30 p-3 text-center">
-          <p className="text-xs font-medium text-primary">Quản trị hệ thống</p>
-          <p className="mt-1 text-[10px] text-primary/70">Toàn quyền truy cập</p>
-        </div>
+    <div className="mt-auto border-t border-border/80 px-5 py-6">
+      <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm leading-relaxed text-muted-foreground">
+        <p className="font-semibold text-primary">Thông tin</p>
+        <p>Y tá hỗ trợ theo dõi và quản lý phác đồ điều trị của bệnh nhân.</p>
       </div>
-    )}
+    </div>
   </aside>
 );
 
-export default AdminSidebar;
+export default NurseSidebar;
 

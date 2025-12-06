@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Card, CardContent } from '@/components/ui';
 import { ArrowLeft } from 'lucide-react';
 import PatientInfoCard from './PatientInfoCard';
 import OdontogramView from './OdontogramView';
 import TreatmentHistoryTimeline from './TreatmentHistoryTimeline';
 import type { ExaminationSummary, TreatmentPlan, TreatmentPhase } from '@/types/doctor';
+import { patientAPI, type PatientResponse } from '@/services/api/patient';
+import { showNotification } from '@/components/ui';
 
 interface PatientDetailPageProps {
   patientId: string;
@@ -25,17 +27,76 @@ interface PatientDetailPageProps {
   treatmentPlans: TreatmentPlan[];
   phasesByPlan: Record<string, TreatmentPhase[]>;
   onBack: () => void;
+  onPhaseClick?: (planId: string, phaseId: string) => void;
+  onAddPhase?: () => void;
 }
 
 const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
   patientId,
-  patientName,
-  patientData,
+  patientName: initialPatientName,
+  patientData: initialPatientData,
   examinations,
   treatmentPlans,
   phasesByPlan,
   onBack,
+  onPhaseClick,
+  onAddPhase,
 }) => {
+  // State để lưu thông tin bệnh nhân đã load từ API
+  const [patientData, setPatientData] = useState<PatientDetailPageProps['patientData']>(initialPatientData);
+  const [patientName, setPatientName] = useState<string | undefined>(initialPatientName);
+  const [loading, setLoading] = useState(false);
+
+  // Load patient data từ API nếu có patientId nhưng chưa có patientData
+  useEffect(() => {
+    // Kiểm tra nếu patientId hợp lệ (UUID format, không phải 'unknown')
+    const isValidPatientId = patientId && 
+                             patientId !== 'unknown' && 
+                             patientId.length > 10 && // UUID thường dài hơn 10 ký tự
+                             !initialPatientData?.fullName; // Chưa có data
+    
+    if (!isValidPatientId) {
+      // Đã có data hoặc không có patientId hợp lệ, không cần load
+      return;
+    }
+
+    const loadPatientData = async () => {
+      setLoading(true);
+      try {
+        console.log('Loading patient data for ID:', patientId);
+        const data = await patientAPI.getPatientById(patientId);
+        console.log('Loaded patient data:', data);
+        setPatientData({
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          dob: data.dob,
+          gender: data.gender,
+          bloodGroup: data.bloodGroup,
+          allergy: data.allergy,
+          medicalHistory: data.medicalHistory,
+        });
+        setPatientName(data.fullName);
+      } catch (error: any) {
+        console.error('Error loading patient data:', error);
+        console.error('Error details:', {
+          patientId,
+          status: error.response?.status,
+          message: error.response?.data?.message || error.message,
+        });
+        // Hiển thị notification nếu có lỗi rõ ràng
+        if (error.response?.status !== 404) {
+          showNotification.error('Lỗi', 'Không thể tải thông tin bệnh nhân');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPatientData();
+  }, [patientId, initialPatientData]);
+
   // Aggregate treatment history from examinations and treatment phases
   const treatmentHistory = React.useMemo(() => {
     const history: Array<{
@@ -84,6 +145,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
                   ? 'in-progress'
                   : 'pending',
             type: 'phase',
+            planId: planId,
+            phaseId: phase.id,
           });
         });
       }
@@ -149,14 +212,20 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Chi tiết bệnh nhân</h1>
           <p className="text-sm text-muted-foreground">
-            {patientName || patientData?.fullName || `Bệnh nhân ${patientId}`}
+            {loading 
+              ? 'Đang tải thông tin...' 
+              : patientName || patientData?.fullName || `Bệnh nhân ${patientId?.slice(0, 8) || 'unknown'}`}
           </p>
         </div>
       </div>
 
       {/* Patient Info Card */}
       <PatientInfoCard
-        patientName={patientName || patientData?.fullName || `Bệnh nhân ${patientId}`}
+        patientName={
+          loading 
+            ? 'Đang tải...' 
+            : patientName || patientData?.fullName || `Bệnh nhân ${patientId?.slice(0, 8) || 'unknown'}`
+        }
         avatar={patientData?.avatar}
         allergy={patientData?.allergy}
         bloodGroup={patientData?.bloodGroup}
@@ -167,12 +236,16 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left: Odontogram */}
         <div className="lg:col-span-1">
-          <OdontogramView teeth={teethData} />
+          <OdontogramView patientId={patientId} teeth={teethData} />
         </div>
 
         {/* Right: Treatment History Timeline */}
         <div className="lg:col-span-1">
-          <TreatmentHistoryTimeline treatments={treatmentHistory} />
+          <TreatmentHistoryTimeline 
+            treatments={treatmentHistory} 
+            onPhaseClick={onPhaseClick}
+            onAddPhase={onAddPhase}
+          />
         </div>
       </div>
     </div>

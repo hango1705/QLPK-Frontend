@@ -14,6 +14,7 @@ import { STATUS_BADGE } from '../constants';
 import { Stethoscope } from 'lucide-react';
 import InsightsSection from './InsightsSection';
 import PatientsSection from './PatientsSection';
+import AppointmentsCalendar from './AppointmentsCalendar';
 
 const DoctorContent: React.FC<ContentSectionProps> = (props) => {
   const {
@@ -33,13 +34,15 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
     onEditPhase,
     onCreatePlan,
     onUpdatePlanStatus,
+    onPhaseClick,
+    onAddPhase,
   } = props;
 
   const renderContent = () => {
     switch (activeSection) {
       case 'appointments':
         return (
-          <AppointmentsBoard
+          <AppointmentsCalendar
             appointments={appointments}
             scheduledAppointments={scheduledAppointments}
             onCreateExam={onCreateExam}
@@ -86,6 +89,8 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
             treatmentPlans={treatmentPlans}
             appointments={appointments}
             phasesByPlan={phasesByPlan}
+            onPhaseClick={onPhaseClick}
+            onAddPhase={onAddPhase}
           />
         );
       case 'overview':

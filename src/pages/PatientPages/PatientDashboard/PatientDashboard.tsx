@@ -2,7 +2,9 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useSelector } from 'react-redux';
 import { useAuth } from '@/hooks/useAuth';
 import { Loading } from '@/components/ui';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
+import { adminAPI } from '@/services/api/admin';
+import { doctorAPI } from '@/services';
 import PatientSidebar from './components/PatientSidebar';
 import PatientHeader from './components/PatientHeader';
 import PatientContent from './components/PatientContent';
@@ -74,16 +76,10 @@ const PatientDashboard: React.FC = () => {
       return;
     }
     Promise.all([
-      apiClient.get('/api/v1/users/myInfo', {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      apiClient.get('/api/v1/patient/myInfo', {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
+      adminAPI.getMyInfo(),
+      patientAPI.getMyInfo(),
     ])
-      .then(([userRes, patientRes]) => {
-        const userData = userRes.data.result || userRes.data;
-        const patientData = patientRes.data.result || patientRes.data;
+      .then(([userData, patientData]) => {
         if (userData) {
           setUser(userData);
         }
@@ -105,8 +101,7 @@ const PatientDashboard: React.FC = () => {
   useEffect(() => {
     const loadOverview = async () => {
       try {
-        const apps = await apiClient.get('/api/v1/patient/myAppointment');
-        const appList = apps.data.result || apps.data || [];
+        const appList = await patientAPI.getMyAppointments();
         const nonCancelled = appList.filter((a: any) => (a.status || '').toLowerCase() !== 'cancel');
         setAppointmentCount(nonCancelled.length);
 
@@ -166,16 +161,15 @@ const PatientDashboard: React.FC = () => {
         });
         setRecentAppointments(sortedApps.slice(0, 3));
 
-        const plansRes = await apiClient.get('/api/v1/patient/myTreatmentPlans');
-        const plans = plansRes.data.result || plansRes.data || [];
+        try {
+          const plans = await patientAPI.getMyTreatmentPlans();
         setPlanCount(plans.length || 0);
 
         // Store treatments for overview and treatments tab
         const treatmentsList: any[] = [];
         for (const p of plans) {
           try {
-            const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${p.id}`);
-            const phases = phasesRes.data.result || phasesRes.data || [];
+              const phases = await doctorAPI.getTreatmentPhases(p.id);
             phases.forEach((ph: any) => {
               treatmentsList.push({
                 id: ph.id || `${p.id}-${ph.phaseNumber}`,
@@ -210,8 +204,7 @@ const PatientDashboard: React.FC = () => {
         const acts: Array<{ label: string; date: Date; color: string }> = [];
         for (const p of plans) {
           try {
-            const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${p.id}`);
-            const phases = phasesRes.data.result || phasesRes.data || [];
+              const phases = await doctorAPI.getTreatmentPhases(p.id);
             phasesTotal += phases.length || 0;
             // derive payments: each phase with cost > 0 is one transaction; if none and plan.totalCost>0 then 1
             const phasePayments = (phases || []).filter((ph: any) => (ph.cost || 0) > 0).length;
@@ -241,6 +234,14 @@ const PatientDashboard: React.FC = () => {
         setPaymentCount(payments);
         acts.sort((a, b) => b.date.getTime() - a.date.getTime());
         setActivities(acts.slice(0, 3));
+        } catch (error) {
+          // If getMyTreatmentPlans fails, set defaults
+          setPlanCount(0);
+          setTreatments([]);
+          setPhaseCount(0);
+          setPaymentCount(0);
+          setActivities([]);
+        }
 
         // Load prescriptions - try to get from API, otherwise use mock data
         try {
@@ -253,8 +254,7 @@ const PatientDashboard: React.FC = () => {
             const mockPrescriptions: any[] = [];
             for (const p of plans) {
               try {
-                const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${p.id}`);
-                const phases = phasesRes.data.result || phasesRes.data || [];
+                const phases = await doctorAPI.getTreatmentPhases(p.id);
                 phases.forEach((ph: any, idx: number) => {
                   if (ph.medications || ph.medicines || ph.drugs) {
                     const meds = ph.medications || ph.medicines || ph.drugs;
@@ -412,7 +412,7 @@ const PatientDashboard: React.FC = () => {
     }
     setSaving(true);
     try {
-      await apiClient.put(`/api/v1/users/updateInfo/${user.id}`, {
+      await adminAPI.updateUserInfo(user.id, {
         fullName: editForm.fullName,
         phone: editForm.phone,
         email: editForm.email,
@@ -420,21 +420,15 @@ const PatientDashboard: React.FC = () => {
         gender: editForm.gender,
         dob: editForm.dob,
       });
-      await apiClient.put(`/api/v1/patient/medicalInformation/${patient.id}`, {
+      await patientAPI.updateMedicalInformation(patient.id, {
         bloodGroup: editForm.bloodGroup,
         allergy: editForm.allergy,
       });
       // Reload data
-      const [userRes, patientRes] = await Promise.all([
-        apiClient.get('/api/v1/users/myInfo', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        apiClient.get('/api/v1/patient/myInfo', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+      const [userData, patientData] = await Promise.all([
+        adminAPI.getMyInfo(),
+        patientAPI.getMyInfo(),
       ]);
-      const userData = userRes.data.result || userRes.data;
-      const patientData = patientRes.data.result || patientRes.data;
       if (userData) setUser(userData);
       if (patientData) setPatient(patientData);
       setEditDialogOpen(false);

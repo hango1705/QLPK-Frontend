@@ -53,6 +53,7 @@ export interface AppointmentSummary {
   listDentalServicesEntity: DentalService[];
   doctorFullName: string;
   doctorSpecialization: string;
+  patientId?: string; // Patient ID from backend (AppointmentResponse có field này)
 }
 
 export interface ExaminationSummary {
@@ -79,6 +80,8 @@ export interface TreatmentPlan {
   totalCost: number;
   doctorFullname: string;
   createAt: string;
+  patientId?: string; // Patient ID from backend (TreatmentPlansResponse có field này)
+  patientName?: string; // Patient name (có thể có trong response)
 }
 
 export interface TreatmentPhase {

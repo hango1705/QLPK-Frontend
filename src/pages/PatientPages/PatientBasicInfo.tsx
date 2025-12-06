@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription, showNotification } from '@/components/ui';
 import { Select } from 'antd';
 import { UserOutlined, PhoneOutlined, HeartOutlined, SafetyCertificateOutlined, SaveOutlined, MailOutlined, HomeOutlined, ManOutlined, CalendarOutlined } from '@ant-design/icons';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
+import { adminAPI } from '@/services/api/admin';
 import { useSelector } from 'react-redux';
 
 const GENDER_OPTS = [
@@ -33,24 +34,24 @@ const PatientBasicInfo = () => {
     setMsg(null);
     setError(null);
     Promise.all([
-      apiClient.get('/api/v1/users/myInfo'),
-      apiClient.get('/api/v1/patient/myInfo')
+      adminAPI.getMyInfo(),
+      patientAPI.getMyInfo()
     ])
       .then(([u, p]) => {
-        setUser(u.data.result);
-        setPatient(p.data.result);
+        setUser(u);
+        setPatient(p);
         setForm({
-          fullName: u.data.result.fullName,
-          phone: u.data.result.phone,
-          email: u.data.result.email,
-          address: u.data.result.address,
-          gender: u.data.result.gender,
-          dob: u.data.result.dob,
-          emergencyContactName: p.data.result.emergencyContactName,
-          emergencyPhoneNumber: p.data.result.emergencyPhoneNumber,
-          bloodGroup: p.data.result.bloodGroup,
-          allergy: p.data.result.allergy,
-          medicalHistory: p.data.result.medicalHistory,
+          fullName: u.fullName,
+          phone: u.phone,
+          email: u.email,
+          address: u.address,
+          gender: u.gender,
+          dob: u.dob,
+          emergencyContactName: p.emergencyContactName,
+          emergencyPhoneNumber: p.emergencyPhoneNumber,
+          bloodGroup: p.bloodGroup,
+          allergy: p.allergy,
+          medicalHistory: p.medicalHistory,
         });
         setLoading(false);
       })
@@ -82,7 +83,7 @@ const PatientBasicInfo = () => {
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường bôi đỏ'); return; }
     setSaving(true); setMsg(null); setError(null);
     try {
-      await apiClient.put(`/api/v1/users/updateInfo/${user.id}`, {
+      await adminAPI.updateUserInfo(user.id, {
         fullName: form.fullName,
         phone: form.phone,
         email: form.email,
@@ -102,7 +103,7 @@ const PatientBasicInfo = () => {
     if (!patient?.id) return setMsg('Thiếu patientId!');
     setSaving(true); setMsg(null); setError(null);
     try {
-      await apiClient.put(`/api/v1/patient/emergencyContact/${patient.id}`, {
+      await patientAPI.updateEmergencyContact(patient.id, {
         emergencyContactName: form.emergencyContactName,
         emergencyPhoneNumber: form.emergencyPhoneNumber
       });
@@ -118,7 +119,7 @@ const PatientBasicInfo = () => {
     if (!patient?.id) return setMsg('Thiếu patientId!');
     setSaving(true); setMsg(null); setError(null);
     try {
-      await apiClient.put(`/api/v1/patient/medicalInformation/${patient.id}`, {
+      await patientAPI.updateMedicalInformation(patient.id, {
         bloodGroup: form.bloodGroup,
         allergy: form.allergy,
         medicalHistory: form.medicalHistory

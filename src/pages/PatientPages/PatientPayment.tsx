@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
-import apiClient from '@/services/api/client';
+import { patientAPI } from '@/services/api/patient';
+import { doctorAPI } from '@/services';
 
 interface PaymentRecord {
   id: string;
@@ -42,13 +43,11 @@ const PatientPayment = () => {
     const load = async () => {
       setFetching(true); setError(null);
       try {
-        const plansRes = await apiClient.get('/api/v1/patient/myTreatmentPlans');
-        const plans: TreatmentPlanApi[] = plansRes.data.result || plansRes.data || [];
+        const plans = await patientAPI.getMyTreatmentPlans();
         const records: PaymentRecord[] = [];
         for (const plan of plans) {
           try {
-            const phasesRes = await apiClient.get(`/api/v1/doctor/treatmentPhases/${plan.id}`);
-            const phases: TreatmentPhasesApi[] = phasesRes.data.result || phasesRes.data || [];
+            const phases = await doctorAPI.getTreatmentPhases(plan.id);
             if (phases.length > 0) {
               phases.forEach((ph, idx) => {
                 const amount = ph.cost || 0;
@@ -102,13 +101,32 @@ const PatientPayment = () => {
   const handlePayNow = async (paymentId: string) => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      showNotification.success('Thanh toán thành công!');
-      setPaymentRecords(prev => 
-        prev.map(p => p.id === paymentId ? { ...p, status: 'paid' as const } : p)
+      // Tìm payment record để lấy amount
+      const payment = paymentRecords.find(p => p.id === paymentId);
+      if (!payment) {
+        showNotification.error('Không tìm thấy thông tin thanh toán');
+        return;
+      }
+
+      // Gọi API VNPay để tạo payment URL
+      const response = await patientAPI.createVnPayPayment({
+        amount: String(payment.amount),
+        // bankCode có thể để trống hoặc thêm UI để user chọn
+      });
+
+      if (response.code === 'ok' && response.paymentUrl) {
+        // Redirect đến VNPay payment page
+        window.location.href = response.paymentUrl;
+      } else {
+        showNotification.error(response.message || 'Không thể tạo liên kết thanh toán');
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      showNotification.error(
+        error.response?.data?.message || 
+        error.message || 
+        'Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.'
       );
-    } catch (error) {
-      showNotification.error('Có lỗi xảy ra khi thanh toán');
     } finally {
       setIsLoading(false);
     }
@@ -265,9 +283,10 @@ const PatientPayment = () => {
                       onClick={() => handlePayNow(payment.id)}
                       variant="primary" 
                       size="sm"
-                      loading={isLoading}
+                      disabled={isLoading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      Thanh toán
+                      {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
                     </Button>
                   )}
                 </div>

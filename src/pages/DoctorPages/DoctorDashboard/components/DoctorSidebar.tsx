@@ -48,7 +48,7 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
 
     <div className="flex-1 space-y-1 px-3">
       {SECTION_ORDER.map((section) => {
-        const { label, description } = SECTION_CONFIG[section];
+        const { label } = SECTION_CONFIG[section];
         const isActive = activeSection === section;
         return (
           <button
@@ -69,10 +69,7 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
               {SECTION_CONFIG[section].icon}
             </span>
             {!isCollapsed && (
-              <span className="flex flex-col">
-                <span className="text-sm font-semibold">{label}</span>
-                <span className="text-[11px] text-muted-foreground">{description}</span>
-              </span>
+              <span className="text-sm font-semibold">{label}</span>
             )}
           </button>
         );
