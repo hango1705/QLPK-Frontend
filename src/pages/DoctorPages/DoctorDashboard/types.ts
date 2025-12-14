@@ -16,7 +16,9 @@ export type Section =
   | 'treatment'
   | 'catalog'
   | 'insights'
-  | 'patients';
+  | 'patients'
+  | 'profile'
+  | 'account';
 
 export interface ExamDialogState {
   mode: 'create' | 'update';
@@ -105,8 +107,10 @@ export interface ContentSectionProps {
   onEditPhase: (plan: TreatmentPlan, phase: TreatmentPhase) => void;
   onCreatePlan: (examination?: ExaminationSummary) => void;
   onUpdatePlanStatus: (plan: TreatmentPlan, status: string) => void;
+  onViewPlanDetail?: (plan: TreatmentPlan) => void;
   onPhaseClick?: (planId: string, phaseId: string) => void;
   onAddPhase?: () => void;
+  onViewAppointmentDetail?: (appointment: AppointmentSummary) => void;
 }
 
 export interface RightRailProps {

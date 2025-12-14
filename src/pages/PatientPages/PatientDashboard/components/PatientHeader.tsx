@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
 import { Bell, Settings, LogOut, Menu, Stethoscope } from 'lucide-react';
 import type { PatientHeaderProps } from '../types';
-import apiClient from '@/services/api/client';
+import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
+import { useAuth } from '@/hooks';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ExtendedPatientHeaderProps extends PatientHeaderProps {
   onToggleSidebar?: () => void;
@@ -19,11 +22,60 @@ const PatientHeader: React.FC<ExtendedPatientHeaderProps> = ({
   onToggleSidebar,
   onToggleCollapse,
 }) => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { token } = useAuth();
+  
   const handleLogout = async () => {
+    // Prevent multiple simultaneous logout calls
+    if (isLogoutInProgress()) {
+      return;
+    }
+    
+    // Save token before clearing state
+    const currentToken = token;
+    
+    if (!currentToken) {
+      // No token, just clear state and navigate
+      queryClient.cancelQueries();
+      queryClient.clear();
+      onLogout();
+      navigate('/login');
+      return;
+    }
+    
+    // Set logout flag FIRST to block all new requests
+    cancelAllPendingRequests(); // This sets isLoggingOut = true
+    
+    // Cancel all active queries to prevent new requests
+    queryClient.cancelQueries();
+    
+    // Clear all queries to prevent any new requests
+    queryClient.clear();
+    
     try {
-      await apiClient.post('/api/v1/auth/logout', {});
-    } catch {}
+      // Send logout request BEFORE clearing token
+      await apiClient.post('/api/v1/auth/logout', { token: currentToken }, {
+        headers: {
+          'X-Logout-Request': 'true',
+        },
+      });
+    } catch (error: any) {
+      // Ignore logout errors - still clear local state
+      // 401/400 is expected if token was already invalidated or invalid
+      // Suppress error completely for logout
+    } finally {
+      // Clear token AFTER logout request is sent
     onLogout();
+      
+      // Reset logout state
+      resetLogoutState();
+      
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        navigate('/login');
+      }, 100);
+    }
   };
 
   const getInitials = () => {

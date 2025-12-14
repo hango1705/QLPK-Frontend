@@ -2,6 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
+import { doctorAPI } from '@/services/api/doctor';
+import { nurseAPI } from '@/services/api/nurse';
+import type { TreatmentPhase } from '@/types/doctor';
+import type { DoctorSummary } from '@/types/doctor';
+import type { NurseInfo } from '@/services/api/nurse';
+import { pdf } from '@react-pdf/renderer';
+import TreatmentPlanPDF from './PatientTreatmentPlan/TreatmentPlanPDF';
 
 interface TreatmentPlanApi {
   id: string;
@@ -12,6 +19,9 @@ interface TreatmentPlanApi {
   status: string; // free text from BE
   totalCost?: number;
   doctorFullname?: string;
+  doctorId?: string;
+  nurseId?: string;
+  patientId?: string;
   createAt?: string; // dd/MM/yyyy
 }
 
@@ -24,6 +34,19 @@ const PatientTreatmentPlan = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const pageSize = 5;
+  
+  // Dialog states
+  const [showPhasesDialog, setShowPhasesDialog] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [phases, setPhases] = useState<TreatmentPhase[]>([]);
+  const [loadingPhases, setLoadingPhases] = useState(false);
+  
+  const [showDoctorDialog, setShowDoctorDialog] = useState(false);
+  const [showNurseDialog, setShowNurseDialog] = useState(false);
+  const [doctorInfo, setDoctorInfo] = useState<DoctorSummary | null>(null);
+  const [nurseInfo, setNurseInfo] = useState<NurseInfo | null>(null);
+  const [loadingDoctor, setLoadingDoctor] = useState(false);
+  const [loadingNurse, setLoadingNurse] = useState(false);
 
   useEffect(() => {
     setFetching(true);
@@ -86,6 +109,111 @@ const PatientTreatmentPlan = () => {
   const avatarOf = (name?: string) => {
     const ch = (name || '?').trim().charAt(0).toUpperCase();
     return ch || 'U';
+  };
+
+  const handleDownloadPDF = async (plan: TreatmentPlanApi) => {
+    try {
+      showNotification.info('Đang tạo file PDF...');
+
+      // Lấy thông tin bác sĩ và y tá nếu có
+      let doctor: DoctorSummary | null = null;
+      let nurse: NurseInfo | null = null;
+
+      if (plan.doctorId) {
+        try {
+          doctor = await nurseAPI.getDoctorById(plan.doctorId);
+        } catch (error) {
+          // Ignore error, continue without doctor info
+        }
+      }
+
+      if (plan.nurseId) {
+        try {
+          nurse = await nurseAPI.getNurseInfo(plan.nurseId);
+        } catch (error) {
+          // Ignore error, continue without nurse info
+        }
+      }
+
+      // Lấy danh sách tiến trình
+      let phases: TreatmentPhase[] = [];
+      try {
+        phases = await doctorAPI.getTreatmentPhases(plan.id);
+      } catch (error) {
+        // Continue without phases
+      }
+
+      // Tạo PDF document
+      const doc = <TreatmentPlanPDF plan={plan} doctor={doctor} nurse={nurse} phases={phases} />;
+
+      // Generate PDF blob
+      const blob = await pdf(doc).toBlob();
+
+      // Tạo URL và tải xuống
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Phac-do-dieu-tri-${plan.title.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showNotification.success('Tải xuống PDF thành công!');
+    } catch (error: any) {
+      showNotification.error('Không thể tạo file PDF: ' + (error.message || 'Lỗi không xác định'));
+    }
+  };
+
+  const handleViewPhases = async (planId: string) => {
+    setSelectedPlanId(planId);
+    setShowPhasesDialog(true);
+    setLoadingPhases(true);
+    try {
+      const phasesData = await doctorAPI.getTreatmentPhases(planId);
+      setPhases(phasesData);
+    } catch (error) {
+      showNotification.error('Không thể tải danh sách tiến trình');
+      setPhases([]);
+    } finally {
+      setLoadingPhases(false);
+    }
+  };
+
+  const handleViewDoctor = async (doctorId: string) => {
+    if (!doctorId) {
+      showNotification.error('Không có thông tin bác sĩ');
+      return;
+    }
+    setShowDoctorDialog(true);
+    setLoadingDoctor(true);
+    try {
+      const doctor = await nurseAPI.getDoctorById(doctorId);
+      setDoctorInfo(doctor);
+    } catch (error) {
+      showNotification.error('Không thể tải thông tin bác sĩ');
+      setDoctorInfo(null);
+    } finally {
+      setLoadingDoctor(false);
+    }
+  };
+
+  const handleViewNurse = async (nurseId: string) => {
+    if (!nurseId) {
+      showNotification.error('Không có thông tin y tá');
+      return;
+    }
+    setShowNurseDialog(true);
+    setLoadingNurse(true);
+    try {
+      const nurse = await nurseAPI.getNurseInfo(nurseId);
+      setNurseInfo(nurse);
+    } catch (error) {
+      showNotification.error('Không thể tải thông tin y tá');
+      setNurseInfo(null);
+    } finally {
+      setLoadingNurse(false);
+    }
   };
 
   const paginated = useMemo(() => {
@@ -187,8 +315,22 @@ const PatientTreatmentPlan = () => {
                     {expandedIds.has(plan.id) ? 'Thu gọn' : 'Mở rộng'}
                   </Button>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm">Xem chi tiết</Button>
-                    <Button variant="primary" size="sm">Tải xuống</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleViewPhases(plan.id)}>
+                      Xem chi tiết
+                    </Button>
+                    {plan.doctorId && (
+                      <Button variant="outline" size="sm" onClick={() => handleViewDoctor(plan.doctorId!)}>
+                        Xem thông tin bác sĩ
+                      </Button>
+                    )}
+                    {plan.nurseId && (
+                      <Button variant="outline" size="sm" onClick={() => handleViewNurse(plan.nurseId!)}>
+                        Xem thông tin y tá
+                      </Button>
+                    )}
+                    <Button variant="primary" size="sm" onClick={() => handleDownloadPDF(plan)}>
+                      Tải xuống
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -300,6 +442,282 @@ const PatientTreatmentPlan = () => {
                     </Button>
                   </div>
                 </form>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Dialog hiển thị các tiến trình */}
+        {showPhasesDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Danh sách tiến trình điều trị
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowPhasesDialog(false);
+                      setSelectedPlanId(null);
+                      setPhases([]);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {loadingPhases ? (
+                  <div className="text-center py-8">Đang tải...</div>
+                ) : phases.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">Chưa có tiến trình nào</div>
+                ) : (
+                  <div className="space-y-4">
+                    {phases.map((phase, index) => (
+                      <Card key={phase.id || index} className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold text-gray-900">
+                            Tiến trình {phase.phaseNumber}
+                          </h4>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            phase.status?.toLowerCase().includes('hoàn') 
+                              ? 'bg-blue-100 text-blue-800'
+                              : phase.status?.toLowerCase().includes('tạm')
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {phase.status || 'Đang thực hiện'}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 text-sm mb-2">{phase.description || '-'}</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-500">Ngày bắt đầu: </span>
+                            <span className="text-gray-900">{phase.startDate || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Ngày kết thúc: </span>
+                            <span className="text-gray-900">{phase.endDate || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Chi phí: </span>
+                            <span className="text-gray-900">
+                              {phase.cost ? new Intl.NumberFormat('vi-VN').format(phase.cost) + ' VNĐ' : '-'}
+                            </span>
+                          </div>
+                          {phase.nextAppointment && (
+                            <div>
+                              <span className="text-gray-500">Lịch hẹn tiếp theo: </span>
+                              <span className="text-gray-900">{phase.nextAppointment}</span>
+                            </div>
+                          )}
+                        </div>
+                        {phase.listComment && phase.listComment.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Nhận xét:</h5>
+                            <div className="space-y-1">
+                              {phase.listComment.map((comment, idx) => (
+                                <p key={idx} className="text-xs text-gray-600">{comment}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {phase.listImage && phase.listImage.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Hình ảnh</h5>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {phase.listImage.map((img, idx) => {
+                                // Map type từ database sang label tiếng Việt
+                                const getImageTypeLabel = (type: string) => {
+                                  switch (type) {
+                                    case 'treatmentPhasesTeeth':
+                                    case 'examinationTeeth':
+                                      return 'Ảnh răng';
+                                    case 'treatmentPhasesFace':
+                                    case 'examinationFace':
+                                      return 'Ảnh mặt';
+                                    case 'treatmentPhasesXray':
+                                    case 'examinationXray':
+                                      return 'Ảnh X-quang';
+                                    default:
+                                      return type; // Fallback nếu có type khác
+                                  }
+                                };
+
+                                return (
+                                  <div key={idx} className="flex flex-col">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 text-white shadow-sm mb-2 w-fit">
+                                      {getImageTypeLabel(img.type || '')}
+                                    </span>
+                                    <img 
+                                      src={img.url} 
+                                      alt={`treatment phase ${img.type || ''}`} 
+                                      className="rounded-md border w-full h-auto"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Dialog hiển thị thông tin bác sĩ */}
+        {showDoctorDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-2xl">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Thông tin bác sĩ
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDoctorDialog(false);
+                      setDoctorInfo(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {loadingDoctor ? (
+                  <div className="text-center py-8">Đang tải...</div>
+                ) : doctorInfo ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-2xl font-bold">
+                        {doctorInfo.fullName?.charAt(0).toUpperCase() || 'D'}
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-semibold text-gray-900">{doctorInfo.fullName || '-'}</h4>
+                        <p className="text-gray-600">{doctorInfo.specialization || '-'}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">ID: </span>
+                        <span className="text-sm text-gray-900">{doctorInfo.id || '-'}</span>
+                      </div>
+                      {doctorInfo.licenseNumber && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Số giấy phép: </span>
+                          <span className="text-sm text-gray-900">{doctorInfo.licenseNumber}</span>
+                        </div>
+                      )}
+                      {doctorInfo.phone && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Số điện thoại: </span>
+                          <span className="text-sm text-gray-900">{doctorInfo.phone}</span>
+                        </div>
+                      )}
+                      {doctorInfo.email && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Email: </span>
+                          <span className="text-sm text-gray-900">{doctorInfo.email}</span>
+                        </div>
+                      )}
+                      {doctorInfo.address && (
+                        <div className="md:col-span-2">
+                          <span className="text-sm font-medium text-gray-500">Địa chỉ: </span>
+                          <span className="text-sm text-gray-900">{doctorInfo.address}</span>
+                        </div>
+                      )}
+                      {doctorInfo.gender && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Giới tính: </span>
+                          <span className="text-sm text-gray-900">
+                            {doctorInfo.gender === 'male' ? 'Nam' : doctorInfo.gender === 'female' ? 'Nữ' : doctorInfo.gender}
+                          </span>
+                        </div>
+                      )}
+                      {doctorInfo.dob && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Ngày sinh: </span>
+                          <span className="text-sm text-gray-900">
+                            {new Date(doctorInfo.dob).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
+                      )}
+                      {doctorInfo.yearsExperience !== undefined && doctorInfo.yearsExperience !== null && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Số năm kinh nghiệm: </span>
+                          <span className="text-sm text-gray-900">{doctorInfo.yearsExperience} năm</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">Không có thông tin bác sĩ</div>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Dialog hiển thị thông tin y tá */}
+        {showNurseDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-2xl">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Thông tin y tá
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowNurseDialog(false);
+                      setNurseInfo(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {loadingNurse ? (
+                  <div className="text-center py-8">Đang tải...</div>
+                ) : nurseInfo ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-green-600 text-white flex items-center justify-center text-2xl font-bold">
+                        {nurseInfo.fullName?.charAt(0).toUpperCase() || 'N'}
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-semibold text-gray-900">{nurseInfo.fullName || '-'}</h4>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                      <div>
+                        <span className="text-sm text-gray-500">ID: </span>
+                        <span className="text-sm text-gray-900">{nurseInfo.id || '-'}</span>
+                      </div>
+                      {nurseInfo.phone && (
+                        <div>
+                          <span className="text-sm text-gray-500">Số điện thoại: </span>
+                          <span className="text-sm text-gray-900">{nurseInfo.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">Không có thông tin y tá</div>
+                )}
               </div>
             </Card>
           </div>

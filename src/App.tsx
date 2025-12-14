@@ -30,7 +30,6 @@ const PatientDashboard = createLazyPage(() => import('./pages/PatientPages/Patie
 const PatientBasicInfo = createLazyPage(() => import('./pages/PatientPages/PatientBasicInfo'));
 const PatientInitialExamination = createLazyPage(() => import('./pages/PatientPages/PatientInitialExamination'));
 const PatientTreatmentPlan = createLazyPage(() => import('./pages/PatientPages/PatientTreatmentPlan'));
-const PatientTreatmentProgress = createLazyPage(() => import('./pages/PatientPages/PatientTreatmentProgress'));
 const PatientPayment = createLazyPage(() => import('./pages/PatientPages/PatientPayment'));
 const DoctorWorkspace = createLazyPage(() => import('./pages/DoctorPages'));
 const AdminWorkspace = createLazyPage(() => import('./pages/AdminPages'));
@@ -191,17 +190,6 @@ const App = () => (
                       <PrivateRoute>
                         <RoleBasedRoute allowedRoles={['patient', 'admin']}>
                           <PatientTreatmentPlan />
-                        </RoleBasedRoute>
-                      </PrivateRoute>
-                    } 
-                  />
-                  
-                  <Route 
-                    path="/patient/treatment-progress" 
-                    element={
-                      <PrivateRoute>
-                        <RoleBasedRoute allowedRoles={['patient', 'admin']}>
-                          <PatientTreatmentProgress />
                         </RoleBasedRoute>
                       </PrivateRoute>
                     } 

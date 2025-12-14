@@ -325,7 +325,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
           <Card>
             <CardContent className="p-6">
               <p className="text-sm text-muted-foreground text-center">
-                Xem chi tiết điều trị trong mục "Tiến trình điều trị" ở sidebar
+                Xem chi tiết điều trị trong mục "Phác đồ điều trị" ở sidebar
               </p>
             </CardContent>
           </Card>

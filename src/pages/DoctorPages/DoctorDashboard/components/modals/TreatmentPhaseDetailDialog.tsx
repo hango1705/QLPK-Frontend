@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,49 +9,57 @@ import {
   Button,
   Textarea,
 } from '@/components/ui';
-import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send } from 'lucide-react';
-import type { ExaminationSummary } from '@/types/doctor';
-import { formatDate, formatDateTime, formatCurrency } from '../../utils';
+import { Image as ImageIcon, MessageSquare, Send, Calendar, DollarSign, FileText } from 'lucide-react';
+import type { TreatmentPhase, TreatmentPlan } from '@/types/doctor';
+import { formatDate, formatCurrency } from '../../utils';
 import { doctorAPI } from '@/services';
 import { useAuth } from '@/hooks';
 import { isDoctorLV2 } from '@/utils/auth';
 import { showNotification } from '@/components/ui';
 
-interface ExaminationDetailDialogProps {
+interface TreatmentPhaseDetailDialogProps {
   open: boolean;
-  examination: ExaminationSummary | null;
+  phase: TreatmentPhase | null;
+  plan: TreatmentPlan | null;
   onOpenChange: (open: boolean) => void;
-  onEdit?: (examination: ExaminationSummary) => void;
+  onEdit?: (phase: TreatmentPhase, plan: TreatmentPlan) => void;
+  onRefresh?: () => void;
 }
 
-const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
+const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   open,
-  examination,
+  phase,
+  plan,
   onOpenChange,
   onEdit,
+  onRefresh,
 }) => {
   const { token } = useAuth();
   const isLV2 = isDoctorLV2(token);
   const [comment, setComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [examinationData, setExaminationData] = useState<ExaminationSummary | null>(examination);
+  const [phaseData, setPhaseData] = useState<TreatmentPhase | null>(phase);
 
-  // Update examination data when prop changes
-  React.useEffect(() => {
-    setExaminationData(examination);
-  }, [examination]);
+  // Update phase data when prop changes
+  useEffect(() => {
+    setPhaseData(phase);
+  }, [phase]);
 
-  if (!examinationData) return null;
+  if (!phaseData || !plan) return null;
 
   const handleAddComment = async () => {
-    if (!comment.trim() || !examinationData) return;
+    if (!comment.trim() || !phaseData) return;
     
     setIsSubmittingComment(true);
     try {
-      const updated = await doctorAPI.commentExamination(examinationData.id, comment.trim());
-      setExaminationData(updated);
+      const updated = await doctorAPI.commentTreatmentPhase(phaseData.id, comment.trim());
+      setPhaseData(updated);
       setComment('');
       showNotification.success('Đã thêm nhận xét thành công');
+      // Refresh parent data if callback provided
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error: any) {
       showNotification.error('Không thể thêm nhận xét', error?.message || 'Đã xảy ra lỗi');
     } finally {
@@ -65,13 +73,15 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
         <DialogHeader className="space-y-2 border-b border-border/70 px-6 pb-4 pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <DialogTitle className="text-xl font-semibold text-foreground">Chi tiết kết quả khám</DialogTitle>
+              <DialogTitle className="text-xl font-semibold text-foreground">
+                Chi tiết tiến trình điều trị
+              </DialogTitle>
               <DialogDescription>
-                Ngày khám: {examinationData.createAt ? formatDate(examinationData.createAt) : 'Chưa có'}
+                {plan.title} - Giai đoạn {phaseData.phaseNumber}
               </DialogDescription>
             </div>
-            {onEdit && examinationData && (
-              <Button variant="outline" size="sm" onClick={() => onEdit(examinationData)}>
+            {onEdit && (
+              <Button variant="outline" size="sm" onClick={() => onEdit(phaseData, plan)}>
                 Chỉnh sửa
               </Button>
             )}
@@ -79,42 +89,75 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-6 px-6 py-6">
+          {/* Phase Info */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Triệu chứng</h3>
-              <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
-                {examinationData.symptoms || 'Không có'}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Chẩn đoán</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">Giai đoạn</h3>
               <p className="rounded-2xl border border-border/70 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">
-                {examinationData.diagnosis || 'Chưa có'}
+                Giai đoạn {phaseData.phaseNumber}
               </p>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">Trạng thái</h3>
+              <Badge variant="outline" className="w-fit">
+                {phaseData.status || 'Chưa xác định'}
+              </Badge>
             </div>
           </div>
 
+          {/* Dates */}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Phác đồ điều trị</h3>
-              <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
-                {examinationData.treatment || 'Không có'}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Ghi chú</h3>
-              <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
-                {examinationData.notes || 'Không có ghi chú'}
-              </p>
-            </div>
+            {phaseData.startDate && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Ngày bắt đầu
+                </h3>
+                <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
+                  {formatDate(phaseData.startDate)}
+                </p>
+              </div>
+            )}
+            {phaseData.endDate && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Ngày kết thúc
+                </h3>
+                <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
+                  {formatDate(phaseData.endDate)}
+                </p>
+              </div>
+            )}
           </div>
 
-          {examinationData.listDentalServicesEntityOrder && examinationData.listDentalServicesEntityOrder.length > 0 && (
+          {/* Description */}
+          {phaseData.description && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">Mô tả</h3>
+              <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm whitespace-pre-wrap">
+                {phaseData.description}
+              </p>
+            </div>
+          )}
+
+          {/* Next Appointment */}
+          {phaseData.nextAppointment && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">Lịch tái khám</h3>
+              <p className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm">
+                {formatDate(phaseData.nextAppointment)}
+              </p>
+            </div>
+          )}
+
+          {/* Services */}
+          {phaseData.listDentalServicesEntityOrder && phaseData.listDentalServicesEntityOrder.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Dịch vụ đã sử dụng</h3>
               <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
                 <div className="space-y-2">
-                  {examinationData.listDentalServicesEntityOrder.map((service, index) => (
+                  {phaseData.listDentalServicesEntityOrder.map((service, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
@@ -135,12 +178,13 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
             </div>
           )}
 
-          {examinationData.listPrescriptionOrder && examinationData.listPrescriptionOrder.length > 0 && (
+          {/* Prescriptions */}
+          {phaseData.listPrescriptionOrder && phaseData.listPrescriptionOrder.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Đơn thuốc</h3>
               <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
                 <div className="space-y-2">
-                  {examinationData.listPrescriptionOrder.map((pres, index) => (
+                  {phaseData.listPrescriptionOrder.map((pres, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
@@ -164,18 +208,22 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
             </div>
           )}
 
-          {examinationData.listImage && examinationData.listImage.length > 0 && (
+          {/* Images */}
+          {phaseData.listImage && phaseData.listImage.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Hình ảnh</h3>
               <div className="grid gap-3 md:grid-cols-3">
-                {examinationData.listImage.map((image) => {
+                {phaseData.listImage.map((image) => {
                   // Map type từ database sang label tiếng Việt
                   const getImageTypeLabel = (type: string) => {
                     switch (type) {
+                      case 'treatmentPhasesTeeth':
                       case 'examinationTeeth':
                         return 'Ảnh răng';
+                      case 'treatmentPhasesFace':
                       case 'examinationFace':
                         return 'Ảnh mặt';
+                      case 'treatmentPhasesXray':
                       case 'examinationXray':
                         return 'Ảnh X-quang';
                       default:
@@ -207,10 +255,14 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
             </div>
           )}
 
+          {/* Cost */}
           <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
-            <span className="text-sm font-semibold text-muted-foreground">Tổng chi phí</span>
+            <span className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Chi phí
+            </span>
             <span className="text-xl font-semibold text-primary">
-              {formatCurrency(examinationData.totalCost)}
+              {formatCurrency(phaseData.cost)}
             </span>
           </div>
 
@@ -223,9 +275,9 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
               </div>
               
               {/* Existing Comments */}
-              {examinationData.listComment && examinationData.listComment.length > 0 && (
+              {phaseData.listComment && phaseData.listComment.length > 0 && (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {examinationData.listComment.map((commentText, index) => (
+                  {phaseData.listComment.map((commentText, index) => (
                     <div
                       key={index}
                       className="rounded-xl border border-border/60 bg-white px-3 py-2 text-sm"
@@ -259,14 +311,14 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
           )}
 
           {/* Display comments for non-LV2 doctors (read-only) */}
-          {!isLV2 && examinationData.listComment && examinationData.listComment.length > 0 && (
+          {!isLV2 && phaseData.listComment && phaseData.listComment.length > 0 && (
             <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/30 p-4">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold text-muted-foreground">Nhận xét từ Doctor LV2</h3>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {examinationData.listComment.map((commentText, index) => (
+                {phaseData.listComment.map((commentText, index) => (
                   <div
                     key={index}
                     className="rounded-xl border border-border/60 bg-white px-3 py-2 text-sm"
@@ -283,5 +335,5 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
   );
 };
 
-export default ExaminationDetailDialog;
+export default TreatmentPhaseDetailDialog;
 

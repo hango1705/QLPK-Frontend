@@ -8,6 +8,8 @@ import {
   NotebookPen,
   BarChart3,
   Users,
+  User,
+  KeyRound,
 } from 'lucide-react';
 
 export const SECTION_CONFIG: Record<
@@ -49,6 +51,16 @@ export const SECTION_CONFIG: Record<
     description: 'Báo cáo hiệu suất & cảnh báo',
     icon: <BarChart3 className="h-4 w-4" />,
   },
+  profile: {
+    label: 'Thông tin cá nhân',
+    description: 'Quản lý thông tin cá nhân',
+    icon: <User className="h-4 w-4" />,
+  },
+  account: {
+    label: 'Tài khoản',
+    description: 'Quản lý tài khoản & mật khẩu',
+    icon: <KeyRound className="h-4 w-4" />,
+  },
 };
 
 // Định nghĩa thứ tự hiển thị trong sidebar
@@ -60,6 +72,8 @@ export const SECTION_ORDER: Section[] = [
   'treatment',
   'catalog',
   'insights',
+  'profile',
+  'account',
 ];
 
 export const STATUS_BADGE: Record<string, string> = {

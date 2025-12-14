@@ -1,89 +1,82 @@
 import apiClient from './client';
+import type { ApiEnvelope } from '@/types/doctor';
 
-export interface UserProfile {
+type ApiPayload<T> = ApiEnvelope<T> | T;
+
+const unwrap = <T>(payload: ApiPayload<T>): T => {
+  if (!payload) {
+    return payload as T;
+  }
+  
+  // Handle case where payload is a JSON string
+  if (typeof payload === 'string') {
+    try {
+      const parsed = JSON.parse(payload);
+      return unwrap<T>(parsed);
+    } catch (e) {
+      return payload as T;
+    }
+  }
+  
+  // Handle ApiEnvelope format: { code: number, result: T }
+  if (typeof payload === 'object' && 'result' in payload) {
+    const envelope = payload as ApiEnvelope<T>;
+    const result = envelope.result;
+    
+    if (result === undefined || result === null) {
+      return payload as T;
+    }
+    
+    return result;
+  }
+  
+  // If payload is already the expected type
+  return payload as T;
+};
+
+export interface UserResponse {
   id: string;
-  name: string;
-  email: string;
+  username: string;
+  fullName: string;
   phone?: string;
+  email?: string;
   address?: string;
-  avatar?: string;
-  role: 'admin' | 'doctor' | 'patient';
-  dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  medicalHistory?: {
-    allergies: string[];
-    medications: string[];
-    conditions: string[];
-  };
-  createdAt: string;
-  updatedAt: string;
+  gender?: string;
+  dob?: string; // Date in format YYYY-MM-DD
 }
 
 export interface UpdateProfileData {
-  name?: string;
+  fullName?: string;
   phone?: string;
+  email?: string;
   address?: string;
-  dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  medicalHistory?: {
-    allergies: string[];
-    medications: string[];
-    conditions: string[];
-  };
+  gender?: string;
+  dob?: string; // Date in format YYYY-MM-DD
 }
 
 export interface ChangePasswordData {
-  currentPassword: string;
-  newPassword: string;
+  oldPassword: string;
+  password: string;
 }
 
 export const userAPI = {
-  getProfile: (userId: string) =>
-    apiClient.get<UserProfile>(`/users/${userId}`),
+  getMyInfo: async (): Promise<UserResponse> => {
+    const response = await apiClient.get('/api/v1/users/myInfo');
+    return unwrap<UserResponse>(response.data);
+  },
     
-  updateProfile: (userId: string, profileData: UpdateProfileData) =>
-    apiClient.put<UserProfile>(`/users/${userId}`, profileData),
+  getProfile: async (userId: string): Promise<UserResponse> => {
+    const response = await apiClient.get(`/api/v1/users/${userId}`);
+    return unwrap<UserResponse>(response.data);
+  },
     
-  uploadAvatar: (userId: string, file: File) => {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    return apiClient.post<{ avatar: string }>(`/users/${userId}/avatar`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  updateProfile: async (userId: string, profileData: UpdateProfileData): Promise<UserResponse> => {
+    const response = await apiClient.put(`/api/v1/users/updateInfo/${userId}`, profileData);
+    return unwrap<UserResponse>(response.data);
   },
   
-  changePassword: (userId: string, passwordData: ChangePasswordData) =>
-    apiClient.post(`/users/${userId}/change-password`, passwordData),
-    
-  deleteAccount: (userId: string, password: string) =>
-    apiClient.delete(`/users/${userId}`, {
-      data: { password }
-    }),
-    
-  getAppointments: (userId: string, params?: { 
-    page?: number; 
-    limit?: number; 
-    status?: string;
-    date?: string;
-  }) =>
-    apiClient.get(`/users/${userId}/appointments`, { params }),
-    
-  getMedicalRecords: (userId: string, params?: { 
-    page?: number; 
-    limit?: number; 
-    type?: string;
-  }) =>
-    apiClient.get(`/users/${userId}/medical-records`, { params }),
+  changePassword: async (userId: string, passwordData: ChangePasswordData): Promise<string> => {
+    const response = await apiClient.put(`/api/v1/users/updatePassword/${userId}`, passwordData);
+    return unwrap<string>(response.data);
+  },
 };

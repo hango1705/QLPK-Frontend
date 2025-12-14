@@ -36,11 +36,6 @@ export const SECTION_CONFIG: Record<
     description: 'Xem phác đồ điều trị',
     icon: <Clipboard className="h-4 w-4" />,
   },
-  progress: {
-    label: 'Tiến trình điều trị',
-    description: 'Theo dõi tiến trình điều trị',
-    icon: <TrendingUp className="h-4 w-4" />,
-  },
   payment: {
     label: 'Thanh toán',
     description: 'Lịch sử thanh toán & hóa đơn',

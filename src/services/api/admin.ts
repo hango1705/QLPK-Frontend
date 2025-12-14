@@ -81,6 +81,16 @@ export const adminAPI = {
     return unwrap<string>(response);
   },
 
+  /**
+   * Update doctor level to DOCTORLV2 (Admin only)
+   * @param doctorId - Doctor ID to upgrade
+   * @returns Success message
+   */
+  updateDoctorLevel: async (doctorId: string): Promise<string> => {
+    const response = await apiClient.post(`/api/v1/role/${doctorId}/updateLevel`);
+    return unwrap<string>(response);
+  },
+
   // Permission Management
   getAllPermissions: async (): Promise<Permission[]> => {
     const response = await apiClient.get('/api/v1/permission');
@@ -92,11 +102,11 @@ export const adminAPI = {
     return unwrap<string>(response);
   },
 
-  // Audit Log
-  getAllAuditLogs: async (): Promise<AuditLog[]> => {
-    const response = await apiClient.get('/api/v1/auditLog');
-    return unwrap<AuditLog[]>(response);
-  },
+  // NOTE: getAllAuditLogs endpoint does not exist in Backend
+  // getAllAuditLogs: async (): Promise<AuditLog[]> => {
+  //   const response = await apiClient.get('/api/v1/auditLog');
+  //   return unwrap<AuditLog[]>(response);
+  // },
 
   // Category Dental Service
   getAllCategories: async (): Promise<CategoryDentalService[]> => {

@@ -6,6 +6,14 @@ import { STATUS_BADGE } from '../constants';
 import { Stethoscope, User, Phone, Mail, MapPin, Calendar } from 'lucide-react';
 import AppointmentsCalendar from './AppointmentsCalendar';
 import DoctorDetailDialog from './DoctorDetailDialog';
+import ProfileSection from './ProfileSection';
+import AccountSection from './AccountSection';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { usePermission } from '@/hooks';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { nurseAPI } from '@/services';
+import { queryKeys } from '@/services/queryClient';
+import { showNotification } from '@/components/ui';
 
 const NurseContent: React.FC<ContentSectionProps> = ({
   activeSection,
@@ -16,9 +24,29 @@ const NurseContent: React.FC<ContentSectionProps> = ({
   selectedDoctorId,
   onDoctorSelect,
   onDoctorClick,
+  onViewAppointmentDetail,
 }) => {
+  const { hasPermission } = usePermission();
+  const canNotificationAppointment = hasPermission('NOTIFICATION_APPOINMENT');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedDoctorDetail, setSelectedDoctorDetail] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Mutation for updating appointment notification
+  const updateNotificationMutation = useMutation({
+    mutationFn: (appointmentId: string) => nurseAPI.updateAppointmentNotification(appointmentId),
+    onSuccess: () => {
+      // Invalidate appointments queries to refresh data
+      queryClient.invalidateQueries({ queryKey: queryKeys.nurse.allAppointments });
+      showNotification.success('Đã cập nhật trạng thái thông báo thành công');
+    },
+    onError: (error: any) => {
+      showNotification.error(
+        'Không thể cập nhật trạng thái thông báo',
+        error?.response?.data?.message || error?.message || 'Đã xảy ra lỗi'
+      );
+    },
+  });
 
   const renderContent = () => {
     switch (activeSection) {
@@ -31,6 +59,7 @@ const NurseContent: React.FC<ContentSectionProps> = ({
             doctors={doctors}
             selectedDoctorId={selectedDoctorId}
             onDoctorSelect={onDoctorSelect}
+            onViewDetail={onViewAppointmentDetail}
           />
         );
       case 'patients':
@@ -60,6 +89,10 @@ const NurseContent: React.FC<ContentSectionProps> = ({
             />
           </>
         );
+      case 'profile':
+        return <ProfileSection />;
+      case 'account':
+        return <AccountSection />;
       case 'overview':
       default:
         return null;
@@ -126,85 +159,6 @@ const TreatmentPlansSection: React.FC<{ plans: ContentSectionProps['treatmentPla
   </Card>
 );
 
-const AppointmentsSection: React.FC<{
-  appointments: ContentSectionProps['appointments'];
-  doctors: ContentSectionProps['doctors'];
-  selectedDoctorId?: string;
-  onDoctorSelect?: (doctorId: string) => void;
-}> = ({ appointments, doctors, selectedDoctorId, onDoctorSelect }) => {
-  const filteredAppointments = selectedDoctorId
-    ? appointments.filter((app) => app.doctorFullName === doctors.find((d) => d.id === selectedDoctorId)?.fullName)
-    : appointments;
-
-  return (
-    <Card className="border-none bg-white/90 shadow-medium">
-      <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <CardTitle className="text-lg">Lịch hẹn của bác sĩ</CardTitle>
-          <CardDescription>Xem lịch hẹn đã lên lịch của các bác sĩ</CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          {doctors.length > 0 && (
-            <select
-              value={selectedDoctorId || ''}
-              onChange={(e) => onDoctorSelect?.(e.target.value)}
-              className="rounded-lg border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="">Tất cả bác sĩ</option>
-              {doctors.map((doctor) => (
-                <option key={doctor.id} value={doctor.id}>
-                  {doctor.fullName}
-                </option>
-              ))}
-            </select>
-          )}
-          <Badge variant="secondary" className="bg-secondary/10 text-secondary">
-            {filteredAppointments.length} lịch hẹn
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {filteredAppointments.map((appointment) => (
-          <div
-            key={appointment.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-white/60 px-4 py-3 transition hover:shadow-medium"
-          >
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">{appointment.type}</p>
-              <p className="text-xs text-muted-foreground">{appointment.notes || 'Không có ghi chú'}</p>
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                <Stethoscope className="h-3 w-3" />
-                <span>{appointment.doctorFullName}</span>
-                {appointment.doctorSpecialization && (
-                  <>
-                    <span>•</span>
-                    <span>{appointment.doctorSpecialization}</span>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="text-right">
-                <p className="font-semibold text-foreground">{formatDateTime(appointment.dateTime)}</p>
-                <Badge className={STATUS_BADGE[appointment.status] || STATUS_BADGE.Scheduled}>
-                  {appointment.status}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        ))}
-        {filteredAppointments.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {selectedDoctorId ? 'Bác sĩ này chưa có lịch hẹn nào.' : 'Chưa có lịch hẹn nào.'}
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
 const PatientsSection: React.FC<{
   patients: ContentSectionProps['patients'];
   selectedPatientId: string | null;
@@ -253,8 +207,8 @@ const PatientsSection: React.FC<{
                 <InfoItem icon={<Phone className="h-4 w-4" />} label="Số điện thoại" value={selectedPatient.phone} />
                 <InfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={selectedPatient.email} />
                 <InfoItem icon={<MapPin className="h-4 w-4" />} label="Địa chỉ" value={selectedPatient.address} />
-                <InfoItem label="Giới tính" value={selectedPatient.gender} />
-                <InfoItem label="Ngày sinh" value={formatDate(selectedPatient.dob)} />
+                <InfoItem icon={<User className="h-4 w-4" />} label="Giới tính" value={selectedPatient.gender === 'MALE' ? 'Nam' : selectedPatient.gender === 'FEMALE' ? 'Nữ' : selectedPatient.gender || 'N/A'} />
+                <InfoItem icon={<Calendar className="h-4 w-4" />} label="Ngày sinh" value={formatDate(selectedPatient.dob)} />
               </div>
 
               {(selectedPatient.emergencyContactName || selectedPatient.emergencyPhoneNumber) && (
@@ -312,31 +266,32 @@ const DoctorsSection: React.FC<{
     </CardHeader>
     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {doctors.map((doctor) => (
-        <div
-          key={doctor.id}
-          onClick={() => onDoctorClick?.(doctor.id)}
-          className="cursor-pointer rounded-2xl border border-border/70 bg-white/70 p-4 shadow-sm transition hover:shadow-medium hover:border-primary/50"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Stethoscope className="h-6 w-6" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-foreground">{doctor.fullName}</h3>
-              {doctor.specialization && (
-                <p className="mt-1 text-xs text-muted-foreground">{doctor.specialization}</p>
-              )}
-              {doctor.licenseNumber && (
-                <p className="mt-1 text-xs text-muted-foreground">Số giấy phép: {doctor.licenseNumber}</p>
-              )}
-              {doctor.yearsExperience !== undefined && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Kinh nghiệm: {doctor.yearsExperience} năm
-                </p>
-              )}
+        <PermissionGuard key={doctor.id} permission={['GET_INFO_DOCTOR', 'PICK_DOCTOR']} requireAll={false}>
+          <div
+            onClick={() => onDoctorClick?.(doctor.id)}
+            className="cursor-pointer rounded-2xl border border-border/70 bg-white/70 p-4 shadow-sm transition hover:shadow-medium hover:border-primary/50"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Stethoscope className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-foreground">{doctor.fullName}</h3>
+                {doctor.specialization && (
+                  <p className="mt-1 text-xs text-muted-foreground">{doctor.specialization}</p>
+                )}
+                {doctor.licenseNumber && (
+                  <p className="mt-1 text-xs text-muted-foreground">Số giấy phép: {doctor.licenseNumber}</p>
+                )}
+                {doctor.yearsExperience !== undefined && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Kinh nghiệm: {doctor.yearsExperience} năm
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </PermissionGuard>
       ))}
       {doctors.length === 0 && (
         <div className="col-span-full rounded-2xl border border-dashed border-border px-6 py-8 text-center">
@@ -353,8 +308,12 @@ const InfoItem: React.FC<{ icon?: React.ReactNode; label: string; value: string 
   value,
 }) => (
   <div className="flex items-start gap-2">
-    {icon && <div className="mt-0.5 text-muted-foreground">{icon}</div>}
-    <div>
+    {icon ? (
+      <div className="mt-0.5 flex h-4 w-4 items-center justify-center text-muted-foreground">{icon}</div>
+    ) : (
+      <div className="h-4 w-4" />
+    )}
+    <div className="flex-1">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-medium text-foreground">{value || 'N/A'}</p>
     </div>

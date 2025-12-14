@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button, Input } from '@/components/ui';
-import { Search, User, Eye, Ban, CheckCircle, Filter, UserPlus, Stethoscope, Heart } from 'lucide-react';
+import { Search, User, Eye, Ban, CheckCircle, Filter, UserPlus, Stethoscope, Heart, TrendingUp } from 'lucide-react';
 import type { UsersSectionProps } from '../types';
 import { ROLE_BADGE, STATUS_BADGE } from '../constants';
 import { cn } from '@/utils/cn';
@@ -12,6 +12,7 @@ const UsersSection: React.FC<UsersSectionProps> = ({
   onEnableUser,
   onAddDoctor,
   onAddNurse,
+  onUpdateDoctorLevel,
   isLoading,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,6 +175,18 @@ const UsersSection: React.FC<UsersSectionProps> = ({
                     <Eye className="mr-2 h-3.5 w-3.5" />
                     Xem
                   </Button>
+                  {user.role === 'doctor' && onUpdateDoctorLevel && !user.disable && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onUpdateDoctorLevel(user.id)}
+                      className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                      title="Nâng cấp bác sĩ lên cấp độ 2 (DOCTORLV2)"
+                    >
+                      <TrendingUp className="mr-2 h-3.5 w-3.5" />
+                      Nâng cấp
+                    </Button>
+                  )}
                   {user.disable ? (
                     <Button
                       size="sm"

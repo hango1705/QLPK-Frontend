@@ -11,9 +11,6 @@ const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) => {
   useEffect(() => {
     // Không cần fetch user info vì backend không có API /auth/me
     // Chỉ cần kiểm tra token có tồn tại hay không
-    if (token && !isAuthenticated) {
-      console.log('🔄 Token exists but user not authenticated - this should not happen');
-    }
   }, [token, isAuthenticated]);
 
   return <>{children}</>;

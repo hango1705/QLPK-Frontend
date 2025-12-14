@@ -70,7 +70,8 @@ export const buildExaminationPayload = (form: ExaminationFormState) => ({
   notes: form.notes,
   treatment: form.treatment,
   totalCost: form.totalCost,
-  listDentalServicesEntityOrder: form.serviceOrders,
+  // Remove categoryId and categoryName before sending to backend
+  listDentalServicesEntityOrder: form.serviceOrders.map(({ categoryId, categoryName, ...service }) => service),
   listPrescriptionOrder: form.prescriptionOrders,
   listImageXray: form.xrayFiles,
   listImageFace: form.faceFiles,
@@ -89,16 +90,21 @@ export const buildPhasePayload = (form: TreatmentPhaseFormState) => {
     ? `${form.procedure}${form.description ? '\n\nGhi chú: ' + form.description : ''}`
     : form.description;
 
+  // Ensure endDate is set - use startDate if endDate is not provided
+  const startDateFormatted = formatDatePayload(form.startDate);
+  const endDateFormatted = formatDatePayload(form.endDate) || startDateFormatted;
+
   return {
     phaseNumber: form.phaseNumber,
     description: fullDescription, // Bao gồm cả procedure và description
     procedure: form.procedure, // Gửi riêng nếu backend hỗ trợ
-    startDate: formatDatePayload(form.startDate),
-    endDate: formatDatePayload(form.endDate),
+    startDate: startDateFormatted,
+    endDate: endDateFormatted, // Always provide endDate (use startDate if not provided)
     cost: form.cost,
     status: form.status,
     nextAppointment,
-    listDentalServicesEntityOrder: form.serviceOrders,
+    // Remove categoryId and categoryName before sending to backend
+    listDentalServicesEntityOrder: form.serviceOrders.map(({ categoryId, categoryName, ...service }) => service),
     listPrescriptionOrder: form.prescriptionOrders,
     listImageXray: form.xrayFiles,
     listImageFace: form.faceFiles,

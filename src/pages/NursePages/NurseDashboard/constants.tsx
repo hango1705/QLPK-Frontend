@@ -6,6 +6,8 @@ import {
   CalendarClock,
   Users,
   Stethoscope,
+  User,
+  KeyRound,
 } from 'lucide-react';
 
 export const SECTION_CONFIG: Record<
@@ -37,6 +39,16 @@ export const SECTION_CONFIG: Record<
     description: 'Danh sách bác sĩ',
     icon: <Stethoscope className="h-4 w-4" />,
   },
+  profile: {
+    label: 'Thông tin cá nhân',
+    description: 'Quản lý thông tin cá nhân',
+    icon: <User className="h-4 w-4" />,
+  },
+  account: {
+    label: 'Tài khoản',
+    description: 'Quản lý tài khoản & mật khẩu',
+    icon: <KeyRound className="h-4 w-4" />,
+  },
 };
 
 // Định nghĩa thứ tự hiển thị trong sidebar
@@ -46,6 +58,8 @@ export const SECTION_ORDER: Section[] = [
   'appointments',
   'patients',
   'doctors',
+  'profile',
+  'account',
 ];
 
 export const STATUS_BADGE: Record<string, string> = {

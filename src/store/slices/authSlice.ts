@@ -38,24 +38,22 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { username: string; password: string }, { rejectWithValue }) => {
     try {
-      console.log('🔐 Attempting login with credentials:', { username: credentials.username });
       const response = await authAPI.login(credentials);
-      console.log('✅ Login successful:', response.data);
       
       // Xử lý response theo format API documentation
       if (response.data.code === 1000 && response.data.result.authenticated) {
+        const token = response.data.result.token;
+        const refreshToken = response.data.result.refreshToken || null;
+        
         return {
-          token: response.data.result.token,
-          refreshToken: response.data.result.refreshToken || null,
+          token,
+          refreshToken,
           authenticated: response.data.result.authenticated
         };
       } else {
         throw new Error('Login failed: Invalid response format');
       }
     } catch (error: any) {
-      console.error('❌ Login failed:', error);
-      console.error('❌ Error response:', error.response?.data);
-      console.error('❌ Error status:', error.response?.status);
       return rejectWithValue(error.response?.data?.message || error.message || 'Login failed');
     }
   }
@@ -116,7 +114,6 @@ export const refreshToken = createAsyncThunk(
           
           // If token is still valid, no need to refresh
           if (isValid) {
-            console.log('Token is still valid, skipping refresh');
             return {
               token: currentToken,
               refreshToken: refreshTokenValue,
@@ -124,12 +121,31 @@ export const refreshToken = createAsyncThunk(
           }
         } catch (introspectError) {
           // Introspect failed, continue with refresh
-          console.warn('Token introspection failed during refresh, continuing with refresh:', introspectError);
         }
       }
       
+      // Call refresh token API
       const response = await authAPI.refreshToken(refreshTokenValue);
-      return response.data;
+      
+      // Handle wrapped response format: { code: 1000, result: { token, refreshToken } }
+      if (response.data && typeof response.data === 'object') {
+        if ('code' in response.data && 'result' in response.data && response.data.code === 1000) {
+          return {
+            token: response.data.result.token,
+            refreshToken: response.data.result.refreshToken || refreshTokenValue,
+          };
+        }
+        // Direct format: { token, refreshToken }
+        if ('token' in response.data) {
+          return {
+            token: response.data.token,
+            refreshToken: response.data.refreshToken || refreshTokenValue,
+          };
+        }
+      }
+      
+      // Fallback: return as-is (shouldn't happen)
+      throw new Error('Invalid refresh token response format');
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Token refresh failed');
     }
@@ -146,32 +162,35 @@ export const logoutUser = createAsyncThunk(
       if (token) {
         await authAPI.logout(token);
       }
-    } catch (error) {
-      // Even if logout fails on server, we should clear local state
-      console.error('Logout error:', error);
+    } catch (error: any) {
+      // Even if logout fails on server (e.g., token expired), we should clear local state
+      // Don't log 401 errors for logout - it's expected that token might be expired
+      if (error?.response?.status !== 401) {
+    }
     }
   }
 );
 
-export const getCurrentUser = createAsyncThunk(
-  'auth/getCurrentUser',
-  async (_, { getState, rejectWithValue }) => {
-    try {
-      const state = getState() as { auth: AuthState };
-      const token = state.auth.token;
+// NOTE: getCurrentUser endpoint does not exist in Backend
+// Use adminAPI.getMyInfo() or doctorAPI.getMyProfile() instead
+// export const getCurrentUser = createAsyncThunk(
+//   'auth/getCurrentUser',
+//   async (_, { getState, rejectWithValue }) => {
+//     try {
+//       const state = getState() as { auth: AuthState };
+//       const token = state.auth.token;
       
-      if (!token) {
-        throw new Error('No token available');
-      }
+//       if (!token) {
+//         throw new Error('No token available');
+//       }
       
-      const response = await authAPI.getCurrentUser(token);
-      console.log('🔍 getCurrentUser response:', response);
-      return response.data;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to get user info');
-    }
-  }
-);
+//       const response = await authAPI.getCurrentUser(token);
+//       return response.data;
+//     } catch (error: any) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to get user info');
+//     }
+//   }
+// );
 
 export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
@@ -213,9 +232,7 @@ export const introspectToken = createAsyncThunk(
   'auth/introspectToken',
   async (token: string, { rejectWithValue }) => {
     try {
-      console.log('🔍 Introspecting token:', token.substring(0, 20) + '...');
       const response = await authAPI.introspectToken(token);
-      console.log('✅ Token introspection response:', response.data);
       
       if (response.data.code === 1000) {
         return response.data.result.valid;
@@ -223,7 +240,6 @@ export const introspectToken = createAsyncThunk(
         throw new Error('Token introspection failed: Invalid response format');
       }
     } catch (error: any) {
-      console.error('❌ Token introspection failed:', error);
       return rejectWithValue(error.response?.data?.message || 'Token validation failed');
     }
   }
@@ -333,20 +349,21 @@ const authSlice = createSlice({
         state.error = null;
       })
       
+      // NOTE: getCurrentUser endpoint does not exist in Backend
       // Get Current User
-      .addCase(getCurrentUser.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(getCurrentUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = true;
-      })
-      .addCase(getCurrentUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-        state.isAuthenticated = false;
-      })
+      // .addCase(getCurrentUser.pending, (state) => {
+      //   state.isLoading = true;
+      // })
+      // .addCase(getCurrentUser.fulfilled, (state, action) => {
+      //   state.isLoading = false;
+      //   state.user = action.payload;
+      //   state.isAuthenticated = true;
+      // })
+      // .addCase(getCurrentUser.rejected, (state, action) => {
+      //   state.isLoading = false;
+      //   state.error = action.payload as string;
+      //   state.isAuthenticated = false;
+      // })
       
       // Forgot Password
       .addCase(forgotPassword.pending, (state) => {

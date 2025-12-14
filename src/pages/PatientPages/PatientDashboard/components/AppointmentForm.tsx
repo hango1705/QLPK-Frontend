@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertTitle, AlertDescription, Button, Input } from '@/components/ui';
 import { Select as AntSelect } from 'antd';
+import { X } from 'lucide-react';
 import apiClient from '@/services/api/client';
 import { patientAPI } from '@/services/api/patient';
 import { doctorAPI } from '@/services';
@@ -59,7 +60,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
         );
         if (mounted) setBookedSet(s);
       } catch (e) {
-        console.error('Error fetching booked slots:', e);
         // Fallback to old API if new one fails
         try {
           const list = await doctorAPI.getAppointmentsByDoctor(doctorId, 'all');
@@ -74,7 +74,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
           );
           if (mounted) setBookedSet(s);
         } catch (fallbackError) {
-          console.error('Fallback API also failed:', fallbackError);
           if (mounted) setBookedSet(new Set());
         }
       }
@@ -192,17 +191,46 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Ngày</label>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setTime('');
-            }}
-          />
+          <div className="relative">
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setTime('');
+              }}
+              className={date ? 'pr-10' : ''}
+            />
+            {date && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDate('');
+                  setTime('');
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
+                title="Reset ngày"
+              >
+                <X className="h-4 w-4 text-gray-500" />
+              </button>
+            )}
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Khung giờ</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium">Khung giờ</label>
+            {time && (
+              <button
+                type="button"
+                onClick={() => setTime('')}
+                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
+                title="Reset khung giờ"
+              >
+                <X className="h-3 w-3" />
+                Reset
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {generateSlots().map((s) => {
               const disabled = isSlotDisabled(s);

@@ -63,9 +63,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
     const loadPatientData = async () => {
       setLoading(true);
       try {
-        console.log('Loading patient data for ID:', patientId);
         const data = await patientAPI.getPatientById(patientId);
-        console.log('Loaded patient data:', data);
         setPatientData({
           fullName: data.fullName,
           email: data.email,
@@ -79,12 +77,6 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
         });
         setPatientName(data.fullName);
       } catch (error: any) {
-        console.error('Error loading patient data:', error);
-        console.error('Error details:', {
-          patientId,
-          status: error.response?.status,
-          message: error.response?.data?.message || error.message,
-        });
         // Hiển thị notification nếu có lỗi rõ ràng
         if (error.response?.status !== 404) {
           showNotification.error('Lỗi', 'Không thể tải thông tin bệnh nhân');

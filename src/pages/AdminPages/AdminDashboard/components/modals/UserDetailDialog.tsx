@@ -34,17 +34,6 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
 }) => {
   if (!user) return null;
 
-  // Debug: Log user info
-  React.useEffect(() => {
-    if (open && user) {
-      console.log('UserDetailDialog - User info:', {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        fullUser: user,
-      });
-    }
-  }, [open, user]);
 
   // Try to fetch patient details for all users (user.id might be patientId)
   // The API will return 404 if user is not a patient, which is fine
@@ -63,16 +52,6 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
     retry: false,
   });
 
-  // Debug: Log patient details
-  React.useEffect(() => {
-    if (open && user) {
-      console.log('UserDetailDialog - Patient details:', {
-        patientDetails,
-        loadingPatientDetails,
-        patientError,
-      });
-    }
-  }, [open, user, patientDetails, loadingPatientDetails, patientError]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

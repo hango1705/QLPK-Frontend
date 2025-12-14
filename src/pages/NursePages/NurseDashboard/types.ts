@@ -6,7 +6,7 @@ import type {
 import type { PatientResponse } from '@/services/api/patient';
 import type { NurseInfo } from '@/services/api/nurse';
 
-export type Section = 'overview' | 'treatment' | 'appointments' | 'patients' | 'doctors';
+export type Section = 'overview' | 'treatment' | 'appointments' | 'patients' | 'doctors' | 'profile' | 'account';
 
 export interface NurseHeaderProps {
   profile?: { fullName?: string; username?: string };
@@ -34,5 +34,9 @@ export interface ContentSectionProps {
   doctors: DoctorSummary[];
   selectedDoctorId?: string;
   onDoctorSelect?: (doctorId: string) => void;
+  onDoctorClick?: (doctorId: string) => void;
+  onAppointmentClick?: (appointment: AppointmentSummary) => void;
+  onRecordExamination?: (appointment: AppointmentSummary) => void;
+  onViewAppointmentDetail?: (appointment: AppointmentSummary) => void;
 }
 

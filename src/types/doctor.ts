@@ -51,9 +51,11 @@ export interface AppointmentSummary {
   notes: string;
   status: string;
   listDentalServicesEntity: DentalService[];
-  doctorFullName: string;
-  doctorSpecialization: string;
+  doctorFullName?: string; // Optional - backend không trả về field này
+  doctorSpecialization?: string; // Optional - backend không trả về field này
   patientId?: string; // Patient ID from backend (AppointmentResponse có field này)
+  doctorId?: string; // Doctor ID from backend (AppointmentResponse có field này)
+  notification?: string; // Notification status (e.g., "Done", "Pending")
 }
 
 export interface ExaminationSummary {
@@ -68,6 +70,7 @@ export interface ExaminationSummary {
   listDentalServicesEntityOrder?: DentalServiceOrder[];
   listPrescriptionOrder?: PrescriptionOrder[];
   createAt?: string;
+  listComment?: string[]; // Comments from Doctor LV2
 }
 
 export interface TreatmentPlan {
@@ -79,6 +82,8 @@ export interface TreatmentPlan {
   status: string;
   totalCost: number;
   doctorFullname: string;
+  nurseId?: string; // Nurse ID from backend
+  nurseFullname?: string; // Tên y tá
   createAt: string;
   patientId?: string; // Patient ID from backend (TreatmentPlansResponse có field này)
   patientName?: string; // Patient name (có thể có trong response)
@@ -96,12 +101,20 @@ export interface TreatmentPhase {
   listDentalServicesEntityOrder?: DentalServiceOrder[];
   listPrescriptionOrder?: PrescriptionOrder[];
   listImage?: ImageAsset[];
+  listComment?: string[]; // Comments from Doctor LV2
 }
 
 export interface DoctorSummary {
   id: string;
   fullName: string;
   specialization: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  gender?: string;
+  dob?: string;
+  licenseNumber?: string;
+  yearsExperience?: number;
 }
 
 export interface BookingSlot {

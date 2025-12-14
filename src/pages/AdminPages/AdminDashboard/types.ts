@@ -36,6 +36,7 @@ export interface UsersSectionProps {
   onEnableUser: (userId: string) => void;
   onAddDoctor?: () => void;
   onAddNurse?: () => void;
+  onUpdateDoctorLevel?: (doctorId: string) => void;
   isLoading: boolean;
 }
 

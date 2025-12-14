@@ -4,6 +4,7 @@ import { Calendar, FileText, NotebookPen, Stethoscope } from 'lucide-react';
 import type { OverviewSectionProps } from '../types';
 import type { AppointmentSummary } from '@/types/doctor';
 import { formatCurrency, formatDate, formatDateTime } from '../utils';
+import { usePermission } from '@/hooks';
 
 const OverviewSection: React.FC<OverviewSectionProps> = ({
   nextAppointment,
@@ -16,6 +17,10 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   onCreateExam,
   onCreatePhase,
 }) => {
+  const { hasPermission } = usePermission();
+  const canCreateExamination = hasPermission('CREATE_EXAMINATION');
+  const canCreateTreatmentPhase = hasPermission('CREATE_TREATMENT_PHASES');
+  
   const delta = scheduledAppointments.length - doneAppointments.length;
 
   return (
@@ -60,11 +65,13 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="border-border/70" onClick={onCreateExam}>
-              <Stethoscope className="mr-2 h-4 w-4" />
-              Ghi nhận kết quả
-            </Button>
-            {treatmentPlans.length > 0 && (
+            {canCreateExamination && (
+              <Button variant="outline" className="border-border/70" onClick={onCreateExam}>
+                <Stethoscope className="mr-2 h-4 w-4" />
+                Ghi nhận kết quả
+              </Button>
+            )}
+            {treatmentPlans.length > 0 && canCreateTreatmentPhase && (
               <Button
                 className="bg-primary text-white shadow-glow hover:bg-primary/90"
                 onClick={() => onCreatePhase(treatmentPlans[0])}
@@ -121,7 +128,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                 key={appointment.id}
                 appointment={appointment}
                 actionLabel="Ghi nhận"
-                onAction={() => onCreateExam()}
+                onAction={canCreateExamination ? () => onCreateExam() : undefined}
               />
             ))}
             {scheduledAppointments.length === 0 && (

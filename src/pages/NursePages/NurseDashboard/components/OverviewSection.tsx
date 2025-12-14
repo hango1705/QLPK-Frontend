@@ -6,6 +6,7 @@ import type { OverviewSectionProps } from '../types';
 import { STATUS_BADGE } from '../constants';
 import { formatCurrency, formatDate } from '../utils';
 import { nurseAPI } from '@/services';
+import { usePermission } from '@/hooks';
 import { queryKeys } from '@/services/queryClient';
 
 const OverviewSection: React.FC<OverviewSectionProps> = ({
@@ -13,10 +14,15 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   appointments,
   doctors,
 }) => {
-  // Get all nurses for pick (to show in overview)
+  const { hasPermission } = usePermission();
+  const canPickNurse = hasPermission('PICK_NURSE');
+  
+  // Get all nurses for pick (to show in overview) - only if user has PICK_NURSE permission
   const { data: nurses = [] } = useQuery({
     queryKey: queryKeys.nurse.nursesForPick,
     queryFn: nurseAPI.getAllNursesForPick,
+    enabled: canPickNurse, // Only fetch if user has permission
+    retry: false, // Don't retry on 401
   });
 
   const activePlans = treatmentPlans.filter((plan) => plan.status?.toLowerCase() === 'inprogress');

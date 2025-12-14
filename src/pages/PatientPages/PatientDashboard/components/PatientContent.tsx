@@ -14,7 +14,6 @@ import AccountPanel from './AccountPanel';
 const LazyBasicInfo = React.lazy(() => import('../../PatientBasicInfo'));
 const LazyInitialExam = React.lazy(() => import('../../PatientInitialExamination'));
 const LazyTreatmentPlan = React.lazy(() => import('../../PatientTreatmentPlan'));
-const LazyTreatmentProgress = React.lazy(() => import('../../PatientTreatmentProgress'));
 const LazyPayment = React.lazy(() => import('../../PatientPayment'));
 
 const PatientContent: React.FC<PatientContentProps> = (props) => {
@@ -108,12 +107,6 @@ const PatientContent: React.FC<PatientContentProps> = (props) => {
       {activeSection === 'plan' && (
         <Suspense fallback={<Loading />}>
           <LazyTreatmentPlan />
-        </Suspense>
-      )}
-
-      {activeSection === 'progress' && (
-        <Suspense fallback={<Loading />}>
-          <LazyTreatmentProgress />
         </Suspense>
       )}
 

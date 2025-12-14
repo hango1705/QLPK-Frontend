@@ -1,10 +1,13 @@
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { useAuth } from '@/hooks/useAuth';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useAuth, usePermission } from '@/hooks';
 import { Loading } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
 import { adminAPI } from '@/services/api/admin';
 import { doctorAPI } from '@/services';
+import { queryKeys } from '@/services/queryClient';
+import apiClient from '@/services/api/client';
 import PatientSidebar from './components/PatientSidebar';
 import PatientHeader from './components/PatientHeader';
 import PatientContent from './components/PatientContent';
@@ -14,12 +17,14 @@ import type { Section, PatientProfile } from './types';
 const LazyBasicInfo = React.lazy(() => import('../PatientBasicInfo'));
 const LazyInitialExam = React.lazy(() => import('../PatientInitialExamination'));
 const LazyTreatmentPlan = React.lazy(() => import('../PatientTreatmentPlan'));
-const LazyTreatmentProgress = React.lazy(() => import('../PatientTreatmentProgress'));
 const LazyPayment = React.lazy(() => import('../PatientPayment'));
 
 const PatientDashboard: React.FC = () => {
   const token = useSelector((state: any) => state.auth.token);
   const { logout } = useAuth();
+  const { hasPermission } = usePermission();
+  const queryClient = useQueryClient();
+  const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
 
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +33,23 @@ const PatientDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<any | null>(null);
+
+  // Fetch treatment plans with React Query
+  const { data: treatmentPlans = [] } = useQuery({
+    queryKey: queryKeys.patient.myTreatmentPlans,
+    queryFn: patientAPI.getMyTreatmentPlans,
+    enabled: canGetAllTreatmentPhases,
+  });
+
+  // Fetch phases for all plans in parallel
+  const phaseQueries = useQueries({
+    queries: treatmentPlans.map((plan) => ({
+      queryKey: queryKeys.patient.treatmentPhases(plan.id),
+      queryFn: () => doctorAPI.getTreatmentPhases(plan.id),
+      enabled: canGetAllTreatmentPhases && !!plan.id,
+      retry: false,
+    })),
+  });
 
   // Overview data
   const [appointmentCount, setAppointmentCount] = useState<number>(0);
@@ -97,6 +119,120 @@ const PatientDashboard: React.FC = () => {
       });
   }, [token]);
 
+  // Compute treatments, phases, payments, and activities from React Query data
+  const computedTreatmentData = useMemo(() => {
+    if (!canGetAllTreatmentPhases || !treatmentPlans.length) {
+      return {
+        treatments: [],
+        phasesTotal: 0,
+        payments: 0,
+        activities: [],
+        planCount: 0,
+      };
+    }
+
+    const treatmentsList: any[] = [];
+    let phasesTotal = 0;
+    let payments = 0;
+    const acts: Array<{ label: string; date: Date; color: string }> = [];
+
+    treatmentPlans.forEach((plan, index) => {
+      const phases = phaseQueries[index]?.data || [];
+      
+      // Build treatments list
+      phases.forEach((ph: any) => {
+        treatmentsList.push({
+          id: ph.id || `${plan.id}-${ph.phaseNumber}`,
+          planId: plan.id,
+          planTitle: plan.title || 'Phác đồ điều trị',
+          phaseNumber: ph.phaseNumber || 0,
+          name: ph.name || plan.title || 'Phác đồ điều trị',
+          description: ph.description || plan.description || '',
+          date: ph.startDate || plan.createAt,
+          endDate: ph.endDate,
+          status: ph.status || 'in-progress',
+          cost: ph.cost || plan.totalCost || 0,
+          notes: ph.notes || plan.description,
+          doctorName: plan.doctorFullName || '',
+          doctorSpecialization: plan.doctorSpecialization || '',
+        });
+      });
+
+      // Calculate statistics
+      phasesTotal += phases.length || 0;
+      const phasePayments = (phases || []).filter((ph: any) => (ph.cost || 0) > 0).length;
+      if (phasePayments > 0) payments += phasePayments;
+      else if ((plan.totalCost || 0) > 0) payments += 1;
+
+      // Build activities
+      phases.forEach((ph: any) => {
+        const d = ph.startDate ? new Date(ph.startDate.split('/').reverse().join('-')) : null;
+        if (d) {
+          acts.push({
+            label: `Cập nhật tiến trình: ${plan.title} - ${ph.phaseNumber}`,
+            date: d,
+            color: 'green',
+          });
+        }
+      });
+      
+      if (plan.createAt) {
+        const d = new Date(plan.createAt.split('/').reverse().join('-'));
+        acts.push({ label: `Nhận phác đồ: ${plan.title}`, date: d, color: 'purple' });
+      }
+    });
+
+    // Sort treatments by date (newest first)
+    treatmentsList.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateB - dateA;
+    });
+
+    // Sort activities by date (newest first)
+    acts.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return {
+      treatments: treatmentsList,
+      phasesTotal,
+      payments,
+      activities: acts.slice(0, 3),
+      planCount: treatmentPlans.length,
+    };
+  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+
+  // Generate mock prescriptions from treatment phases
+  const mockPrescriptions = useMemo(() => {
+    if (!canGetAllTreatmentPhases || !treatmentPlans.length) return [];
+    
+    const prescriptions: any[] = [];
+    treatmentPlans.forEach((plan, index) => {
+      const phases = phaseQueries[index]?.data || [];
+      phases.forEach((ph: any, idx: number) => {
+        if (ph.medications || ph.medicines || ph.drugs) {
+          const meds = ph.medications || ph.medicines || ph.drugs;
+          prescriptions.push({
+            id: `pres-${plan.id}-${ph.id || idx}`,
+            treatmentPlanId: plan.id,
+            treatmentPhaseId: ph.id,
+            treatmentName: plan.title || 'Phác đồ điều trị',
+            date: ph.startDate || plan.createAt,
+            endDate: ph.endDate,
+            doctorName: plan.doctorFullName || '',
+            medications: Array.isArray(meds)
+              ? meds
+              : typeof meds === 'string'
+                ? meds.split(',').map((m: string) => m.trim())
+                : [],
+            status: ph.status || 'active',
+            notes: ph.notes || ph.description || '',
+          });
+        }
+      });
+    });
+    return prescriptions;
+  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+
   // Load overview data
   useEffect(() => {
     const loadOverview = async () => {
@@ -161,138 +297,11 @@ const PatientDashboard: React.FC = () => {
         });
         setRecentAppointments(sortedApps.slice(0, 3));
 
-        try {
-          const plans = await patientAPI.getMyTreatmentPlans();
-        setPlanCount(plans.length || 0);
-
-        // Store treatments for overview and treatments tab
-        const treatmentsList: any[] = [];
-        for (const p of plans) {
-          try {
-              const phases = await doctorAPI.getTreatmentPhases(p.id);
-            phases.forEach((ph: any) => {
-              treatmentsList.push({
-                id: ph.id || `${p.id}-${ph.phaseNumber}`,
-                planId: p.id,
-                planTitle: p.title || 'Phác đồ điều trị',
-                phaseNumber: ph.phaseNumber || 0,
-                name: ph.name || p.title || 'Phác đồ điều trị',
-                description: ph.description || p.description || '',
-                date: ph.startDate || p.createAt,
-                endDate: ph.endDate,
-                status: ph.status || 'in-progress',
-                cost: ph.cost || p.totalCost || 0,
-                notes: ph.notes || p.description,
-                doctorName: p.doctorFullName || '',
-                doctorSpecialization: p.doctorSpecialization || '',
-              });
-            });
-          } catch (e) {
-            // ignore single plan error
-          }
-        }
-        // Sort by date (newest first)
-        treatmentsList.sort((a, b) => {
-          const dateA = new Date(a.date || 0).getTime();
-          const dateB = new Date(b.date || 0).getTime();
-          return dateB - dateA;
-        });
-        setTreatments(treatmentsList);
-
-        let phasesTotal = 0;
-        let payments = 0;
-        const acts: Array<{ label: string; date: Date; color: string }> = [];
-        for (const p of plans) {
-          try {
-              const phases = await doctorAPI.getTreatmentPhases(p.id);
-            phasesTotal += phases.length || 0;
-            // derive payments: each phase with cost > 0 is one transaction; if none and plan.totalCost>0 then 1
-            const phasePayments = (phases || []).filter((ph: any) => (ph.cost || 0) > 0).length;
-            if (phasePayments > 0) payments += phasePayments;
-            else if ((p.totalCost || 0) > 0) payments += 1;
-
-            // activities: latest phase update
-            (phases || []).forEach((ph: any) => {
-              const d = ph.startDate ? new Date(ph.startDate.split('/').reverse().join('-')) : null;
-              if (d)
-                acts.push({
-                  label: `Cập nhật tiến trình: ${p.title} - ${ph.phaseNumber}`,
-                  date: d,
-                  color: 'green',
-                });
-            });
-            // activity: plan created
-            if (p.createAt) {
-              const d = new Date(p.createAt.split('/').reverse().join('-'));
-              acts.push({ label: `Nhận phác đồ: ${p.title}`, date: d, color: 'purple' });
-            }
-          } catch (e) {
-            // ignore single plan error
-          }
-        }
-        setPhaseCount(phasesTotal);
-        setPaymentCount(payments);
-        acts.sort((a, b) => b.date.getTime() - a.date.getTime());
-        setActivities(acts.slice(0, 3));
-        } catch (error) {
-          // If getMyTreatmentPlans fails, set defaults
-          setPlanCount(0);
-          setTreatments([]);
-          setPhaseCount(0);
-          setPaymentCount(0);
-          setActivities([]);
-        }
-
-        // Load prescriptions - try to get from API, otherwise use mock data
-        try {
-          const presRes = await apiClient.get('/api/v1/patient/prescriptions');
-          const presList = presRes.data.result || presRes.data || [];
-          if (presList.length > 0) {
-            setPrescriptions(presList);
-          } else {
-            // Generate mock prescriptions from treatment phases if available
-            const mockPrescriptions: any[] = [];
-            for (const p of plans) {
-              try {
-                const phases = await doctorAPI.getTreatmentPhases(p.id);
-                phases.forEach((ph: any, idx: number) => {
-                  if (ph.medications || ph.medicines || ph.drugs) {
-                    const meds = ph.medications || ph.medicines || ph.drugs;
-                    mockPrescriptions.push({
-                      id: `pres-${p.id}-${ph.id || idx}`,
-                      treatmentPlanId: p.id,
-                      treatmentPhaseId: ph.id,
-                      treatmentName: p.title || 'Phác đồ điều trị',
-                      date: ph.startDate || p.createAt,
-                      endDate: ph.endDate,
-                      doctorName: p.doctorFullName || '',
-                      medications: Array.isArray(meds)
-                        ? meds
-                        : typeof meds === 'string'
-                          ? meds.split(',').map((m: string) => m.trim())
-                          : [],
-                      status: ph.status || 'active',
-                      notes: ph.notes || ph.description || '',
-                    });
-                  }
-                });
-              } catch (e) {
-                // ignore
-              }
-            }
-            setPrescriptions(mockPrescriptions);
-          }
-        } catch (e) {
+        // NOTE: /api/v1/patient/prescriptions endpoint does not exist in Backend
+          // Mock prescriptions will be set from React Query data in useEffect below
           setPrescriptions([]);
-        }
 
-        // Load vitals - try to get from API, otherwise use mock data
-        try {
-          const vitalsRes = await apiClient.get('/api/v1/patient/vitals');
-          const vitalsList = vitalsRes.data.result || vitalsRes.data || [];
-          if (vitalsList.length > 0) {
-            setVitals(vitalsList);
-          } else {
+        // NOTE: /api/v1/patient/vitals endpoint does not exist in Backend
             // Generate mock vitals from appointments if available
             const mockVitals: any[] = [];
             const completedApps = appList.filter(
@@ -326,24 +335,14 @@ const PatientDashboard: React.FC = () => {
               }
             });
             setVitals(mockVitals);
-          }
-        } catch (e) {
-          setVitals([]);
-        }
 
-        // Load documents - try to get from API, otherwise use mock data
-        try {
-          const docsRes = await apiClient.get('/api/v1/patient/documents');
-          const docsList = docsRes.data.result || docsRes.data || [];
-          if (docsList.length > 0) {
-            setDocuments(docsList);
-          } else {
+        // NOTE: /api/v1/patient/documents endpoint does not exist in Backend
             // Generate mock documents from appointments and treatments
             const mockDocs: any[] = [];
-            const completedApps = appList.filter(
+        const completedAppsForDocs = appList.filter(
               (a: any) => (a.status || '').toLowerCase().includes('done') && a.dateTime,
             );
-            completedApps.slice(0, 3).forEach((app: any, idx: number) => {
+        completedAppsForDocs.slice(0, 3).forEach((app: any, idx: number) => {
               const baseDate = app.dateTime ? new Date(app.dateTime) : new Date();
               mockDocs.push(
                 {
@@ -371,16 +370,28 @@ const PatientDashboard: React.FC = () => {
               );
             });
             setDocuments(mockDocs);
-          }
-        } catch (e) {
-          setDocuments([]);
-        }
       } catch {
         // ignore silently for overview
       }
     };
     loadOverview();
   }, []);
+
+  // Update state from computed React Query data
+  useEffect(() => {
+    setPlanCount(computedTreatmentData.planCount);
+    setTreatments(computedTreatmentData.treatments);
+    setPhaseCount(computedTreatmentData.phasesTotal);
+    setPaymentCount(computedTreatmentData.payments);
+    setActivities(computedTreatmentData.activities);
+  }, [computedTreatmentData]);
+
+  // Update prescriptions with mock data from React Query
+  useEffect(() => {
+    if (prescriptions.length === 0 && mockPrescriptions.length > 0) {
+      setPrescriptions(mockPrescriptions);
+    }
+  }, [mockPrescriptions, prescriptions.length]);
 
   const handleRefreshData = () => {
     // Reload overview data
@@ -433,7 +444,7 @@ const PatientDashboard: React.FC = () => {
       if (patientData) setPatient(patientData);
       setEditDialogOpen(false);
     } catch (e: any) {
-      console.error('Error saving profile:', e);
+      // Error saving profile
     } finally {
       setSaving(false);
     }
@@ -445,7 +456,9 @@ const PatientDashboard: React.FC = () => {
         profile={patient}
         user={user}
         activeSection={section}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+        }}
         onEditProfile={handleEditProfile}
         isLoading={loading}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

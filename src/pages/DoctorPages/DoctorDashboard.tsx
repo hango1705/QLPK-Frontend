@@ -1,21 +1,26 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { showNotification, Loading } from '@/components/ui';
 import { doctorAPI } from '@/services';
-import apiClient from '@/services/api/client';
+import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
 import { queryKeys } from '@/services/queryClient';
-import { useAuth } from '@/hooks';
+import { useAuth, usePermission } from '@/hooks';
 import type { TreatmentPhase, TreatmentPlan } from '@/types/doctor';
 import DoctorSidebar from './DoctorDashboard/components/DoctorSidebar';
 import DoctorHeader from './DoctorDashboard/components/DoctorHeader';
 import OverviewSection from './DoctorDashboard/components/OverviewSection';
 import DoctorContent from './DoctorDashboard/components/DoctorContent';
-import RightRail from './DoctorDashboard/components/RightRail';
+import ProfileSection from './DoctorDashboard/components/ProfileSection';
+import AccountSection from './DoctorDashboard/components/AccountSection';
 import ExamDialog from './DoctorDashboard/components/modals/ExamDialog';
 import TreatmentPhaseDialog from './DoctorDashboard/components/modals/TreatmentPhaseDialog';
 import TreatmentPlanDialog from './DoctorDashboard/components/modals/TreatmentPlanDialog';
 import ExaminationDetailDialog from './DoctorDashboard/components/modals/ExaminationDetailDialog';
-import type { ExaminationSummary } from '@/types/doctor';
+import TreatmentPhaseDetailDialog from './DoctorDashboard/components/modals/TreatmentPhaseDetailDialog';
+import TreatmentPlanDetailDialog from './DoctorDashboard/components/modals/TreatmentPlanDetailDialog';
+import AppointmentDetailDialog from './DoctorDashboard/components/modals/AppointmentDetailDialog';
+import type { ExaminationSummary, AppointmentSummary } from '@/types/doctor';
 import type { TreatmentPlanFormState } from './DoctorDashboard/components/modals/TreatmentPlanDialog';
 import { SECTION_CONFIG } from './DoctorDashboard/constants';
 import {
@@ -37,30 +42,69 @@ const DoctorDashboard: React.FC = () => {
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const [examDialog, setExamDialog] = useState<ExamDialogState | null>(null);
   const [phaseDialog, setPhaseDialog] = useState<PhaseDialogState | null>(null);
-  const [planDialog, setPlanDialog] = useState<{ open: boolean; examination?: ExaminationSummary }>({ open: false });
+  const [planDialog, setPlanDialog] = useState<{ open: boolean; examination?: ExaminationSummary; plan?: TreatmentPlan }>({ open: false });
   const [examDetailDialog, setExamDetailDialog] = useState<ExaminationSummary | null>(null);
+  const [phaseDetailDialog, setPhaseDetailDialog] = useState<{ phase: TreatmentPhase; plan: TreatmentPlan } | null>(null);
+  const [planDetailDialog, setPlanDetailDialog] = useState<TreatmentPlan | null>(null);
+  const [appointmentDetailDialog, setAppointmentDetailDialog] = useState<AppointmentSummary | null>(null);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const queryClient = useQueryClient();
-  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const { logout, isAuthenticated, token } = useAuth();
+  const { hasPermission } = usePermission();
+  const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
+  const canPickDoctor = hasPermission('PICK_DOCTOR');
 
-  const { data: profile, isLoading: loadingProfile } = useQuery({
+  const { data: profile, isLoading: loadingProfile, error: profileError } = useQuery({
     queryKey: queryKeys.doctor.profile,
     queryFn: doctorAPI.getMyProfile,
+    enabled: isAuthenticated && !!token,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });
 
-  const { data: scheduledAppointments = [], isLoading: loadingScheduled } = useQuery({
+  const { data: scheduledAppointmentsRaw = [], isLoading: loadingScheduled, error: scheduledError } = useQuery({
     queryKey: queryKeys.doctor.appointments('scheduled'),
     queryFn: () => doctorAPI.getMyAppointments('scheduled'),
+    enabled: isAuthenticated && !!token,
+    retry: 1,
+    retryDelay: 1000,
   });
+  
+  // Ensure scheduledAppointments is always an array
+  const scheduledAppointments = useMemo(() => {
+    if (!scheduledAppointmentsRaw) return [];
+    return Array.isArray(scheduledAppointmentsRaw) ? scheduledAppointmentsRaw : [];
+  }, [scheduledAppointmentsRaw]);
 
-  const { data: allAppointments = [], isLoading: loadingAppointments } = useQuery({
+  const { data: allAppointmentsRaw, isLoading: loadingAppointments, error: appointmentsError } = useQuery({
     queryKey: queryKeys.doctor.appointments('all'),
     queryFn: () => doctorAPI.getMyAppointments('all'),
+    enabled: isAuthenticated && !!token,
+    retry: 1,
+    retryDelay: 1000,
   });
+  
+  // Ensure allAppointments is always an array
+  const allAppointments = useMemo(() => {
+    if (!allAppointmentsRaw) {
+      return [];
+    }
+    if (!Array.isArray(allAppointmentsRaw)) {
+      // allAppointmentsRaw is not an array, handle gracefully
+      return [];
+    }
+    return allAppointmentsRaw;
+  }, [allAppointmentsRaw]);
 
-  const { data: examinations = [], isLoading: loadingExaminations } = useQuery({
+  const { data: examinations = [], isLoading: loadingExaminations, error: examinationsError } = useQuery({
     queryKey: queryKeys.doctor.examinations,
     queryFn: doctorAPI.getMyExaminations,
+    enabled: isAuthenticated && !!token,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const { data: treatmentPlans = [], isLoading: loadingPlans, error: treatmentPlansError } = useQuery({
@@ -71,12 +115,12 @@ const DoctorDashboard: React.FC = () => {
     refetchOnWindowFocus: false,
   });
 
-  // Chỉ query phases nếu có treatmentPlans (tránh query khi API fail)
+  // Chỉ query phases nếu có treatmentPlans và có permission (tránh query khi API fail)
   const phaseQueries = useQueries({
     queries: (treatmentPlans && treatmentPlans.length > 0 ? treatmentPlans : []).map((plan) => ({
       queryKey: queryKeys.doctor.treatmentPhases(plan.id),
       queryFn: () => doctorAPI.getTreatmentPhases(plan.id),
-      enabled: !!plan.id,
+      enabled: !!plan.id && canGetAllTreatmentPhases,
       retry: false, // Không retry để tránh spam
     })),
   }) as UseQueryResult<TreatmentPhase[]>[];
@@ -89,25 +133,46 @@ const DoctorDashboard: React.FC = () => {
     return results;
   }, [treatmentPlans, phaseQueries]);
 
+  // Update planDetailDialog when treatmentPlans data changes
+  useEffect(() => {
+    if (planDetailDialog && treatmentPlans.length > 0) {
+      const updatedPlan = treatmentPlans.find(p => p.id === planDetailDialog.id);
+      if (updatedPlan) {
+        setPlanDetailDialog(updatedPlan);
+      }
+    }
+  }, [treatmentPlans, planDetailDialog?.id]);
+
   const { data: serviceCategories = [] } = useQuery({
     queryKey: queryKeys.services.categories,
     queryFn: doctorAPI.getDentalCategories,
+    enabled: isAuthenticated && !!token,
   });
 
   const { data: services = [] } = useQuery({
     queryKey: queryKeys.services.all,
     queryFn: doctorAPI.getDentalServices,
+    enabled: isAuthenticated && !!token,
   });
 
   const { data: prescriptionCatalog = [] } = useQuery({
     queryKey: queryKeys.doctor.catalog,
     queryFn: doctorAPI.getPrescriptionCatalog,
+    enabled: isAuthenticated && !!token,
   });
 
-  const { data: doctorDirectory = [] } = useQuery({
+  const { data: doctorDirectoryRaw = [] } = useQuery({
     queryKey: queryKeys.doctor.doctorDirectory,
     queryFn: doctorAPI.getDoctorDirectory,
+    enabled: isAuthenticated && !!token && canPickDoctor, // Only fetch if user has PICK_DOCTOR permission
+    retry: false, // Don't retry on 401 - this endpoint requires PICK_DOCTOR permission
   });
+  
+  // Ensure doctorDirectory is always an array
+  const doctorDirectory = useMemo(() => {
+    if (!doctorDirectoryRaw) return [];
+    return Array.isArray(doctorDirectoryRaw) ? doctorDirectoryRaw : [];
+  }, [doctorDirectoryRaw]);
 
   const createExamMutation = useMutation({
     mutationFn: ({
@@ -197,8 +262,30 @@ const DoctorDashboard: React.FC = () => {
       planId: string;
       payload: Parameters<typeof doctorAPI.updateTreatmentPlan>[1];
     }) => doctorAPI.updateTreatmentPlan(planId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPlans });
+    onSuccess: async (updatedPlan) => {
+      // Invalidate and refetch to get latest data including nurseFullname
+      await queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPlans });
+      await queryClient.refetchQueries({ queryKey: queryKeys.doctor.treatmentPlans });
+      queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPhases() });
+      
+      // Update planDetailDialog if it's currently open for the updated plan
+      // Wait a bit for refetch to complete, then update with fresh data
+      setTimeout(() => {
+        if (planDetailDialog && planDetailDialog.id === updatedPlan.id) {
+          // Get fresh data from query cache
+          const freshPlans = queryClient.getQueryData<TreatmentPlan[]>(queryKeys.doctor.treatmentPlans);
+          if (freshPlans) {
+            const freshPlan = freshPlans.find(p => p.id === updatedPlan.id);
+            if (freshPlan) {
+              setPlanDetailDialog(freshPlan);
+            }
+          } else {
+            // Fallback to updatedPlan from response
+            setPlanDetailDialog(updatedPlan);
+          }
+        }
+      }, 100);
+      
       showNotification.success('Đã cập nhật phác đồ');
     },
     onError: (error: any) => {
@@ -250,33 +337,98 @@ const DoctorDashboard: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    try {
-      await apiClient.post('/api/v1/auth/logout', {});
-    } catch (error) {
-    } finally {
+    // Prevent multiple simultaneous logout calls
+    if (isLogoutInProgress()) {
+      return;
+    }
+    
+    // Save token before clearing state
+    const currentToken = token;
+    
+    if (!currentToken) {
+      // No token, just clear state and navigate
+      queryClient.cancelQueries();
+      queryClient.clear();
       logout();
+      navigate('/login');
+      return;
+    }
+    
+    // Set logout flag FIRST to block all new requests
+    cancelAllPendingRequests(); // This sets isLoggingOut = true
+    
+    // Cancel all active queries to prevent new requests
+    queryClient.cancelQueries();
+    
+    // Clear all queries to prevent any new requests
+    queryClient.clear();
+    
+    try {
+      // Send logout request BEFORE clearing token
+      // This ensures we have the token available for the request
+      await apiClient.post('/api/v1/auth/logout', { token: currentToken }, {
+        // Add a custom config to mark this as logout request
+        headers: {
+          'X-Logout-Request': 'true',
+        },
+      });
+    } catch (error: any) {
+      // Ignore logout errors - still clear local state
+      // 401/400 is expected if token was already invalidated or invalid
+      // These errors are already handled in the interceptor
+      if (error?.response?.status !== 401 && error?.response?.status !== 400 && error?.message !== 'Logout request already in progress for this token' && error?.message !== 'Logout in progress, request cancelled') {
+        // Logout request failed, but error is expected (401/400)
+      }
+    } finally {
+      // Clear token AFTER logout request is sent
+      logout();
+      
+      // Reset logout state
+      resetLogoutState();
+      
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        navigate('/login');
+      }, 100);
     }
   };
 
   const nextAppointment = useMemo(() => getNextAppointment(scheduledAppointments), [scheduledAppointments]);
   const doneAppointments = useMemo(
-    () => allAppointments.filter((app) => app.status?.toLowerCase() === 'done'),
+    () => Array.isArray(allAppointments) ? allAppointments.filter((app) => app.status?.toLowerCase() === 'done') : [],
     [allAppointments],
   );
   const cancelledAppointments = useMemo(
-    () => allAppointments.filter((app) => app.status?.toLowerCase() === 'cancel'),
+    () => Array.isArray(allAppointments) ? allAppointments.filter((app) => app.status?.toLowerCase() === 'cancel') : [],
     [allAppointments],
   );
   const activePhases = useMemo(() => aggregatePhases(treatmentPlans, phasesByPlan), [treatmentPlans, phasesByPlan]);
 
   // Chỉ block loading nếu các API quan trọng đang load
-  // Nếu treatmentPlans fail, vẫn cho phép render (với empty array)
-  const isLoadingPage =
+  // Nếu một số API fail, vẫn cho phép render (với empty data)
+  // Timeout: Nếu đã load quá 10 giây, cho phép render để tránh infinite loading
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      setLoadingTimeout(false); // Reset timeout when auth changes
+      const timer = setTimeout(() => {
+        // Loading timeout - allowing render with partial data
+        setLoadingTimeout(true);
+      }, 10000); // 10 seconds timeout
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [isAuthenticated, token, loadingProfile, loadingScheduled, loadingAppointments, loadingExaminations, loadingPlans, profileError, scheduledError, appointmentsError, examinationsError, treatmentPlansError]);
+  
+  const isLoadingPage = !loadingTimeout && (
     loadingProfile || 
     loadingScheduled || 
     loadingAppointments || 
     loadingExaminations || 
-    (loadingPlans && !treatmentPlansError); // Chỉ block nếu đang load và chưa có error
+    (loadingPlans && !treatmentPlansError)
+  );
 
   return (
     <div className="flex min-h-screen bg-gradient-fresh text-foreground">
@@ -309,80 +461,75 @@ const DoctorDashboard: React.FC = () => {
               <Loading size="lg" />
             </div>
           ) : (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="space-y-6">
-                {activeSection === 'overview' ? (
-                  <OverviewSection
-                    nextAppointment={nextAppointment}
-                    scheduledAppointments={scheduledAppointments}
-                    doneAppointments={doneAppointments}
-                    cancelledAppointments={cancelledAppointments}
-                    examinations={examinations}
-                    treatmentPlans={treatmentPlans}
-                    activePhases={activePhases}
-                    onCreateExam={() => {
-                      if (scheduledAppointments.length) {
-                        setExamDialog({ mode: 'create', appointment: scheduledAppointments[0] });
-                      }
-                    }}
-                    onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
-                  />
-                ) : (
-                  <DoctorContent
-                    activeSection={activeSection}
-                    appointments={allAppointments}
-                    scheduledAppointments={scheduledAppointments}
-                    examinations={examinations}
-                    treatmentPlans={treatmentPlans}
-                    phasesByPlan={phasesByPlan}
-                    serviceCategories={serviceCategories}
-                    services={services}
-                    prescriptions={prescriptionCatalog}
-                    doctors={doctorDirectory}
-                    onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
-                    onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
-                    onViewExamDetail={(examination) => setExamDetailDialog(examination)}
-                    onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
-                    onEditPhase={(plan, phase) => setPhaseDialog({ mode: 'update', plan, phase })}
-                    onCreatePlan={(examination) => setPlanDialog({ open: true, examination })}
-                    onUpdatePlanStatus={handlePlanStatusChange}
-                    onPhaseClick={(planId, phaseId) => {
-                      // Chuyển đến section treatment
-                      setActiveSection('treatment');
-                      // Tìm plan và phase tương ứng
-                      const plan = treatmentPlans.find((p) => p.id === planId);
-                      const phases = phasesByPlan[planId] || [];
-                      const phase = phases.find((p) => p.id === phaseId);
-                      if (plan && phase) {
-                        // Mở modal với phase tương ứng
-                        setPhaseDialog({ mode: 'update', plan, phase });
-                      }
-                    }}
-                    onAddPhase={() => {
-                      // Chuyển đến section treatment
-                      setActiveSection('treatment');
-                      // Tìm plan đầu tiên để tạo phase mới
-                      // Nếu có nhiều plans, lấy plan đầu tiên
-                      // Nếu không có plan, có thể cần tạo plan trước
-                      if (treatmentPlans.length > 0) {
-                        const firstPlan = treatmentPlans[0];
-                        setPhaseDialog({ mode: 'create', plan: firstPlan });
-                      } else {
-                        showNotification.info('Vui lòng tạo phác đồ điều trị trước khi thêm tiến trình');
-                      }
-                    }}
-                  />
-                )}
-              </div>
-
-              <RightRail
-                nextAppointment={nextAppointment}
-                scheduledAppointments={scheduledAppointments}
-                treatmentPlans={treatmentPlans}
-                serviceCategories={serviceCategories}
-                onQuickExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
-                onQuickPhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
-              />
+            <div className="space-y-6">
+              {activeSection === 'overview' ? (
+                <OverviewSection
+                  nextAppointment={nextAppointment}
+                  scheduledAppointments={scheduledAppointments}
+                  doneAppointments={doneAppointments}
+                  cancelledAppointments={cancelledAppointments}
+                  examinations={examinations}
+                  treatmentPlans={treatmentPlans}
+                  activePhases={activePhases}
+                  onCreateExam={() => {
+                    if (scheduledAppointments.length) {
+                      setExamDialog({ mode: 'create', appointment: scheduledAppointments[0] });
+                    }
+                  }}
+                  onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
+                />
+              ) : activeSection === 'profile' ? (
+                <ProfileSection />
+              ) : activeSection === 'account' ? (
+                <AccountSection />
+              ) : (
+                <DoctorContent
+                  activeSection={activeSection}
+                  appointments={allAppointments}
+                  scheduledAppointments={scheduledAppointments}
+                  examinations={examinations}
+                  treatmentPlans={treatmentPlans}
+                  phasesByPlan={phasesByPlan}
+                  serviceCategories={serviceCategories}
+                  services={services}
+                  prescriptions={prescriptionCatalog}
+                  doctors={doctorDirectory}
+                  onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
+                  onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
+                  onViewExamDetail={(examination) => setExamDetailDialog(examination)}
+                  onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
+                  onEditPhase={(plan, phase) => setPhaseDialog({ mode: 'update', plan, phase })}
+                  onCreatePlan={(examination) => setPlanDialog({ open: true, examination })}
+                  onUpdatePlanStatus={handlePlanStatusChange}
+                  onViewPlanDetail={(plan) => setPlanDetailDialog(plan)}
+                  onViewAppointmentDetail={(appointment) => setAppointmentDetailDialog(appointment)}
+                  onPhaseClick={(planId, phaseId) => {
+                    // Chuyển đến section treatment
+                    setActiveSection('treatment');
+                    // Tìm plan và phase tương ứng
+                    const plan = treatmentPlans.find((p) => p.id === planId);
+                    const phases = phasesByPlan[planId] || [];
+                    const phase = phases.find((p) => p.id === phaseId);
+                    if (plan && phase) {
+                      // Mở modal với phase tương ứng
+                      setPhaseDialog({ mode: 'update', plan, phase });
+                    }
+                  }}
+                  onAddPhase={() => {
+                    // Chuyển đến section treatment
+                    setActiveSection('treatment');
+                    // Tìm plan đầu tiên để tạo phase mới
+                    // Nếu có nhiều plans, lấy plan đầu tiên
+                    // Nếu không có plan, có thể cần tạo plan trước
+                    if (treatmentPlans.length > 0) {
+                      const firstPlan = treatmentPlans[0];
+                      setPhaseDialog({ mode: 'create', plan: firstPlan });
+                    } else {
+                      showNotification.info('Vui lòng tạo phác đồ điều trị trước khi thêm tiến trình');
+                    }
+                  }}
+                />
+              )}
             </div>
           )}
         </main>
@@ -411,10 +558,33 @@ const DoctorDashboard: React.FC = () => {
       <TreatmentPlanDialog
         open={planDialog.open}
         examination={planDialog.examination}
+        plan={planDialog.plan}
         examinations={examinations}
-        onOpenChange={(open) => setPlanDialog({ open, examination: undefined })}
-        onSubmit={(form) => createPlanMutation.mutate(form)}
-        isLoading={createPlanMutation.isPending}
+        onOpenChange={(open) => setPlanDialog({ open, examination: undefined, plan: undefined })}
+        onSubmit={(form) => {
+          if (planDialog.plan) {
+            // Edit mode - map form to update payload
+            const updatePayload: Parameters<typeof doctorAPI.updateTreatmentPlan>[1] = {
+              title: form.title,
+              description: form.description,
+              duration: form.duration || '',
+              notes: form.notes || '',
+              status: planDialog.plan.status, // Keep current status
+            };
+            // Only include nurseId if it's provided and not empty
+            if (form.nurseId && form.nurseId.trim() !== '') {
+              updatePayload.nurseId = form.nurseId;
+            }
+            updatePlanMutation.mutate({ 
+              planId: planDialog.plan.id, 
+              payload: updatePayload
+            });
+          } else {
+            // Create mode
+            createPlanMutation.mutate(form);
+          }
+        }}
+        isLoading={createPlanMutation.isPending || updatePlanMutation.isPending}
       />
 
       <ExaminationDetailDialog
@@ -425,6 +595,54 @@ const DoctorDashboard: React.FC = () => {
           setExamDetailDialog(null);
           setExamDialog({ mode: 'update', examination: exam });
         }}
+      />
+
+      <TreatmentPhaseDetailDialog
+        open={!!phaseDetailDialog}
+        phase={phaseDetailDialog?.phase || null}
+        plan={phaseDetailDialog?.plan || null}
+        onOpenChange={(open) => !open && setPhaseDetailDialog(null)}
+        onEdit={(phase, plan) => {
+          setPhaseDetailDialog(null);
+          setPhaseDialog({ mode: 'update', plan, phase });
+        }}
+        onRefresh={() => {
+          // Refresh treatment phases data
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPhases() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPlans });
+        }}
+      />
+      <TreatmentPlanDetailDialog
+        open={!!planDetailDialog}
+        plan={planDetailDialog}
+        phases={planDetailDialog ? phasesByPlan[planDetailDialog.id] || [] : []}
+        onOpenChange={(open) => !open && setPlanDetailDialog(null)}
+        onEdit={(plan) => {
+          setPlanDetailDialog(null);
+          setPlanDialog({ open: true, plan });
+        }}
+        onCreatePhase={(plan) => {
+          setPlanDetailDialog(null);
+          setPhaseDialog({ mode: 'create', plan });
+        }}
+        onEditPhase={(plan, phase) => {
+          setPlanDetailDialog(null);
+          setPhaseDetailDialog({ phase, plan });
+        }}
+      />
+      <AppointmentDetailDialog
+        open={!!appointmentDetailDialog}
+        appointment={appointmentDetailDialog}
+        onOpenChange={(open) => !open && setAppointmentDetailDialog(null)}
+        onCreateExam={(appointment) => {
+          setAppointmentDetailDialog(null);
+          setExamDialog({ mode: 'create', appointment });
+        }}
+        onCreatePhase={(plan) => {
+          setAppointmentDetailDialog(null);
+          setPhaseDialog({ mode: 'create', plan });
+        }}
+        treatmentPlans={treatmentPlans}
       />
     </div>
   );

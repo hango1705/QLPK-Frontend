@@ -12,6 +12,7 @@ interface AppointmentsCalendarProps {
   doctors?: Array<{ id: string; fullName: string }>;
   selectedDoctorId?: string;
   onDoctorSelect?: (doctorId: string) => void;
+  onViewDetail?: (appointment: AppointmentSummary) => void;
 }
 
 // Chuyển đổi AppointmentSummary sang FullCalendar Event format
@@ -63,7 +64,9 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
   doctors,
   selectedDoctorId,
   onDoctorSelect,
+  onViewDetail,
 }) => {
+  // Appointments are already filtered in NurseDashboard, so we use them directly
   const events = convertAppointmentsToEvents(appointments);
   const scheduledAppointments = appointments.filter(
     (app) => app.status?.toLowerCase() === 'scheduled'
@@ -72,6 +75,13 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
   const handleDateClick = (dateClickInfo: any) => {
     // Có thể mở dialog tạo appointment mới ở đây nếu cần
     // Date clicked: dateClickInfo.dateStr
+  };
+
+  const handleEventClick = (clickInfo: any) => {
+    const appointment = clickInfo.event.extendedProps.appointment as AppointmentSummary;
+    if (onViewDetail && appointment) {
+      onViewDetail(appointment);
+    }
   };
 
   // Custom event content để hiển thị thông tin chi tiết hơn
@@ -109,8 +119,7 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
       {/* Header với thống kê và filter */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/70 bg-white/60 px-4 py-3">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Lịch hẹn của tất cả bác sĩ</h3>
-          <p className="text-xs text-muted-foreground">Xem lịch hẹn đã lên lịch của các bác sĩ</p>
+          <h3 className="text-base font-semibold text-foreground">Lịch hẹn của bác sĩ</h3>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {doctors && doctors.length > 0 && (
@@ -145,6 +154,7 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
           events={events}
+          eventClick={handleEventClick}
           dateClick={handleDateClick}
           eventContent={renderEventContent}
           height="auto"

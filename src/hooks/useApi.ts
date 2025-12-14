@@ -4,17 +4,18 @@ import { authAPI } from '@/services/api/auth';
 import { userAPI } from '@/services/api/user';
 import { showNotification } from '@/components/ui';
 
-// Auth queries
-export const useCurrentUser = () => {
-  return useQuery({
-    queryKey: queryKeys.auth.currentUser,
-    queryFn: async () => {
-      const response = await authAPI.getCurrentUser('');
-      return response.data;
-    },
-    enabled: false, // Only run when explicitly called
-  });
-};
+// NOTE: getCurrentUser endpoint does not exist in Backend
+// Use adminAPI.getMyInfo() or doctorAPI.getMyProfile() instead
+// export const useCurrentUser = () => {
+//   return useQuery({
+//     queryKey: queryKeys.auth.currentUser,
+//     queryFn: async () => {
+//       const response = await authAPI.getCurrentUser('');
+//       return response.data;
+//     },
+//     enabled: false, // Only run when explicitly called
+//   });
+// };
 
 // User queries
 export const useUserProfile = (userId: string) => {
@@ -28,16 +29,17 @@ export const useUserProfile = (userId: string) => {
   });
 };
 
-export const useUserAppointments = (userId: string, params?: any) => {
-  return useQuery({
-    queryKey: queryKeys.user.appointments(userId),
-    queryFn: async () => {
-      const response = await userAPI.getAppointments(userId, params);
-      return response.data;
-    },
-    enabled: !!userId,
-  });
-};
+// NOTE: getAppointments endpoint does not exist in Backend
+// export const useUserAppointments = (userId: string, params?: any) => {
+//   return useQuery({
+//     queryKey: queryKeys.user.appointments(userId),
+//     queryFn: async () => {
+//       const response = await userAPI.getAppointments(userId, params);
+//       return response.data;
+//     },
+//     enabled: !!userId,
+//   });
+// };
 
 // User mutations
 export const useUpdateProfile = () => {
@@ -59,24 +61,25 @@ export const useUpdateProfile = () => {
   });
 };
 
-export const useUploadAvatar = () => {
-  const queryClient = useQueryClient();
+// NOTE: uploadAvatar endpoint does not exist in Backend
+// export const useUploadAvatar = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ userId, file }: { userId: string; file: File }) =>
-      userAPI.uploadAvatar(userId, file),
-    onSuccess: (data, variables) => {
-      // Invalidate and refetch user profile
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.user.profile(variables.userId),
-      });
-      showNotification.success('Avatar uploaded successfully!');
-    },
-    onError: (error: any) => {
-      showNotification.error('Failed to upload avatar', error.message);
-    },
-  });
-};
+//   return useMutation({
+//     mutationFn: ({ userId, file }: { userId: string; file: File }) =>
+//       userAPI.uploadAvatar(userId, file),
+//     onSuccess: (data, variables) => {
+//       // Invalidate and refetch user profile
+//       queryClient.invalidateQueries({
+//         queryKey: queryKeys.user.profile(variables.userId),
+//       });
+//       showNotification.success('Avatar uploaded successfully!');
+//     },
+//     onError: (error: any) => {
+//       showNotification.error('Failed to upload avatar', error.message);
+//     },
+//   });
+// };
 
 export const useChangePassword = () => {
   return useMutation({
@@ -84,7 +87,7 @@ export const useChangePassword = () => {
       userId: string; 
       currentPassword: string; 
       newPassword: string; 
-    }) => userAPI.changePassword(userId, { currentPassword, newPassword }),
+    }) => userAPI.changePassword(userId, { oldPassword: currentPassword, password: newPassword }),
     onSuccess: () => {
       showNotification.success('Password changed successfully!');
     },
@@ -94,21 +97,22 @@ export const useChangePassword = () => {
   });
 };
 
-export const useDeleteAccount = () => {
-  const queryClient = useQueryClient();
+// NOTE: deleteAccount endpoint does not exist in Backend
+// export const useDeleteAccount = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
-      userAPI.deleteAccount(userId, password),
-    onSuccess: () => {
-      // Clear all queries
-      queryClient.clear();
-      showNotification.success('Account deleted successfully');
-      // Redirect to home page
-      window.location.href = '/';
-    },
-    onError: (error: any) => {
-      showNotification.error('Failed to delete account', error.message);
-    },
-  });
-};
+//   return useMutation({
+//     mutationFn: ({ userId, password }: { userId: string; password: string }) =>
+//       userAPI.deleteAccount(userId, password),
+//     onSuccess: () => {
+//       // Clear all queries
+//       queryClient.clear();
+//       showNotification.success('Account deleted successfully');
+//       // Redirect to home page
+//       window.location.href = '/';
+//     },
+//     onError: (error: any) => {
+//       showNotification.error('Failed to delete account', error.message);
+//     },
+//   });
+// };

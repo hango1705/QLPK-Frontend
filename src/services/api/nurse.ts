@@ -89,19 +89,23 @@ export const nurseAPI = {
     const appointmentArrays = await Promise.all(appointmentPromises);
     
     // Merge and deduplicate by appointment ID
+    // When duplicates are found, keep the one with doctorId (prefer the latest one)
     const allAppointments: AppointmentSummary[] = [];
-    const seenIds = new Set<string>();
+    const appointmentMap = new Map<string, AppointmentSummary>();
     
     appointmentArrays.forEach((appointments) => {
       appointments.forEach((appointment) => {
-        if (!seenIds.has(appointment.id)) {
-          seenIds.add(appointment.id);
-          allAppointments.push(appointment);
+        const existing = appointmentMap.get(appointment.id);
+        // If appointment doesn't exist in map, add it
+        // If it exists but doesn't have doctorId, replace it with the new one (which should have doctorId)
+        if (!existing || (!existing.doctorId && appointment.doctorId)) {
+          appointmentMap.set(appointment.id, appointment);
         }
       });
     });
 
-    return allAppointments;
+    // Convert map values to array
+    return Array.from(appointmentMap.values());
   },
 
   /**
@@ -140,6 +144,16 @@ export const nurseAPI = {
   getDoctorById: async (doctorId: string): Promise<DoctorSummary> => {
     const response = await apiClient.get(`/api/v1/nurse/doctors/${doctorId}`);
     return unwrap<DoctorSummary>(response.data);
+  },
+
+  /**
+   * Update appointment notification status (mark as notified)
+   * @param appointmentId - Appointment ID
+   * @returns Updated appointment response
+   */
+  updateAppointmentNotification: async (appointmentId: string): Promise<AppointmentSummary> => {
+    const response = await apiClient.put(`/api/v1/nurse/appointment/${appointmentId}`);
+    return unwrap<AppointmentSummary>(response.data);
   },
 };
 

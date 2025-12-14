@@ -27,7 +27,10 @@ export interface TreatmentPlansResponse {
   notes: string;
   status: string;
   totalCost: number;
-  doctorFullname: string;
+  doctorFullname?: string;
+  doctorId?: string;
+  nurseId?: string;
+  patientId?: string;
   createAt: string; // Format: "dd/MM/yyyy"
 }
 
@@ -354,6 +357,21 @@ export const patientAPI = {
       params,
     });
     return unwrap<VNPayResponse>(response);
+  },
+
+  /**
+   * Update cost payment information
+   * Role: PATIENT
+   * @param costId - Cost ID
+   * @param data - Payment update data (paymentMethod, status, vnpTxnRef)
+   * @returns Updated cost response
+   */
+  updateCostPayment: async (
+    costId: string,
+    data: { paymentMethod: string; status: string; vnpTxnRef?: string },
+  ): Promise<CostResponse> => {
+    const response = await apiClient.put(`/api/v1/cost/${costId}`, data);
+    return unwrap<CostResponse>(response);
   },
 };
 

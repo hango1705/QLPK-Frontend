@@ -1,6 +1,5 @@
 import React from 'react';
-import { Button, ScrollArea, Separator } from '@/components/ui';
-import { Plus } from 'lucide-react';
+import { Button, ScrollArea } from '@/components/ui';
 import { SECTION_CONFIG } from '../constants';
 import type { PatientSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
@@ -53,24 +52,6 @@ const PatientSidebar: React.FC<PatientSidebarProps> = ({
             );
           })}
         </nav>
-        {!isCollapsed && (
-          <>
-            <Separator className="my-6" />
-            <div className="space-y-2">
-              <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Quick Actions
-              </p>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 border-dashed"
-                onClick={() => onSectionChange('appointment')}
-              >
-                <Plus className="h-4 w-4" />
-                Đặt lịch hẹn
-              </Button>
-            </div>
-          </>
-        )}
       </ScrollArea>
     </aside>
   );

@@ -16,7 +16,7 @@ interface ExaminationListItem {
 
 interface ExaminationDetail extends ExaminationListItem {
   totalCost?: number;
-  listImage?: { publicId: string; url: string }[];
+  listImage?: Array<{ publicId: string; url: string; type: string }>;
 }
 
 const PatientInitialExamination = () => {
@@ -275,9 +275,34 @@ const PatientInitialExamination = () => {
                       <div>
                         <div className="font-medium mb-2">Hình ảnh</div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {detail.listImage.map((img, idx) => (
-                            <img key={idx} src={img.url} alt="examination" className="rounded-md border" />
-                          ))}
+                          {detail.listImage.map((img, idx) => {
+                            // Map type từ database sang label tiếng Việt
+                            const getImageTypeLabel = (type: string) => {
+                              switch (type) {
+                                case 'examinationTeeth':
+                                  return 'Ảnh răng';
+                                case 'examinationFace':
+                                  return 'Ảnh mặt';
+                                case 'examinationXray':
+                                  return 'Ảnh X-quang';
+                                default:
+                                  return type; // Fallback nếu có type khác
+                              }
+                            };
+
+                            return (
+                              <div key={idx} className="flex flex-col">
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 text-white shadow-sm mb-2 w-fit">
+                                  {getImageTypeLabel(img.type || '')}
+                                </span>
+                                <img 
+                                  src={img.url} 
+                                  alt={`examination ${img.type || ''}`} 
+                                  className="rounded-md border w-full h-auto"
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

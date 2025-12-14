@@ -38,10 +38,23 @@ const deriveRoleFromScope = (scope?: string): AppRole => {
   if (!scope) return 'patient';
   const scopes = scope.split(' ').filter(Boolean);
   if (scopes.includes('ROLE_ADMIN')) return 'admin';
-  if (scopes.includes('ROLE_DOCTOR')) return 'doctor';
+  if (scopes.includes('ROLE_DOCTOR') || scopes.includes('ROLE_DOCTORLV2')) return 'doctor';
   if (scopes.includes('ROLE_NURSE')) return 'nurse';
   if (scopes.includes('ROLE_PATIENT')) return 'patient';
   return 'patient';
+};
+
+/**
+ * Check if user has DOCTORLV2 role
+ * @param token - JWT token
+ * @returns boolean - true if user has DOCTORLV2 role
+ */
+export const isDoctorLV2 = (token?: string): boolean => {
+  if (!token) return false;
+  const payload = decodeTokenPayload<{ scope?: string }>(token);
+  if (!payload?.scope) return false;
+  const scopes = payload.scope.split(' ').filter(Boolean);
+  return scopes.includes('ROLE_DOCTORLV2');
 };
 
 export const extractRoleFromToken = (token?: string): AppRole => {
@@ -80,7 +93,6 @@ export const checkTokenValidity = async (token: string): Promise<boolean> => {
     const response = await authAPI.introspectToken(token);
     return response.data?.code === 1000 && response.data?.result?.valid === true;
   } catch (error) {
-    console.error('Token validation error:', error);
     return false;
   }
 };

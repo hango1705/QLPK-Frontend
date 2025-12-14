@@ -5,6 +5,8 @@ import { UserOutlined, PhoneOutlined, HeartOutlined, SafetyCertificateOutlined, 
 import { patientAPI } from '@/services/api/patient';
 import { adminAPI } from '@/services/api/admin';
 import { useSelector } from 'react-redux';
+import { usePermission } from '@/hooks';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
 
 const GENDER_OPTS = [
   { label: 'Nam', value: 'male' },
@@ -18,6 +20,8 @@ const BLOOD_OPTS = [
 
 const PatientBasicInfo = () => {
   const token = useSelector((state: any) => state.auth.token);
+  const { hasPermission } = usePermission();
+  const canGetBasicInfo = hasPermission('GET_BASIC_INFO');
   const [patient, setPatient] = useState<any | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true); // loading tổng
@@ -29,7 +33,7 @@ const PatientBasicInfo = () => {
 
   // Load info userId/patientId
   useEffect(() => {
-    if (!token) return;
+    if (!token || !canGetBasicInfo) return;
     setLoading(true);
     setMsg(null);
     setError(null);
@@ -59,7 +63,7 @@ const PatientBasicInfo = () => {
         setError('Không thể lấy thông tin bệnh nhân này!');
         setLoading(false);
       });
-  }, [token]);
+  }, [token, canGetBasicInfo]);
 
   // Handlers
   const onChange = (e: any) => {
@@ -75,21 +79,42 @@ const PatientBasicInfo = () => {
   // Lưu info cá nhân
   const saveInfo = async () => {
     if (!user?.id) return setMsg('Thiếu userId!');
-    // simple validations
+    // Validation các trường bắt buộc
     const errs: any = {};
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
-    if (form.phone && !/^\d{9,11}$/.test((form.phone || '').replace(/\D/g, ''))) errs.phone = 'Số điện thoại 9-11 chữ số';
+    
+    // Họ tên bắt buộc
+    if (!form.fullName || form.fullName.trim() === '') {
+      errs.fullName = 'Họ tên không được để trống';
+    }
+    
+    // Số điện thoại bắt buộc
+    if (!form.phone || form.phone.trim() === '') {
+      errs.phone = 'Số điện thoại không được để trống';
+    } else if (!/^\d{9,11}$/.test((form.phone || '').replace(/\D/g, ''))) {
+      errs.phone = 'Số điện thoại phải có 9-11 chữ số';
+    }
+    
+    // Email không được sửa, chỉ validate format nếu có
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errs.email = 'Email không hợp lệ';
+    }
+    
     setFieldErrors(errs);
-    if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường bôi đỏ'); return; }
+    if (Object.keys(errs).length) { 
+      setError('Vui lòng kiểm tra lại các trường bôi đỏ'); 
+      return; 
+    }
+    
     setSaving(true); setMsg(null); setError(null);
     try {
+      // Không gửi email khi update vì không được sửa
       await adminAPI.updateUserInfo(user.id, {
-        fullName: form.fullName,
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-        gender: form.gender,
-        dob: form.dob,
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        // Không gửi email - giữ nguyên email hiện tại
+        address: form.address?.trim() || '',
+        gender: form.gender || '',
+        dob: form.dob || '',
       });
       setMsg('Đã lưu thông tin cá nhân!');
       showNotification.success('Thành công', 'Đã lưu thông tin cá nhân');
@@ -134,7 +159,15 @@ const PatientBasicInfo = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Đang tải dữ liệu…</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PermissionGuard permission="GET_BASIC_INFO" fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Alert variant="destructive">
+          <AlertTitle>Không có quyền truy cập</AlertTitle>
+          <AlertDescription>Bạn không có quyền xem thông tin cơ bản bệnh nhân</AlertDescription>
+        </Alert>
+      </div>
+    }>
+      <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -161,13 +194,42 @@ const PatientBasicInfo = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-6">
             <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><UserOutlined /> Thông tin cá nhân</div>
-            <label className="block text-sm font-medium mb-1">Họ tên</label>
-            <Input aria-label="Họ tên" name="fullName" value={form.fullName || ''} onChange={onChange} className="mb-3" />
+            <label className="block text-sm font-medium mb-1">
+              Họ tên <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              aria-label="Họ tên" 
+              name="fullName" 
+              value={form.fullName || ''} 
+              onChange={onChange} 
+              className={`mb-1 ${fieldErrors.fullName ? 'border-red-500' : ''}`}
+              required
+            />
+            {fieldErrors.fullName && <div className="text-xs text-red-600 mb-2">{fieldErrors.fullName}</div>}
             <label className="block text-sm font-medium mb-1">Email</label>
-            <Input aria-label="Email" name="email" value={form.email || ''} onChange={onChange} className={`mb-1 ${fieldErrors.email ? 'border-red-500' : ''}`} prefix={<MailOutlined />} placeholder="name@example.com" />
-            {fieldErrors.email && <div className="text-xs text-red-600 mb-2">{fieldErrors.email}</div>}
-            <label className="block text-sm font-medium mb-1">Số điện thoại</label>
-            <Input aria-label="Số điện thoại" name="phone" value={form.phone || ''} onChange={onChange} className={`mb-1 ${fieldErrors.phone ? 'border-red-500' : ''}`} prefix={<PhoneOutlined />} placeholder="0986532214" />
+            <Input 
+              aria-label="Email" 
+              name="email" 
+              value={form.email || ''} 
+              disabled
+              className="mb-3 bg-gray-100 cursor-not-allowed" 
+              prefix={<MailOutlined />} 
+              placeholder="name@example.com"
+              title="Email không thể thay đổi"
+            />
+            <label className="block text-sm font-medium mb-1">
+              Số điện thoại <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              aria-label="Số điện thoại" 
+              name="phone" 
+              value={form.phone || ''} 
+              onChange={onChange} 
+              className={`mb-1 ${fieldErrors.phone ? 'border-red-500' : ''}`} 
+              prefix={<PhoneOutlined />} 
+              placeholder="0986532214"
+              required
+            />
             {fieldErrors.phone && <div className="text-xs text-red-600 mb-2">{fieldErrors.phone}</div>}
             <label className="block text-sm font-medium mb-1">Địa chỉ</label>
             <Input aria-label="Địa chỉ" name="address" value={form.address || ''} onChange={onChange} className="mb-3" prefix={<HomeOutlined />} />
@@ -224,6 +286,7 @@ const PatientBasicInfo = () => {
         </div>
       </div>
     </div>
+    </PermissionGuard>
   );
 };
 

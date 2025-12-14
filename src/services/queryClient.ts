@@ -98,6 +98,8 @@ export const queryKeys = {
     myInfo: ['patient', 'myInfo'] as const,
     bookingDateTime: (doctorId: string) => ['patient', 'bookingDateTime', doctorId] as const,
     treatmentPlans: (patientId: string) => ['patient', 'treatmentPlans', patientId] as const,
+    myTreatmentPlans: ['patient', 'myTreatmentPlans'] as const,
+    treatmentPhases: (planId: string) => ['patient', 'treatmentPhases', planId] as const,
     costs: ['patient', 'costs'] as const,
   },
 
@@ -107,6 +109,7 @@ export const queryKeys = {
     nursesForPick: ['nurse', 'pick'] as const,
     appointmentsByDoctor: (doctorId: string) => ['nurse', 'appointments', 'doctor', doctorId] as const,
     allAppointments: ['nurse', 'appointments', 'all'] as const,
+    doctor: (doctorId: string) => ['nurse', 'doctors', doctorId] as const,
     treatmentPlans: ['nurse', 'treatmentPlans'] as const,
     patient: (patientId: string) => ['nurse', 'patient', patientId] as const,
     doctors: ['nurse', 'doctors'] as const,

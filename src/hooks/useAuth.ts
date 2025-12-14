@@ -5,7 +5,7 @@ import {
   loginUser, 
   registerUser, 
   logoutUser, 
-  getCurrentUser,
+  // getCurrentUser, // NOTE: API does not exist in Backend
   sendVerificationCode,
   forgotPassword,
   verifyResetPassword,
@@ -17,7 +17,7 @@ import {
 import { 
   fetchUserProfile, 
   updateUserProfile, 
-  uploadAvatar,
+  // uploadAvatar, // NOTE: API does not exist in Backend
   changePassword,
   clearUserError 
 } from '@/store/slices/userSlice';
@@ -70,9 +70,10 @@ export const useAuth = () => {
     return dispatch(logoutUser());
   }, [dispatch]);
 
-  const getCurrentUserInfo = useCallback(() => {
-    return dispatch(getCurrentUser());
-  }, [dispatch]);
+  // NOTE: getCurrentUser API does not exist in Backend
+  // const getCurrentUserInfo = useCallback(() => {
+  //   return dispatch(getCurrentUser());
+  // }, [dispatch]);
 
   const clearError = useCallback(() => {
     dispatch(clearAuthError());
@@ -92,7 +93,7 @@ export const useAuth = () => {
     resetPassword: resetPasswordAction,
     introspectToken: introspectTokenAction,
     logout,
-    getCurrentUserInfo,
+    // getCurrentUserInfo, // NOTE: API does not exist in Backend
     clearError,
     resetLoading: resetLoadingState,
   };
@@ -111,9 +112,10 @@ export const useUser = () => {
     return dispatch(updateUserProfile({ userId, profileData }));
   }, [dispatch]);
 
-  const uploadUserAvatar = useCallback((userId: string, file: File) => {
-    return dispatch(uploadAvatar({ userId, file }));
-  }, [dispatch]);
+  // NOTE: uploadAvatar API does not exist in Backend
+  // const uploadUserAvatar = useCallback((userId: string, file: File) => {
+  //   return dispatch(uploadAvatar({ userId, file }));
+  // }, [dispatch]);
 
   const changeUserPassword = useCallback((userId: string, currentPassword: string, newPassword: string) => {
     return dispatch(changePassword({ userId, currentPassword, newPassword }));
@@ -127,7 +129,7 @@ export const useUser = () => {
     ...user,
     fetchProfile,
     updateProfile,
-    uploadAvatar: uploadUserAvatar,
+    // uploadAvatar: uploadUserAvatar, // NOTE: API does not exist in Backend
     changePassword: changeUserPassword,
     clearError,
   };

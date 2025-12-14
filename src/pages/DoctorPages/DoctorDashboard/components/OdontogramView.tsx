@@ -5,6 +5,8 @@ import { Smile } from 'lucide-react';
 import { Odontogram } from 'react-odontogram';
 import { patientAPI, type ToothResponse } from '@/services/api/patient';
 import { showNotification } from '@/components/ui';
+import { usePermission } from '@/hooks';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
 
 interface ToothData {
   number: number;
@@ -36,6 +38,11 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
   onToothClick, 
   onToothStatusChange 
 }) => {
+  const { hasPermission } = usePermission();
+  const canGetToothStatus = hasPermission('GET_TOOTH_STATUS');
+  const canCreateToothStatus = hasPermission('CREATE_TOOTH_STATUS');
+  const canUpdateToothStatus = hasPermission('UPDATE_TOOTH_STATUS');
+  
   // State quản lý tình trạng của từng răng (toothNumber -> { status, id })
   const [toothStatusMap, setToothStatusMap] = useState<Record<number, { status: string; id?: string }>>(() => {
     const initialMap: Record<number, { status: string; id?: string }> = {};
@@ -55,7 +62,7 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
 
   // Load teeth data from API when patientId is provided
   useEffect(() => {
-    if (!patientId) return;
+    if (!patientId || !canGetToothStatus) return;
 
     const loadTeeth = async () => {
       setLoading(true);
@@ -70,7 +77,6 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
         });
         setToothStatusMap(newMap);
       } catch (error) {
-        console.error('Error loading teeth data:', error);
         showNotification.error('Lỗi', 'Không thể tải dữ liệu răng');
       } finally {
         setLoading(false);
@@ -78,7 +84,7 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
     };
 
     loadTeeth();
-  }, [patientId]);
+  }, [patientId, canGetToothStatus]);
 
   // Convert teeth data to initialSelected format (array of tooth IDs)
   // Format: "teeth-{FDI_number}" (e.g., "teeth-21", "teeth-12")
@@ -149,9 +155,20 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
       return;
     }
 
-    setSaving(true);
     const toothNumber = selectedTooth;
     const existingTooth = toothStatusMap[toothNumber];
+
+    // Check permissions
+    if (existingTooth?.id && !canUpdateToothStatus) {
+      showNotification.error('Lỗi', 'Bạn không có quyền cập nhật trạng thái răng');
+      return;
+    }
+    if (!existingTooth?.id && !canCreateToothStatus) {
+      showNotification.error('Lỗi', 'Bạn không có quyền tạo trạng thái răng');
+      return;
+    }
+
+    setSaving(true);
 
     try {
       let updatedTooth: ToothResponse;
@@ -212,12 +229,11 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
         }
       }, 300);
     } catch (error: any) {
-      console.error('Error saving tooth status:', error);
       showNotification.error('Lỗi', error.response?.data?.message || 'Không thể lưu tình trạng răng');
     } finally {
       setSaving(false);
     }
-  }, [selectedTooth, toothStatusMap, onToothStatusChange, patientId]);
+  }, [selectedTooth, toothStatusMap, onToothStatusChange, patientId, canCreateToothStatus, canUpdateToothStatus]);
 
   // Colors configuration - sẽ được override bằng CSS cho từng răng
   const colors = useMemo(() => ({
@@ -277,7 +293,6 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
         const toothGroup = findToothGroup(svg, toothNumber);
         
         if (!toothGroup) {
-          console.warn(`Could not find group for tooth ${toothNumber}`);
           return;
         }
 
@@ -334,12 +349,17 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
         <CardDescription>Sơ đồ răng và tình trạng điều trị</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {/* Odontogram Component */}
-          <div 
-            ref={odontogramRef}
-            className="w-full overflow-x-auto bg-white rounded-xl p-4 [&_svg]:bg-white [&_svg_path]:stroke-gray-800 [&_svg_path]:fill-white"
-          >
+        <PermissionGuard permission="GET_TOOTH_STATUS" fallback={
+          <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-center">
+            <p className="text-sm text-gray-600">Bạn không có quyền xem trạng thái răng</p>
+          </div>
+        }>
+          <div className="space-y-4">
+            {/* Odontogram Component */}
+            <div 
+              ref={odontogramRef}
+              className="w-full overflow-x-auto bg-white rounded-xl p-4 [&_svg]:bg-white [&_svg_path]:stroke-gray-800 [&_svg_path]:fill-white"
+            >
             <style>{`
               /* Override odontogram styles for light theme */
               .react-odontogram svg {
@@ -421,17 +441,23 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
                 </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-3 py-4">
-                {TOOTH_STATUSES.map((status) => (
+                {TOOTH_STATUSES.map((status) => {
+                  const existingTooth = selectedTooth !== null ? toothStatusMap[selectedTooth] : null;
+                  const canModify = existingTooth?.id 
+                    ? canUpdateToothStatus 
+                    : canCreateToothStatus;
+                  
+                  return (
                   <Button
                     key={status.value}
                     variant="outline"
-                    disabled={saving}
+                    disabled={saving || !canModify}
                     className={`h-auto flex-col items-start p-3 ${
                       selectedTooth !== null && toothStatusMap[selectedTooth]?.status === status.value
                         ? 'border-2 border-primary bg-primary/5'
                         : ''
-                    }`}
-                    onClick={() => handleStatusSelect(status.value)}
+                    } ${!canModify ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => canModify && handleStatusSelect(status.value)}
                   >
                     <div className="flex items-center gap-2 w-full">
                       <div
@@ -441,7 +467,8 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
                       <span className="text-sm font-medium">{status.label}</span>
                     </div>
                   </Button>
-                ))}
+                  );
+                })}
               </div>
             </DialogContent>
           </Dialog>
@@ -510,6 +537,7 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
             </div>
           )}
         </div>
+        </PermissionGuard>
       </CardContent>
     </Card>
   );

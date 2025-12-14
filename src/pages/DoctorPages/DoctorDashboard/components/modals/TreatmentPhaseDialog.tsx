@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,12 @@ import { X, Plus, Upload } from 'lucide-react';
 import type { DentalService, PrescriptionItem, TreatmentPlan } from '@/types/doctor';
 import type { PhaseDialogState, TreatmentPhaseFormState } from '../../types';
 import { formatToInputDate, formatToInputTime, formatCurrency } from '../../utils';
+import { doctorAPI } from '@/services';
+
+interface CategoryDentalService {
+  id: string;
+  name: string;
+}
 
 interface TreatmentPhaseDialogProps {
   open: boolean;
@@ -56,8 +63,65 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
   isLoading,
 }) => {
   const [form, setForm] = useState<TreatmentPhaseFormState>(defaultForm);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [imagePreviews, setImagePreviews] = useState<{
+    xrayFiles: string[];
+    faceFiles: string[];
+    teethFiles: string[];
+  }>({
+    xrayFiles: [],
+    faceFiles: [],
+    teethFiles: [],
+  });
+
+  // Fetch categories
+  const { data: categoriesData = [] } = useQuery({
+    queryKey: ['categoryDentalService'],
+    queryFn: doctorAPI.getDentalCategories,
+    enabled: open,
+  });
+
+  // Extract categories from the response
+  const categories: CategoryDentalService[] = useMemo(() => {
+    return categoriesData.map((cat: any) => ({ id: cat.id, name: cat.name }));
+  }, [categoriesData]);
+
+  // Filter services by selected category
+  const filteredServices = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    // Find services from the category data or filter by categoryDentalServiceId
+    const categoryData = categoriesData.find((cat: any) => cat.id === selectedCategoryId);
+    if (categoryData?.listDentalServiceEntity) {
+      return categoryData.listDentalServiceEntity;
+    }
+    // Fallback: filter services by categoryDentalServiceId
+    return services.filter((service: any) => service.categoryDentalServiceId === selectedCategoryId);
+  }, [services, selectedCategoryId, categoriesData]);
 
   useEffect(() => {
+    // Map services to find their categories when loading existing data
+    const mapServicesWithCategories = (serviceOrders: any[]) => {
+      return serviceOrders.map((service) => {
+        // Nếu đã có categoryId thì giữ nguyên
+        if ((service as any).categoryId) {
+          return service;
+        }
+        // Tìm category từ services list
+        const serviceData = services.find(s => s.name === service.name);
+        if (serviceData && (serviceData as any).categoryDentalServiceId) {
+          const categoryId = (serviceData as any).categoryDentalServiceId;
+          const categoryName = categories.find(c => c.id === categoryId)?.name || '';
+          return {
+            ...service,
+            categoryId,
+            categoryName,
+          };
+        }
+        return service;
+      });
+    };
+
     if (context?.mode === 'update' && context.phase) {
       setForm({
         phaseNumber: context.phase.phaseNumber,
@@ -69,17 +133,40 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
         status: context.phase.status,
         nextAppointmentDate: formatToInputDate(context.phase.nextAppointment),
         nextAppointmentTime: formatToInputTime(context.phase.nextAppointment),
-        serviceOrders: context.phase.listDentalServicesEntityOrder ?? [],
+        serviceOrders: mapServicesWithCategories(context.phase.listDentalServicesEntityOrder ?? []),
         prescriptionOrders: context.phase.listPrescriptionOrder ?? [],
         xrayFiles: [],
         faceFiles: [],
         teethFiles: [],
         removeImageIds: [],
       });
+      // Load existing images as previews
+      if (context.phase.listImage) {
+        const xrayImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesXray').map((img: any) => img.url);
+        const faceImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesFace').map((img: any) => img.url);
+        const teethImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesTeeth').map((img: any) => img.url);
+        setImagePreviews({
+          xrayFiles: xrayImages,
+          faceFiles: faceImages,
+          teethFiles: teethImages,
+        });
+      }
     } else if (context?.mode === 'create') {
       setForm(defaultForm);
+      setImagePreviews({ xrayFiles: [], faceFiles: [], teethFiles: [] });
     }
-  }, [context]);
+  }, [context, services, categories]);
+
+  // Cleanup preview URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      Object.values(imagePreviews).flat().forEach((url) => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, []);
 
   // Tính tổng chi phí tự động từ dịch vụ và thuốc
   const calculatedCost = form.serviceOrders.reduce((sum, s) => sum + (s.cost || 0), 0) +
@@ -92,16 +179,69 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
     }
   }, [calculatedCost]);
 
+  // Nhóm services theo category để hiển thị
+  const servicesByCategory = useMemo(() => {
+    const grouped: Record<string, Array<{ service: any; index: number }>> = {};
+    form.serviceOrders.forEach((serviceOrder, index) => {
+      // Lấy categoryId từ serviceOrder hoặc tìm từ service data
+      let categoryId = (serviceOrder as any).categoryId;
+      if (!categoryId) {
+        // Tìm service trong services list để lấy categoryId
+        const serviceData = services.find(s => s.name === serviceOrder.name);
+        if (serviceData && (serviceData as any).categoryDentalServiceId) {
+          categoryId = (serviceData as any).categoryDentalServiceId;
+        } else {
+          // Tìm từ categoriesData
+          const categoryData = categoriesData.find((cat: any) => 
+            cat.listDentalServiceEntity?.some((s: any) => s.name === serviceOrder.name)
+          );
+          if (categoryData) {
+            categoryId = categoryData.id;
+          }
+        }
+      }
+      // Nếu vẫn không có categoryId, dùng 'other'
+      const key = categoryId || 'other';
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push({ 
+        service: {
+          ...serviceOrder,
+          categoryId: categoryId || 'other',
+          categoryName: categories.find(c => c.id === categoryId)?.name || 'Khác'
+        }, 
+        index 
+      });
+    });
+    return grouped;
+  }, [form.serviceOrders, services, categories, categoriesData]);
+
   if (!context) return null;
 
   const handleServiceAdd = (service: DentalService) => {
     setForm((prev) => {
+      // Tìm categoryId từ service hoặc selectedCategoryId
+      let categoryId = (service as any).categoryDentalServiceId || selectedCategoryId;
+      if (!categoryId) {
+        // Tìm từ categoriesData
+        const categoryData = categoriesData.find((cat: any) => 
+          cat.listDentalServiceEntity?.some((s: any) => s.id === service.id || s.name === service.name)
+        );
+        if (categoryData) {
+          categoryId = categoryData.id;
+        }
+      }
+      const categoryName = categories.find(c => c.id === categoryId)?.name || '';
+      
       const newService = {
         name: service.name,
         unit: service.unit,
         unitPrice: service.unitPrice,
         quantity: 1,
         cost: service.unitPrice,
+        categoryId: categoryId || 'other',
+        categoryName: categoryName,
       };
       return {
         ...prev,
@@ -109,6 +249,8 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
         cost: prev.cost + newService.cost,
       };
     });
+    // Reset selected service after adding
+    setSelectedServiceId('');
   };
 
   const handlePrescriptionAdd = (item: PrescriptionItem) => {
@@ -257,62 +399,103 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
 
           {/* Dịch vụ sử dụng */}
           <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <Label className="text-sm font-semibold text-foreground">Dịch vụ sử dụng trong lần điều trị</Label>
-              <Select
-                onValueChange={(value) => {
-                  const service = services.find((item) => item.id === value);
-                  if (service) handleServiceAdd(service);
-                }}
-              >
-                <SelectTrigger className="w-56 text-xs">
-                  <SelectValue placeholder="Chọn dịch vụ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {services.map((service) => (
-                    <SelectItem key={service.id} value={service.id ?? service.name}>
-                      {service.name} · {formatCurrency(service.unitPrice)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select 
+                  value={selectedCategoryId} 
+                  onValueChange={(value) => {
+                    setSelectedCategoryId(value);
+                  }}
+                >
+                  <SelectTrigger className="w-48 text-xs">
+                    <SelectValue placeholder="Chọn danh mục" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    const service = filteredServices.find((item) => item.id === value);
+                    if (service) {
+                      handleServiceAdd(service);
+                    }
+                  }}
+                  disabled={!selectedCategoryId || filteredServices.length === 0}
+                >
+                  <SelectTrigger className="w-56 text-xs">
+                    <SelectValue placeholder={selectedCategoryId ? "Chọn dịch vụ" : "Chọn danh mục trước"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredServices.map((service) => (
+                      <SelectItem key={service.id} value={service.id ?? service.name}>
+                        {service.name} · {formatCurrency(service.unitPrice)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {/* Hiển thị danh sách dịch vụ đã chọn, nhóm theo category */}
             {form.serviceOrders.length > 0 && (
-              <div className="space-y-2">
-                {form.serviceOrders.map((service, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{service.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {service.unitPrice.toLocaleString('vi-VN')} đ / {service.unit}
-                      </p>
+              <div className="space-y-3 mt-4">
+                {Object.entries(servicesByCategory).map(([categoryId, items]) => {
+                  const categoryName = items[0]?.service?.categoryName || categories.find(c => c.id === categoryId)?.name || 'Khác';
+                  return (
+                    <div key={categoryId} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-px flex-1 bg-border/50"></div>
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">
+                          {categoryName}
+                        </span>
+                        <div className="h-px flex-1 bg-border/50"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {items.map(({ service, index }) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
+                          >
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-foreground">{service.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {service.unitPrice.toLocaleString('vi-VN')} đ / {service.unit}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                value={service.quantity}
+                                onChange={(e) => handleServiceQuantityChange(index, Number(e.target.value))}
+                                className="w-16 text-center text-xs"
+                              />
+                              <span className="text-xs text-muted-foreground">x</span>
+                              <span className="w-24 text-right text-sm font-semibold text-primary">
+                                {formatCurrency(service.cost)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleServiceRemove(index)}
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min={1}
-                        value={service.quantity}
-                        onChange={(e) => handleServiceQuantityChange(index, Number(e.target.value))}
-                        className="w-16 text-center text-xs"
-                      />
-                      <span className="text-xs text-muted-foreground">x</span>
-                      <span className="w-24 text-right text-sm font-semibold text-primary">
-                        {formatCurrency(service.cost)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleServiceRemove(index)}
-                        className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -396,15 +579,57 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
                       className="w-full rounded-xl border border-dashed border-border px-3 py-2 text-xs file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20"
                       onChange={(event) => {
                         const files = Array.from(event.target.files || []);
+                        // Revoke old preview URLs for this field (only blob URLs)
+                        const oldPreviews = imagePreviews[field] || [];
+                        oldPreviews.forEach((url) => {
+                          if (url.startsWith('blob:')) {
+                            URL.revokeObjectURL(url);
+                          }
+                        });
+                        // Create new preview URLs
+                        const newPreviews = files.map((file) => URL.createObjectURL(file));
                         setForm((prev) => ({ ...prev, [field]: files }));
+                        setImagePreviews((prev) => ({
+                          ...prev,
+                          [field]: newPreviews,
+                        }));
                       }}
                     />
-                    {form[field].length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {form[field].map((file, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-xs">
-                            {file.name}
-                          </Badge>
+                    {/* Preview images */}
+                    {imagePreviews[field] && imagePreviews[field].length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {imagePreviews[field].map((previewUrl, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={previewUrl}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg border border-border"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                // Revoke URL if it's a blob
+                                if (previewUrl.startsWith('blob:')) {
+                                  URL.revokeObjectURL(previewUrl);
+                                }
+                                // Remove preview
+                                setImagePreviews((prev) => ({
+                                  ...prev,
+                                  [field]: prev[field].filter((_, i) => i !== index),
+                                }));
+                                // Remove from form files
+                                setForm((prev) => {
+                                  const newFiles = [...(prev[field] || [])];
+                                  newFiles.splice(index, 1);
+                                  return { ...prev, [field]: newFiles };
+                                });
+                              }}
+                              className="absolute top-1 right-1 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     )}

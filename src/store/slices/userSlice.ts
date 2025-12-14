@@ -64,17 +64,18 @@ export const updateUserProfile = createAsyncThunk(
   }
 );
 
-export const uploadAvatar = createAsyncThunk(
-  'user/uploadAvatar',
-  async ({ userId, file }: { userId: string; file: File }, { rejectWithValue }) => {
-    try {
-      const response = await userAPI.uploadAvatar(userId, file);
-      return response.data;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to upload avatar');
-    }
-  }
-);
+// NOTE: uploadAvatar endpoint does not exist in Backend
+// export const uploadAvatar = createAsyncThunk(
+//   'user/uploadAvatar',
+//   async ({ userId, file }: { userId: string; file: File }, { rejectWithValue }) => {
+//     try {
+//       const response = await userAPI.uploadAvatar(userId, file);
+//       return response.data;
+//     } catch (error: any) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to upload avatar');
+//     }
+//   }
+// );
 
 export const changePassword = createAsyncThunk(
   'user/changePassword',
@@ -89,8 +90,8 @@ export const changePassword = createAsyncThunk(
   }, { rejectWithValue }) => {
     try {
       const response = await userAPI.changePassword(userId, {
-        currentPassword,
-        newPassword,
+        oldPassword: currentPassword,  // Map to Backend field name
+        password: newPassword,        // Map to Backend field name
       });
       return response.data;
     } catch (error: any) {
@@ -99,17 +100,18 @@ export const changePassword = createAsyncThunk(
   }
 );
 
-export const deleteAccount = createAsyncThunk(
-  'user/deleteAccount',
-  async ({ userId, password }: { userId: string; password: string }, { rejectWithValue }) => {
-    try {
-      await userAPI.deleteAccount(userId, password);
-      return userId;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete account');
-    }
-  }
-);
+// NOTE: deleteAccount endpoint does not exist in Backend
+// export const deleteAccount = createAsyncThunk(
+//   'user/deleteAccount',
+//   async ({ userId, password }: { userId: string; password: string }, { rejectWithValue }) => {
+//     try {
+//       await userAPI.deleteAccount(userId, password);
+//       return userId;
+//     } catch (error: any) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to delete account');
+//     }
+//   }
+// );
 
 const userSlice = createSlice({
   name: 'user',
@@ -158,22 +160,23 @@ const userSlice = createSlice({
         state.error = action.payload as string;
       })
       
+      // NOTE: uploadAvatar endpoint does not exist in Backend
       // Upload Avatar
-      .addCase(uploadAvatar.pending, (state) => {
-        state.isUpdating = true;
-        state.error = null;
-      })
-      .addCase(uploadAvatar.fulfilled, (state, action) => {
-        state.isUpdating = false;
-        if (state.profile) {
-          state.profile.avatar = action.payload.avatar;
-        }
-        state.error = null;
-      })
-      .addCase(uploadAvatar.rejected, (state, action) => {
-        state.isUpdating = false;
-        state.error = action.payload as string;
-      })
+      // .addCase(uploadAvatar.pending, (state) => {
+      //   state.isUpdating = true;
+      //   state.error = null;
+      // })
+      // .addCase(uploadAvatar.fulfilled, (state, action) => {
+      //   state.isUpdating = false;
+      //   if (state.profile) {
+      //     state.profile.avatar = action.payload.avatar;
+      //   }
+      //   state.error = null;
+      // })
+      // .addCase(uploadAvatar.rejected, (state, action) => {
+      //   state.isUpdating = false;
+      //   state.error = action.payload as string;
+      // })
       
       // Change Password
       .addCase(changePassword.pending, (state) => {
@@ -189,20 +192,21 @@ const userSlice = createSlice({
         state.error = action.payload as string;
       })
       
+      // NOTE: deleteAccount endpoint does not exist in Backend
       // Delete Account
-      .addCase(deleteAccount.pending, (state) => {
-        state.isUpdating = true;
-        state.error = null;
-      })
-      .addCase(deleteAccount.fulfilled, (state) => {
-        state.isUpdating = false;
-        state.profile = null;
-        state.error = null;
-      })
-      .addCase(deleteAccount.rejected, (state, action) => {
-        state.isUpdating = false;
-        state.error = action.payload as string;
-      });
+      // .addCase(deleteAccount.pending, (state) => {
+      //   state.isUpdating = true;
+      //   state.error = null;
+      // })
+      // .addCase(deleteAccount.fulfilled, (state) => {
+      //   state.isUpdating = false;
+      //   state.profile = null;
+      //   state.error = null;
+      // })
+      // .addCase(deleteAccount.rejected, (state, action) => {
+      //   state.isUpdating = false;
+      //   state.error = action.payload as string;
+      // });
   },
 });
 

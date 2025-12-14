@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { showNotification, Loading } from '@/components/ui';
 import { adminAPI } from '@/services/api/admin';
 import { authAPI } from '@/services/api/auth';
+import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
 import { queryKeys } from '@/services/queryClient';
 import { useAuth } from '@/hooks';
 import AdminSidebar from './AdminDashboard/components/AdminSidebar';
@@ -52,7 +54,8 @@ const AdminDashboard: React.FC = () => {
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [addUserType, setAddUserType] = useState<'doctor' | 'nurse'>('doctor');
   const queryClient = useQueryClient();
-  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const { logout, token } = useAuth();
 
   const { data: profile, isLoading: loadingProfile } = useQuery({
     queryKey: queryKeys.admin.profile,
@@ -74,10 +77,13 @@ const AdminDashboard: React.FC = () => {
     queryFn: adminAPI.getAllPermissions,
   });
 
-  const { data: auditLogs = [], isLoading: loadingAuditLogs } = useQuery({
-    queryKey: queryKeys.admin.auditLogs,
-    queryFn: adminAPI.getAllAuditLogs,
-  });
+  // NOTE: getAllAuditLogs endpoint does not exist in Backend
+  // const { data: auditLogs = [], isLoading: loadingAuditLogs } = useQuery({
+  //   queryKey: queryKeys.admin.auditLogs,
+  //   queryFn: adminAPI.getAllAuditLogs,
+  // });
+  const auditLogs: any[] = [];
+  const loadingAuditLogs = false;
 
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: queryKeys.admin.categories,
@@ -276,14 +282,67 @@ const AdminDashboard: React.FC = () => {
     },
   });
 
+  const updateDoctorLevelMutation = useMutation({
+    mutationFn: (doctorId: string) => adminAPI.updateDoctorLevel(doctorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users });
+      showNotification.success('Đã nâng cấp bác sĩ lên cấp độ 2');
+    },
+    onError: (error: any) => {
+      showNotification.error('Không thể nâng cấp bác sĩ', error?.message || 'Đã xảy ra lỗi');
+    },
+  });
+
   const isLoadingPage = loadingProfile || loadingUsers || loadingRoles || loadingPermissions || loadingAuditLogs;
 
   const handleLogout = async () => {
+    // Prevent multiple simultaneous logout calls
+    if (isLogoutInProgress()) {
+      return;
+    }
+    
+    // Save token before clearing state
+    const currentToken = token;
+    
+    if (!currentToken) {
+      // No token, just clear state and navigate
+      queryClient.cancelQueries();
+      queryClient.clear();
+      logout();
+      navigate('/login');
+      return;
+    }
+    
+    // Set logout flag FIRST to block all new requests
+    cancelAllPendingRequests(); // This sets isLoggingOut = true
+    
+    // Cancel all active queries to prevent new requests
+    queryClient.cancelQueries();
+    
+    // Clear all queries to prevent any new requests
+    queryClient.clear();
+    
     try {
-      await logout();
+      // Send logout request BEFORE clearing token
+      await apiClient.post('/api/v1/auth/logout', { token: currentToken });
       showNotification.success('Đăng xuất thành công');
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore logout errors - still clear local state
+      // 401/400 is expected if token was already invalidated or invalid
+      if (error?.response?.status !== 401 && error?.response?.status !== 400 && error?.message !== 'Logout request already in progress for this token' && error?.message !== 'Logout in progress, request cancelled') {
       showNotification.error('Đăng xuất thất bại');
+      }
+    } finally {
+      // Clear token AFTER logout request is sent
+      logout();
+      
+      // Reset logout state
+      resetLogoutState();
+      
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        navigate('/login');
+      }, 100);
     }
   };
 
@@ -320,6 +379,12 @@ const AdminDashboard: React.FC = () => {
 
   const handleRemovePermission = (roleName: string, permissionName: string) => {
     removePermissionFromRoleMutation.mutate({ roleName, permissionName });
+  };
+
+  const handleUpdateDoctorLevel = (doctorId: string) => {
+    if (confirm('Bạn có chắc chắn muốn nâng cấp bác sĩ này lên cấp độ 2 (DOCTORLV2)?')) {
+      updateDoctorLevelMutation.mutate(doctorId);
+    }
   };
 
   const handleRoleSubmit = (form: RoleRequest) => {

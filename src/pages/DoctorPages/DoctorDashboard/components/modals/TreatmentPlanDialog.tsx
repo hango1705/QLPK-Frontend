@@ -13,6 +13,12 @@ import {
   Loading,
 } from '@/components/ui';
 import type { ExaminationSummary } from '@/types/doctor';
+import { usePermission } from '@/hooks';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { nurseAPI } from '@/services';
+import type { NursePick } from '@/services/api/nurse';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/services/queryClient';
 
 export interface TreatmentPlanFormState {
   title: string;
@@ -20,11 +26,13 @@ export interface TreatmentPlanFormState {
   duration: string;
   notes: string;
   examinationId: string;
+  nurseId?: string;
 }
 
 interface TreatmentPlanDialogProps {
   open: boolean;
   examination?: ExaminationSummary;
+  plan?: TreatmentPlan; // For edit mode
   examinations: ExaminationSummary[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (form: TreatmentPlanFormState) => void;
@@ -37,20 +45,42 @@ const defaultForm: TreatmentPlanFormState = {
   duration: '',
   notes: '',
   examinationId: '',
+  nurseId: '',
 };
 
 const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
   open,
   examination,
+  plan,
   examinations,
   onOpenChange,
   onSubmit,
   isLoading,
 }) => {
   const [form, setForm] = useState<TreatmentPlanFormState>(defaultForm);
+  const isEditMode = !!plan;
+
+  // Fetch danh sách y tá
+  const { data: nurses = [], isLoading: loadingNurses } = useQuery({
+    queryKey: queryKeys.nurse.nursesForPick,
+    queryFn: nurseAPI.getAllNursesForPick,
+    enabled: open,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   useEffect(() => {
-    if (examination) {
+    if (plan) {
+      // Edit mode: pre-fill form with plan data
+      setForm({
+        title: plan.title || '',
+        description: plan.description || '',
+        duration: plan.duration || '',
+        notes: plan.notes || '',
+        examinationId: '', // Examination ID might not be available in plan
+        nurseId: plan.nurseId || '', // Nurse ID from plan if available
+      });
+    } else if (examination) {
+      // Create mode with examination
       setForm((prev) => ({
         ...prev,
         examinationId: examination.id,
@@ -59,10 +89,15 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
     } else {
       setForm(defaultForm);
     }
-  }, [examination, open]);
+  }, [examination, plan, open]);
 
   const handleSubmit = () => {
-    if (!form.examinationId) {
+    // In edit mode, examinationId is not required
+    if (!isEditMode && !form.examinationId) {
+      return;
+    }
+    // Title and description are always required
+    if (!form.title || !form.description) {
       return;
     }
     onSubmit(form);
@@ -72,13 +107,18 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-0 sm:max-w-2xl">
         <DialogHeader className="space-y-2 border-b border-border/70 px-6 pb-4 pt-6">
-          <DialogTitle className="text-xl font-semibold text-foreground">Tạo phác đồ điều trị</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-foreground">
+            {isEditMode ? 'Chỉnh sửa phác đồ điều trị' : 'Tạo phác đồ điều trị'}
+          </DialogTitle>
           <DialogDescription>
-            Tạo kế hoạch điều trị dựa trên kết quả khám bệnh
+            {isEditMode 
+              ? 'Cập nhật thông tin phác đồ điều trị'
+              : 'Tạo kế hoạch điều trị dựa trên kết quả khám bệnh'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 px-6 py-6">
+          {!isEditMode && (
           <div className="space-y-2">
             <Label>Kết quả khám bệnh *</Label>
             <select
@@ -100,6 +140,7 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
               </p>
             )}
           </div>
+          )}
 
           <div className="space-y-2">
             <Label>Tiêu đề phác đồ *</Label>
@@ -131,6 +172,25 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
                 placeholder="Ví dụ: 3 tháng, 6 tuần"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Y tá</Label>
+              <select
+                value={form.nurseId || ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, nurseId: e.target.value || undefined }))}
+                className="w-full rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                disabled={loadingNurses}
+              >
+                <option value="">Chọn y tá (tùy chọn)</option>
+                {nurses.map((nurse) => (
+                  <option key={nurse.id} value={nurse.id}>
+                    {nurse.fullName}
+                  </option>
+                ))}
+              </select>
+              {loadingNurses && (
+                <p className="text-xs text-muted-foreground">Đang tải danh sách y tá...</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -151,9 +211,9 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
           <Button
             className="flex-1 bg-primary text-white hover:bg-primary/90"
             onClick={handleSubmit}
-            disabled={isLoading || !form.examinationId || !form.title || !form.description}
+            disabled={isLoading || (!isEditMode && !form.examinationId) || !form.title || !form.description}
           >
-            {isLoading ? <Loading size="sm" /> : 'Tạo phác đồ'}
+            {isLoading ? <Loading size="sm" /> : isEditMode ? 'Cập nhật phác đồ' : 'Tạo phác đồ'}
           </Button>
         </DialogFooter>
       </DialogContent>

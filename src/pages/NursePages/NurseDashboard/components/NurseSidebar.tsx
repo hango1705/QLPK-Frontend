@@ -88,13 +88,6 @@ const NurseSidebar: React.FC<SidebarProps> = ({
         );
       })}
     </div>
-
-    <div className="mt-auto border-t border-border/80 px-5 py-6">
-      <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm leading-relaxed text-muted-foreground">
-        <p className="font-semibold text-primary">Thông tin</p>
-        <p>Y tá hỗ trợ theo dõi và quản lý phác đồ điều trị của bệnh nhân.</p>
-      </div>
-    </div>
   </aside>
 );
 

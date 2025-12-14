@@ -6,18 +6,20 @@ import interactionPlugin from '@fullcalendar/interaction';
 import type { EventInput } from '@fullcalendar/core';
 import type { AppointmentSummary } from '@/types/doctor';
 import { Badge } from '@/components/ui';
+import { usePermission } from '@/hooks';
 
 interface AppointmentsCalendarProps {
   appointments: AppointmentSummary[];
   scheduledAppointments: AppointmentSummary[];
   onCreateExam: (appointment: AppointmentSummary) => void;
+  onViewDetail?: (appointment: AppointmentSummary) => void;
 }
 
 // Chuyển đổi AppointmentSummary sang FullCalendar Event format
 const convertAppointmentsToEvents = (
   appointments: AppointmentSummary[],
 ): EventInput[] => {
-  return appointments.map((appointment) => {
+  const events = appointments.map((appointment) => {
     // Xác định màu sắc dựa trên status
     let backgroundColor = '#3b82f6'; // blue (default - scheduled)
     let borderColor = '#2563eb';
@@ -40,10 +42,20 @@ const convertAppointmentsToEvents = (
         break;
     }
 
+    // Ensure dateTime is in a format FullCalendar can parse
+    let startDate = appointment.dateTime;
+    if (startDate) {
+      // If dateTime is not in ISO format, try to parse and convert it
+      const parsedDate = new Date(startDate);
+      if (!isNaN(parsedDate.getTime())) {
+        startDate = parsedDate.toISOString();
+      }
+    }
+
     return {
       id: appointment.id,
       title: appointment.type || 'Lịch hẹn',
-      start: appointment.dateTime,
+      start: startDate,
       backgroundColor,
       borderColor,
       textColor,
@@ -55,18 +67,33 @@ const convertAppointmentsToEvents = (
       },
     };
   });
+  
+  return events;
 };
 
 const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
   appointments,
   scheduledAppointments,
   onCreateExam,
+  onViewDetail,
 }) => {
+  const { hasPermission } = usePermission();
+  const canCreateExamination = hasPermission('CREATE_EXAMINATION');
+  
+  // Update events when appointments change
+  // Events will be recalculated when appointments change
+  
   const events = convertAppointmentsToEvents(appointments);
 
   const handleEventClick = (clickInfo: any) => {
     const appointment = clickInfo.event.extendedProps.appointment as AppointmentSummary;
-    if (appointment && appointment.status?.toLowerCase() === 'scheduled') {
+    // If onViewDetail is provided, open detail dialog instead of exam dialog
+    if (onViewDetail && appointment) {
+      onViewDetail(appointment);
+      return;
+    }
+    // Allow opening exam dialog for all appointments except cancelled ones
+    if (appointment && appointment.status?.toLowerCase() !== 'cancel' && appointment.status?.toLowerCase() !== 'cancelled' && canCreateExamination) {
       onCreateExam(appointment);
     }
   };

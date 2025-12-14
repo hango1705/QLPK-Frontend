@@ -69,16 +69,13 @@ const LoginPage = () => {
         } else {
           // Lỗi logic: Đăng nhập thành công nhưng không có token
           notification.error('Không lấy được token!');
-          console.error('Login fulfilled but no token:', result.payload);
         }
       } else if (result.type === 'auth/login/rejected') {
         // Lỗi từ server (sai pass, user không tồn tại...)
         notification.error('Tên đăng nhập hoặc mật khẩu không đúng');
-        console.error('Login process failed:', result.payload);
       }
     } catch (error) {
       // Lỗi mạng hoặc lỗi hệ thống
-      console.error('Login error caught:', error);
       notification.error('Đã xảy ra lỗi. Vui lòng thử lại.');
     }
   };
@@ -139,7 +136,6 @@ const LoginPage = () => {
               onSubmit={handleSubmit(
                 onSubmit, // <-- TỐI ƯU CÚ PHÁP
                 (errors) => {
-                  console.log('Form validation errors:', errors);
                   // Tự động hiển thị lỗi bên dưới Input rồi
                 }
               )} 

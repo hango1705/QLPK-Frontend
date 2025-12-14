@@ -8,7 +8,6 @@ export const useLocalStorage = <T>(key: string, initialValue: T) => {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
   });
@@ -19,7 +18,7 @@ export const useLocalStorage = <T>(key: string, initialValue: T) => {
       setStoredValue(valueToStore);
       window.localStorage.setItem(key, JSON.stringify(valueToStore));
     } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+      // Silent fail
     }
   }, [key, storedValue]);
 
@@ -28,7 +27,7 @@ export const useLocalStorage = <T>(key: string, initialValue: T) => {
       window.localStorage.removeItem(key);
       setStoredValue(initialValue);
     } catch (error) {
-      console.error(`Error removing localStorage key "${key}":`, error);
+      // Silent fail
     }
   }, [key, initialValue]);
 
@@ -42,7 +41,6 @@ export const useSessionStorage = <T>(key: string, initialValue: T) => {
       const item = window.sessionStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(`Error reading sessionStorage key "${key}":`, error);
       return initialValue;
     }
   });
@@ -53,7 +51,7 @@ export const useSessionStorage = <T>(key: string, initialValue: T) => {
       setStoredValue(valueToStore);
       window.sessionStorage.setItem(key, JSON.stringify(valueToStore));
     } catch (error) {
-      console.error(`Error setting sessionStorage key "${key}":`, error);
+      // Silent fail
     }
   }, [key, storedValue]);
 
@@ -135,7 +133,6 @@ export const useCopyToClipboard = () => {
 
   const copy = useCallback(async (text: string) => {
     if (!navigator?.clipboard) {
-      console.warn('Clipboard not supported');
       return false;
     }
 
@@ -144,7 +141,6 @@ export const useCopyToClipboard = () => {
       setCopiedText(text);
       return true;
     } catch (error) {
-      console.error('Failed to copy text: ', error);
       setCopiedText(null);
       return false;
     }

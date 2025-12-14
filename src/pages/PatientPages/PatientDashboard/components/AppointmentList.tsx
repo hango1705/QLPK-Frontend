@@ -123,7 +123,6 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
           .filter((dt) => Boolean(dt) && dt !== currentDateTime);
         setBookedSet(new Set<string>(bookedSlots));
       } catch (e) {
-        console.error('Error fetching booked slots for reschedule:', e);
         try {
           const list = await doctorAPI.getAppointmentsByDoctor(rescheduleDoctorId, 'all');
           const scheduledList = list.filter((x) => {
@@ -137,7 +136,6 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
             ),
           );
         } catch (fallbackError) {
-          console.error('Fallback API also failed:', fallbackError);
           setBookedSet(new Set());
         }
       }

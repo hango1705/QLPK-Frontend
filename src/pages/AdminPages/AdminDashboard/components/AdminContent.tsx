@@ -43,6 +43,7 @@ const AdminContent: React.FC<ContentSectionProps> = (props) => {
           onEnableUser={props.onEnableUser}
           onAddDoctor={props.onAddDoctor}
           onAddNurse={props.onAddNurse}
+          onUpdateDoctorLevel={props.onUpdateDoctorLevel}
           isLoading={isLoading}
         />
       )}

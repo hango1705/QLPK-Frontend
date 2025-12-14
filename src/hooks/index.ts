@@ -3,13 +3,13 @@ export { useAuth, useUser, useAuthUser } from './useAuth';
 
 // API hooks
 export { 
-  useCurrentUser,
+  // useCurrentUser, // NOTE: API does not exist in Backend
   useUserProfile,
-  useUserAppointments,
+  // useUserAppointments, // NOTE: API does not exist in Backend
   useUpdateProfile,
-  useUploadAvatar,
+  // useUploadAvatar, // NOTE: API does not exist in Backend
   useChangePassword,
-  useDeleteAccount
+  // useDeleteAccount // NOTE: API does not exist in Backend
 } from './useApi';
 
 // Utility hooks
@@ -24,6 +24,9 @@ export {
   useProtectedRoute,
   useFormValidation
 } from './useUtils';
+
+// Permission hooks
+export { usePermission } from './usePermission';
 
 // Existing hooks
 export { useIsMobile } from './use-mobile';

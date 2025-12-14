@@ -3,7 +3,6 @@ export type Section =
   | 'basic'
   | 'initial'
   | 'plan'
-  | 'progress'
   | 'payment'
   | 'appointment'
   | 'appointments'

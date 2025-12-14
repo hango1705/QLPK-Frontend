@@ -94,7 +94,6 @@ const AddUserDialog: React.FC<AddUserDialogProps> = ({
       setCodeSent(true);
       showNotification.success('Đã gửi mã xác thực đến email');
     } catch (error: any) {
-      console.error('Failed to send verification code:', error);
       showNotification.error('Không thể gửi mã xác thực', error?.message || 'Đã xảy ra lỗi');
     } finally {
       setSendingCode(false);

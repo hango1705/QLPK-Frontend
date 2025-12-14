@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '@/components/ui';
 import { Sparkles, Menu } from 'lucide-react';
 import { SECTION_CONFIG, SECTION_ORDER } from '../constants';
 import type { DoctorSidebarProps, Section } from '../types';
@@ -74,21 +73,6 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
           </button>
         );
       })}
-    </div>
-
-    <div className="mt-auto border-t border-border/80 px-5 py-6">
-      <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm leading-relaxed text-muted-foreground">
-        <p className="font-semibold text-primary">Gợi ý nhanh</p>
-        <p>Tạo kết quả khám hoặc tiến trình điều trị ngay khi hoàn tất hẹn.</p>
-        <Button
-          variant="ghost"
-          className="mt-3 h-10 w-full border border-primary/40 text-primary hover:bg-primary/10"
-          onClick={onCreateExam}
-          disabled={!scheduledCount}
-        >
-          Ghi nhận khám
-        </Button>
-      </div>
     </div>
   </aside>
 );

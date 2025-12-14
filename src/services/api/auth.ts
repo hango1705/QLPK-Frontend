@@ -102,12 +102,14 @@ export const authAPI = {
     apiClient.post('/api/v1/auth/logout', { token }),
     
   refreshToken: (refreshToken: string) =>
-    apiClient.post<RefreshTokenResponse>('/api/v1/auth/refresh', { refreshToken }),
+    apiClient.post<{ code: number; result: RefreshTokenResponse }>('/api/v1/auth/refresh', { refreshToken }),
     
-  getCurrentUser: (token: string) =>
-    apiClient.get<UserResponse>('/api/v1/auth/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    }),
+  // NOTE: getCurrentUser endpoint does not exist in Backend
+  // Use adminAPI.getMyInfo() or doctorAPI.getMyProfile() instead
+  // getCurrentUser: (token: string) =>
+  //   apiClient.get<UserResponse>('/api/v1/auth/me', {
+  //     headers: { Authorization: `Bearer ${token}` }
+  //   }),
     
   forgotPassword: (username: string) =>
     apiClient.post('/api/v1/auth/forgotPassword', { username }),
@@ -118,11 +120,13 @@ export const authAPI = {
   resetPassword: (id: string, newPassword: string) =>
     apiClient.post('/api/v1/auth/resetPassword', { id, newPassword }),
     
-  verifyEmail: (token: string) =>
-    apiClient.post('/api/v1/auth/verify-email', { token }),
+  // NOTE: verifyEmail endpoint does not exist in Backend
+  // verifyEmail: (token: string) =>
+  //   apiClient.post('/api/v1/auth/verify-email', { token }),
     
-  resendVerification: (email: string) =>
-    apiClient.post('/api/v1/auth/resend-verification', { email }),
+  // NOTE: resendVerification endpoint does not exist in Backend
+  // resendVerification: (email: string) =>
+  //   apiClient.post('/api/v1/auth/resend-verification', { email }),
     
   // Token Introspection API
   introspectToken: (token: string) =>

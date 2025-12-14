@@ -1,8 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
 import { doctorAPI } from '@/services';
+import { usePermission } from '@/hooks';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { queryKeys } from '@/services/queryClient';
 
 interface PaymentRecord {
   id: string;
@@ -32,58 +36,71 @@ interface TreatmentPhasesApi {
 }
 
 const PatientPayment = () => {
+  const { hasPermission } = usePermission();
+  const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
+  const canUpdatePaymentCost = hasPermission('UPDATE_PAYMENT_COST');
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
+  // Fetch treatment plans
+  const { data: treatmentPlans = [], isLoading: loadingPlans } = useQuery({
+    queryKey: queryKeys.patient.myTreatmentPlans,
+    queryFn: patientAPI.getMyTreatmentPlans,
+    enabled: canGetAllTreatmentPhases,
+  });
 
-  useEffect(() => {
-    const load = async () => {
-      setFetching(true); setError(null);
-      try {
-        const plans = await patientAPI.getMyTreatmentPlans();
-        const records: PaymentRecord[] = [];
-        for (const plan of plans) {
-          try {
-            const phases = await doctorAPI.getTreatmentPhases(plan.id);
-            if (phases.length > 0) {
-              phases.forEach((ph, idx) => {
-                const amount = ph.cost || 0;
-                if (amount <= 0) return;
-                records.push({
-                  id: ph.id,
-                  date: ph.startDate || plan.createAt || '-',
-                  amount,
-                  description: `${plan.title} - Giai đoạn ${idx + 1}`,
-                  status: 'pending', // backend chưa có trạng thái thanh toán
-                  invoiceNumber: `AUTO-${plan.id.slice(0, 6)}-${idx + 1}`,
-                  dueDate: ph.startDate || '-',
-                  treatmentPlan: plan.title,
-                });
-              });
-            } else if ((plan.totalCost || 0) > 0) {
-              records.push({
-                id: plan.id,
-                date: plan.createAt || '-',
-                amount: plan.totalCost || 0,
-                description: plan.title,
-                status: 'pending',
-                invoiceNumber: `AUTO-${plan.id.slice(0, 6)}`,
-                dueDate: plan.createAt || '-',
-                treatmentPlan: plan.title,
-              });
-            }
-          } catch {}
-        }
-        setPaymentRecords(records);
-      } catch {
-        setError('Không thể tải dữ liệu thanh toán (sử dụng tổng chi phí phác đồ)');
-      } finally { setFetching(false); }
-    };
-    load();
-  }, []);
+  // Fetch phases for all plans in parallel
+  const phaseQueries = useQueries({
+    queries: treatmentPlans.map((plan) => ({
+      queryKey: queryKeys.patient.treatmentPhases(plan.id),
+      queryFn: () => doctorAPI.getTreatmentPhases(plan.id),
+      enabled: canGetAllTreatmentPhases && !!plan.id,
+      retry: false,
+    })),
+  });
+
+  // Transform phases to payment records
+  const paymentRecords = useMemo<PaymentRecord[]>(() => {
+    if (!canGetAllTreatmentPhases || !treatmentPlans.length) return [];
+    
+    const records: PaymentRecord[] = [];
+    treatmentPlans.forEach((plan, index) => {
+      const phases = phaseQueries[index]?.data || [];
+      if (phases.length > 0) {
+        phases.forEach((ph, idx) => {
+          const amount = ph.cost || 0;
+          if (amount <= 0) return;
+          records.push({
+            id: ph.id,
+            date: ph.startDate || plan.createAt || '-',
+            amount,
+            description: `${plan.title} - Giai đoạn ${idx + 1}`,
+            status: 'pending', // backend chưa có trạng thái thanh toán
+            invoiceNumber: `AUTO-${plan.id.slice(0, 6)}-${idx + 1}`,
+            dueDate: ph.startDate || '-',
+            treatmentPlan: plan.title,
+          });
+        });
+      } else if ((plan.totalCost || 0) > 0) {
+        records.push({
+          id: plan.id,
+          date: plan.createAt || '-',
+          amount: plan.totalCost || 0,
+          description: plan.title,
+          status: 'pending',
+          invoiceNumber: `AUTO-${plan.id.slice(0, 6)}`,
+          dueDate: plan.createAt || '-',
+          treatmentPlan: plan.title,
+        });
+      }
+    });
+    return records;
+  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+
+  const fetching = loadingPlans || phaseQueries.some(q => q.isLoading);
+  const error = phaseQueries.find(q => q.error)?.error 
+    ? 'Không thể tải dữ liệu thanh toán (sử dụng tổng chi phí phác đồ)' 
+    : null;
 
   const handleAddPayment = async () => {
     setIsLoading(true);
@@ -121,7 +138,6 @@ const PatientPayment = () => {
         showNotification.error(response.message || 'Không thể tạo liên kết thanh toán');
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
       showNotification.error(
         error.response?.data?.message || 
         error.message || 
@@ -279,15 +295,26 @@ const PatientPayment = () => {
                     </Button>
                   </div>
                   {(payment.status === 'pending' || payment.status === 'overdue') && (
-                    <Button 
-                      onClick={() => handlePayNow(payment.id)}
-                      variant="primary" 
-                      size="sm"
-                      disabled={isLoading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
-                    </Button>
+                    <PermissionGuard permission="UPDATE_PAYMENT_COST" fallback={
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        disabled
+                        className="bg-gray-400 text-white cursor-not-allowed"
+                      >
+                        Không có quyền thanh toán
+                      </Button>
+                    }>
+                      <Button 
+                        onClick={() => handlePayNow(payment.id)}
+                        variant="primary" 
+                        size="sm"
+                        disabled={isLoading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
+                      </Button>
+                    </PermissionGuard>
                   )}
                 </div>
               </div>
