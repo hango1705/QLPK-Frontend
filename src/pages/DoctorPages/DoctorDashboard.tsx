@@ -461,75 +461,75 @@ const DoctorDashboard: React.FC = () => {
               <Loading size="lg" />
             </div>
           ) : (
-            <div className="space-y-6">
-              {activeSection === 'overview' ? (
-                <OverviewSection
-                  nextAppointment={nextAppointment}
-                  scheduledAppointments={scheduledAppointments}
-                  doneAppointments={doneAppointments}
-                  cancelledAppointments={cancelledAppointments}
-                  examinations={examinations}
-                  treatmentPlans={treatmentPlans}
-                  activePhases={activePhases}
-                  onCreateExam={() => {
-                    if (scheduledAppointments.length) {
-                      setExamDialog({ mode: 'create', appointment: scheduledAppointments[0] });
-                    }
-                  }}
-                  onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
-                />
+              <div className="space-y-6">
+                {activeSection === 'overview' ? (
+                  <OverviewSection
+                    nextAppointment={nextAppointment}
+                    scheduledAppointments={scheduledAppointments}
+                    doneAppointments={doneAppointments}
+                    cancelledAppointments={cancelledAppointments}
+                    examinations={examinations}
+                    treatmentPlans={treatmentPlans}
+                    activePhases={activePhases}
+                    onCreateExam={() => {
+                      if (scheduledAppointments.length) {
+                        setExamDialog({ mode: 'create', appointment: scheduledAppointments[0] });
+                      }
+                    }}
+                    onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
+                  />
               ) : activeSection === 'profile' ? (
                 <ProfileSection />
               ) : activeSection === 'account' ? (
                 <AccountSection />
-              ) : (
-                <DoctorContent
-                  activeSection={activeSection}
-                  appointments={allAppointments}
-                  scheduledAppointments={scheduledAppointments}
-                  examinations={examinations}
-                  treatmentPlans={treatmentPlans}
-                  phasesByPlan={phasesByPlan}
-                  serviceCategories={serviceCategories}
-                  services={services}
-                  prescriptions={prescriptionCatalog}
-                  doctors={doctorDirectory}
-                  onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
-                  onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
-                  onViewExamDetail={(examination) => setExamDetailDialog(examination)}
-                  onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
-                  onEditPhase={(plan, phase) => setPhaseDialog({ mode: 'update', plan, phase })}
-                  onCreatePlan={(examination) => setPlanDialog({ open: true, examination })}
-                  onUpdatePlanStatus={handlePlanStatusChange}
+                ) : (
+                  <DoctorContent
+                    activeSection={activeSection}
+                    appointments={allAppointments}
+                    scheduledAppointments={scheduledAppointments}
+                    examinations={examinations}
+                    treatmentPlans={treatmentPlans}
+                    phasesByPlan={phasesByPlan}
+                    serviceCategories={serviceCategories}
+                    services={services}
+                    prescriptions={prescriptionCatalog}
+                    doctors={doctorDirectory}
+                    onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
+                    onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
+                    onViewExamDetail={(examination) => setExamDetailDialog(examination)}
+                    onCreatePhase={(plan) => setPhaseDialog({ mode: 'create', plan })}
+                    onEditPhase={(plan, phase) => setPhaseDialog({ mode: 'update', plan, phase })}
+                    onCreatePlan={(examination) => setPlanDialog({ open: true, examination })}
+                    onUpdatePlanStatus={handlePlanStatusChange}
                   onViewPlanDetail={(plan) => setPlanDetailDialog(plan)}
                   onViewAppointmentDetail={(appointment) => setAppointmentDetailDialog(appointment)}
-                  onPhaseClick={(planId, phaseId) => {
-                    // Chuyển đến section treatment
-                    setActiveSection('treatment');
-                    // Tìm plan và phase tương ứng
-                    const plan = treatmentPlans.find((p) => p.id === planId);
-                    const phases = phasesByPlan[planId] || [];
-                    const phase = phases.find((p) => p.id === phaseId);
-                    if (plan && phase) {
-                      // Mở modal với phase tương ứng
-                      setPhaseDialog({ mode: 'update', plan, phase });
-                    }
-                  }}
-                  onAddPhase={() => {
-                    // Chuyển đến section treatment
-                    setActiveSection('treatment');
-                    // Tìm plan đầu tiên để tạo phase mới
-                    // Nếu có nhiều plans, lấy plan đầu tiên
-                    // Nếu không có plan, có thể cần tạo plan trước
-                    if (treatmentPlans.length > 0) {
-                      const firstPlan = treatmentPlans[0];
-                      setPhaseDialog({ mode: 'create', plan: firstPlan });
-                    } else {
-                      showNotification.info('Vui lòng tạo phác đồ điều trị trước khi thêm tiến trình');
-                    }
-                  }}
-                />
-              )}
+                    onPhaseClick={(planId, phaseId) => {
+                      // Chuyển đến section treatment
+                      setActiveSection('treatment');
+                      // Tìm plan và phase tương ứng
+                      const plan = treatmentPlans.find((p) => p.id === planId);
+                      const phases = phasesByPlan[planId] || [];
+                      const phase = phases.find((p) => p.id === phaseId);
+                      if (plan && phase) {
+                        // Mở modal với phase tương ứng
+                        setPhaseDialog({ mode: 'update', plan, phase });
+                      }
+                    }}
+                    onAddPhase={() => {
+                      // Chuyển đến section treatment
+                      setActiveSection('treatment');
+                      // Tìm plan đầu tiên để tạo phase mới
+                      // Nếu có nhiều plans, lấy plan đầu tiên
+                      // Nếu không có plan, có thể cần tạo plan trước
+                      if (treatmentPlans.length > 0) {
+                        const firstPlan = treatmentPlans[0];
+                        setPhaseDialog({ mode: 'create', plan: firstPlan });
+                      } else {
+                        showNotification.info('Vui lòng tạo phác đồ điều trị trước khi thêm tiến trình');
+                      }
+                    }}
+                  />
+                )}
             </div>
           )}
         </main>

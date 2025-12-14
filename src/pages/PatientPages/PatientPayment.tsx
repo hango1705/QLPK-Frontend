@@ -42,6 +42,13 @@ const PatientPayment = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch all costs (real cost records from database)
+  const { data: costs = [], isLoading: loadingCosts } = useQuery({
+    queryKey: ['patient', 'costs'],
+    queryFn: patientAPI.getAllMyCost,
+    enabled: canUpdatePaymentCost,
+  });
+
   // Fetch treatment plans
   const { data: treatmentPlans = [], isLoading: loadingPlans } = useQuery({
     queryKey: queryKeys.patient.myTreatmentPlans,
@@ -59,45 +66,62 @@ const PatientPayment = () => {
     })),
   });
 
-  // Transform phases to payment records
+  // Transform costs to payment records
+  // Use real cost records from database instead of phases/plans
   const paymentRecords = useMemo<PaymentRecord[]>(() => {
-    if (!canGetAllTreatmentPhases || !treatmentPlans.length) return [];
-    
-    const records: PaymentRecord[] = [];
-    treatmentPlans.forEach((plan, index) => {
-      const phases = phaseQueries[index]?.data || [];
-      if (phases.length > 0) {
-        phases.forEach((ph, idx) => {
-          const amount = ph.cost || 0;
-          if (amount <= 0) return;
+    if (!canUpdatePaymentCost || !costs.length) {
+      // Fallback: if no costs, use phases/plans (for display only, not for payment)
+      if (!canGetAllTreatmentPhases || !treatmentPlans.length) return [];
+      
+      const records: PaymentRecord[] = [];
+      treatmentPlans.forEach((plan, index) => {
+        const phases = phaseQueries[index]?.data || [];
+        if (phases.length > 0) {
+          phases.forEach((ph, idx) => {
+            const amount = ph.cost || 0;
+            if (amount <= 0) return;
+            records.push({
+              id: ph.id, // This won't work for payment, but for display
+              date: ph.startDate || plan.createAt || '-',
+              amount,
+              description: `${plan.title} - Giai đoạn ${idx + 1}`,
+              status: 'pending',
+              invoiceNumber: `AUTO-${plan.id.slice(0, 6)}-${idx + 1}`,
+              dueDate: ph.startDate || '-',
+              treatmentPlan: plan.title,
+            });
+          });
+        } else if ((plan.totalCost || 0) > 0) {
           records.push({
-            id: ph.id,
-            date: ph.startDate || plan.createAt || '-',
-            amount,
-            description: `${plan.title} - Giai đoạn ${idx + 1}`,
-            status: 'pending', // backend chưa có trạng thái thanh toán
-            invoiceNumber: `AUTO-${plan.id.slice(0, 6)}-${idx + 1}`,
-            dueDate: ph.startDate || '-',
+            id: plan.id, // This won't work for payment, but for display
+            date: plan.createAt || '-',
+            amount: plan.totalCost || 0,
+            description: plan.title,
+            status: 'pending',
+            invoiceNumber: `AUTO-${plan.id.slice(0, 6)}`,
+            dueDate: plan.createAt || '-',
             treatmentPlan: plan.title,
           });
-        });
-      } else if ((plan.totalCost || 0) > 0) {
-        records.push({
-          id: plan.id,
-          date: plan.createAt || '-',
-          amount: plan.totalCost || 0,
-          description: plan.title,
-          status: 'pending',
-          invoiceNumber: `AUTO-${plan.id.slice(0, 6)}`,
-          dueDate: plan.createAt || '-',
-          treatmentPlan: plan.title,
-        });
-      }
-    });
-    return records;
-  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+        }
+      });
+      return records;
+    }
 
-  const fetching = loadingPlans || phaseQueries.some(q => q.isLoading);
+    // Use real cost records from database
+    return costs.map((cost) => ({
+      id: cost.id, // Real cost ID from database
+      date: cost.paymentDate || '-',
+      amount: cost.totalCost,
+      description: cost.title,
+      status: cost.status === 'paid' ? 'paid' : cost.status === 'wait' ? 'pending' : 'pending',
+      paymentMethod: cost.paymentMethod,
+      invoiceNumber: `AUTO-${cost.id.slice(0, 6)}`,
+      dueDate: cost.paymentDate || '-',
+      treatmentPlan: cost.title,
+    }));
+  }, [costs, treatmentPlans, phaseQueries, canGetAllTreatmentPhases, canUpdatePaymentCost]);
+
+  const fetching = loadingCosts || loadingPlans || phaseQueries.some(q => q.isLoading);
   const error = phaseQueries.find(q => q.error)?.error 
     ? 'Không thể tải dữ liệu thanh toán (sử dụng tổng chi phí phác đồ)' 
     : null;
@@ -125,6 +149,11 @@ const PatientPayment = () => {
         return;
       }
 
+      // Lưu costId vào localStorage để sử dụng trong callback
+      // paymentId có thể là phaseId hoặc planId, nhưng cần costId thực sự
+      // Tạm thời sử dụng paymentId, sau này có thể cần map từ phaseId/planId sang costId
+      localStorage.setItem('vnpay_costId', paymentId);
+
       // Gọi API VNPay để tạo payment URL
       const response = await patientAPI.createVnPayPayment({
         amount: String(payment.amount),
@@ -136,8 +165,10 @@ const PatientPayment = () => {
         window.location.href = response.paymentUrl;
       } else {
         showNotification.error(response.message || 'Không thể tạo liên kết thanh toán');
+        localStorage.removeItem('vnpay_costId'); // Clean up on error
       }
     } catch (error: any) {
+      localStorage.removeItem('vnpay_costId'); // Clean up on error
       showNotification.error(
         error.response?.data?.message || 
         error.message || 

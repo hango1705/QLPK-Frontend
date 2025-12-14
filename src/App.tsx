@@ -31,6 +31,7 @@ const PatientBasicInfo = createLazyPage(() => import('./pages/PatientPages/Patie
 const PatientInitialExamination = createLazyPage(() => import('./pages/PatientPages/PatientInitialExamination'));
 const PatientTreatmentPlan = createLazyPage(() => import('./pages/PatientPages/PatientTreatmentPlan'));
 const PatientPayment = createLazyPage(() => import('./pages/PatientPages/PatientPayment'));
+const PaymentCallback = createLazyPage(() => import('./pages/PaymentCallback'));
 const DoctorWorkspace = createLazyPage(() => import('./pages/DoctorPages'));
 const AdminWorkspace = createLazyPage(() => import('./pages/AdminPages'));
 const NurseWorkspace = createLazyPage(() => import('./pages/NursePages'));
@@ -201,6 +202,18 @@ const App = () => (
                       <PrivateRoute>
                         <RoleBasedRoute allowedRoles={['patient', 'admin']}>
                           <PatientPayment />
+                        </RoleBasedRoute>
+                      </PrivateRoute>
+                    } 
+                  />
+
+                  {/* Payment callback - public route (VNPay redirects here) */}
+                  <Route 
+                    path="/payment/paymentCallback" 
+                    element={
+                      <PrivateRoute>
+                        <RoleBasedRoute allowedRoles={['patient', 'admin']}>
+                          <PaymentCallback />
                         </RoleBasedRoute>
                       </PrivateRoute>
                     } 

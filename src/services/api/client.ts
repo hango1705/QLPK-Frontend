@@ -72,9 +72,17 @@ apiClient.interceptors.request.use(
     const isLogoutRequest = config.url?.includes('/auth/logout');
     const isLoginRequest = config.url?.includes('/auth/login');
     const isRegisterRequest = config.url?.includes('/auth/register');
+    const isVerifiedCodeRequest = config.url?.includes('/auth/verifiedCode');
+    const isForgotPasswordRequest = config.url?.includes('/auth/forgotPassword');
+    const isVerifyResetPasswordRequest = config.url?.includes('/auth/verifyResetPassword');
+    const isResetPasswordRequest = config.url?.includes('/auth/resetPassword');
     
-    // If we're logging out, reject all requests except logout/login/register
-    if (isLoggingOut && !isLogoutRequest && !isLoginRequest && !isRegisterRequest) {
+    // Public endpoints that don't require authentication
+    const isPublicRequest = isLoginRequest || isRegisterRequest || isVerifiedCodeRequest || 
+                           isForgotPasswordRequest || isVerifyResetPasswordRequest || isResetPasswordRequest;
+    
+    // If we're logging out, reject all requests except logout and public requests
+    if (isLoggingOut && !isLogoutRequest && !isPublicRequest) {
       return Promise.reject(new Error('Logout in progress, request cancelled'));
     }
     
@@ -121,8 +129,8 @@ apiClient.interceptors.request.use(
     }
     
     // Check if user is logged out (no token) - cancel request
-    // But allow logout/login/register requests to proceed even without token in state
-    if (!token && !isLoginRequest && !isRegisterRequest && !isLogoutRequest) {
+    // But allow logout and public requests to proceed even without token in state
+    if (!token && !isPublicRequest && !isLogoutRequest) {
       const abortController = new AbortController();
       abortController.abort();
       config.signal = abortController.signal;
@@ -143,7 +151,8 @@ apiClient.interceptors.request.use(
     }
     
     // Proactive token refresh: Check if token is expired or about to expire
-    if (token && isTokenExpired(token)) {
+    // Skip token refresh for public requests (they don't need authentication)
+    if (token && !isPublicRequest && isTokenExpired(token)) {
       // Token is expired, try to refresh before making the request
       if (!isRefreshing) {
         isRefreshing = true;
@@ -183,8 +192,9 @@ apiClient.interceptors.request.use(
       }
     }
     
-    // Add token to request if available
-    if (token && config.headers) {
+    // Add token to request if available and not a public request
+    // Public requests should not include Authorization header
+    if (token && config.headers && !isPublicRequest) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     

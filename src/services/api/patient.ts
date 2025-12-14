@@ -87,6 +87,12 @@ export interface CostResponse {
   }>;
 }
 
+export interface CostPaymentUpdateRequest {
+  paymentMethod: string;
+  status: string;
+  vnpTxnRef?: string;
+}
+
 export interface VNPayResponse {
   code: string;
   message: string;

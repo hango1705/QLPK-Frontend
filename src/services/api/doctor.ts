@@ -133,6 +133,7 @@ export interface TreatmentPlanPayload {
   notes: string;
   examinationId: string;
   nurseId?: string; // Optional - only include if nurse is assigned
+  doctorId?: string; // Optional - only for DOCTORLV2 with PICK_DOCTOR permission
 }
 
 export interface TreatmentPlanUpdatePayload {
@@ -366,7 +367,7 @@ export const doctorAPI = {
 
   createTreatmentPlan: async (payload: TreatmentPlanPayload): Promise<TreatmentPlan> => {
     // Build request payload matching backend TreatmentPlansRequest
-    // Backend expects: title, description, duration, notes, examinationId, nurseId (optional)
+    // Backend expects: title, description, duration, notes, examinationId, nurseId (optional), doctorId (optional)
     const requestPayload: any = {
       title: payload.title || '',
       description: payload.description || '',
@@ -378,6 +379,11 @@ export const doctorAPI = {
     // Only include nurseId if it's provided and not empty
     if (payload.nurseId && payload.nurseId.trim() !== '') {
       requestPayload.nurseId = payload.nurseId;
+    }
+    
+    // Only include doctorId if it's provided and not empty (for DOCTORLV2 with PICK_DOCTOR permission)
+    if (payload.doctorId && payload.doctorId.trim() !== '') {
+      requestPayload.doctorId = payload.doctorId;
     }
     
     try {

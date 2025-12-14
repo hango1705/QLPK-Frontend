@@ -89,7 +89,10 @@ export const sendVerificationCode = createAsyncThunk(
       const response = await authAPI.sendVerificationCode(email);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to send verification code');
+      // Backend returns ApiResponses with structure: { code: int, result: string }
+      // Error message is in result field, not message field
+      const errorMessage = error.response?.data?.result || error.response?.data?.message || error.message || 'Failed to send verification code';
+      return rejectWithValue(errorMessage);
     }
   }
 );

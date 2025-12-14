@@ -1,6 +1,7 @@
 import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth, usePermission } from '@/hooks';
 import { Loading } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
@@ -25,11 +26,15 @@ const PatientDashboard: React.FC = () => {
   const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
   const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [section, setSection] = useState<Section>('overview');
+  
+  // Initialize section from URL query param or default to 'overview'
+  const initialSection = (searchParams.get('section') as Section) || 'overview';
+  const [section, setSection] = useState<Section>(initialSection);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<any | null>(null);
@@ -86,6 +91,20 @@ const PatientDashboard: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
+
+  // Handle section change from URL query param
+  useEffect(() => {
+    const sectionParam = searchParams.get('section');
+    if (sectionParam && ['overview', 'basic', 'initial', 'plan', 'payment', 'appointment', 'appointments', 'account'].includes(sectionParam)) {
+      setSection(sectionParam as Section);
+      // Remove query param after setting section to keep URL clean
+      if (searchParams.has('section')) {
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('section');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+    }
+  }, [searchParams, setSearchParams]);
 
   // Load patient and user info
   useEffect(() => {

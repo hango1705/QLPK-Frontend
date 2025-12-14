@@ -15,8 +15,9 @@ import {
 import type { ExaminationSummary } from '@/types/doctor';
 import { usePermission } from '@/hooks';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { nurseAPI } from '@/services';
+import { nurseAPI, doctorAPI } from '@/services';
 import type { NursePick } from '@/services/api/nurse';
+import type { DoctorSummary } from '@/types/doctor';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/services/queryClient';
 
@@ -27,6 +28,7 @@ export interface TreatmentPlanFormState {
   notes: string;
   examinationId: string;
   nurseId?: string;
+  doctorId?: string; // Optional - only for DOCTORLV2 with PICK_DOCTOR permission
 }
 
 interface TreatmentPlanDialogProps {
@@ -46,6 +48,7 @@ const defaultForm: TreatmentPlanFormState = {
   notes: '',
   examinationId: '',
   nurseId: '',
+  doctorId: '',
 };
 
 const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
@@ -59,12 +62,23 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
 }) => {
   const [form, setForm] = useState<TreatmentPlanFormState>(defaultForm);
   const isEditMode = !!plan;
+  const { hasPermission } = usePermission();
+  const canPickDoctor = hasPermission('PICK_DOCTOR');
+  const canPickNurse = hasPermission('PICK_NURSE');
 
-  // Fetch danh sách y tá
+  // Fetch danh sách y tá - only if user has PICK_NURSE permission
   const { data: nurses = [], isLoading: loadingNurses } = useQuery({
     queryKey: queryKeys.nurse.nursesForPick,
     queryFn: nurseAPI.getAllNursesForPick,
-    enabled: open,
+    enabled: open && canPickNurse,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fetch danh sách bác sĩ - only if user has PICK_DOCTOR permission
+  const { data: doctors = [], isLoading: loadingDoctors } = useQuery({
+    queryKey: queryKeys.doctor.doctorDirectory,
+    queryFn: doctorAPI.getDoctorDirectory,
+    enabled: open && canPickDoctor,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -78,6 +92,7 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
         notes: plan.notes || '',
         examinationId: '', // Examination ID might not be available in plan
         nurseId: plan.nurseId || '', // Nurse ID from plan if available
+        doctorId: plan.doctorId || '', // Doctor ID from plan if available
       });
     } else if (examination) {
       // Create mode with examination
@@ -172,25 +187,48 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
                 placeholder="Ví dụ: 3 tháng, 6 tuần"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Y tá</Label>
-              <select
-                value={form.nurseId || ''}
-                onChange={(e) => setForm((prev) => ({ ...prev, nurseId: e.target.value || undefined }))}
-                className="w-full rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                disabled={loadingNurses}
-              >
-                <option value="">Chọn y tá (tùy chọn)</option>
-                {nurses.map((nurse) => (
-                  <option key={nurse.id} value={nurse.id}>
-                    {nurse.fullName}
-                  </option>
-                ))}
-              </select>
-              {loadingNurses && (
-                <p className="text-xs text-muted-foreground">Đang tải danh sách y tá...</p>
-              )}
-            </div>
+            {canPickDoctor && (
+              <div className="space-y-2">
+                <Label>Bác sĩ</Label>
+                <select
+                  value={form.doctorId || ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, doctorId: e.target.value || undefined }))}
+                  className="w-full rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  disabled={loadingDoctors}
+                >
+                  <option value="">Chọn bác sĩ (tùy chọn)</option>
+                  {doctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.fullName}
+                    </option>
+                  ))}
+                </select>
+                {loadingDoctors && (
+                  <p className="text-xs text-muted-foreground">Đang tải danh sách bác sĩ...</p>
+                )}
+              </div>
+            )}
+            {canPickNurse && (
+              <div className="space-y-2">
+                <Label>Y tá</Label>
+                <select
+                  value={form.nurseId || ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nurseId: e.target.value || undefined }))}
+                  className="w-full rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  disabled={loadingNurses}
+                >
+                  <option value="">Chọn y tá (tùy chọn)</option>
+                  {nurses.map((nurse) => (
+                    <option key={nurse.id} value={nurse.id}>
+                      {nurse.fullName}
+                    </option>
+                  ))}
+                </select>
+                {loadingNurses && (
+                  <p className="text-xs text-muted-foreground">Đang tải danh sách y tá...</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
