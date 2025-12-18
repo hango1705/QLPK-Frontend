@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
-import { patientAPI } from '@/services/api/patient';
+import { patientAPI, type CostResponse } from '@/services/api/patient';
 import { doctorAPI } from '@/services';
 import { usePermission } from '@/hooks';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
@@ -18,6 +18,7 @@ interface PaymentRecord {
   invoiceNumber: string;
   dueDate: string;
   treatmentPlan: string;
+  costData?: CostResponse; // Full cost data for detail modal
 }
 
 interface TreatmentPlanApi {
@@ -41,6 +42,8 @@ const PatientPayment = () => {
   const canUpdatePaymentCost = hasPermission('UPDATE_PAYMENT_COST');
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCostDetail, setSelectedCostDetail] = useState<CostResponse | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Fetch all costs (real cost records from database)
   const { data: costs = [], isLoading: loadingCosts } = useQuery({
@@ -118,6 +121,7 @@ const PatientPayment = () => {
       invoiceNumber: `AUTO-${cost.id.slice(0, 6)}`,
       dueDate: cost.paymentDate || '-',
       treatmentPlan: cost.title,
+      costData: cost, // Store full cost data for detail modal
     }));
   }, [costs, treatmentPlans, phaseQueries, canGetAllTreatmentPhases, canUpdatePaymentCost]);
 
@@ -216,6 +220,20 @@ const PatientPayment = () => {
     }).format(amount);
   };
 
+  const handleViewInvoice = (payment: PaymentRecord) => {
+    // Find the full cost data
+    const costData = costs.find(c => c.id === payment.id);
+    if (costData) {
+      setSelectedCostDetail(costData);
+      setDetailModalOpen(true);
+    }
+  };
+
+  const truncateText = (text: string, maxLength: number = 80) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
   const totalPaid = paymentRecords
     .filter(p => p.status === 'paid')
     .reduce((sum, p) => sum + p.amount, 0);
@@ -236,9 +254,6 @@ const PatientPayment = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Thanh toán</h1>
-              <p className="text-gray-600 mt-1">
-                Quản lý thanh toán và lịch sử giao dịch (chưa tích hợp trạng thái từ backend)
-              </p>
             </div>
             {/* Ẩn nút thêm thanh toán */}
           </div>
@@ -274,19 +289,19 @@ const PatientPayment = () => {
         </div>
 
         {/* Payment Records */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {!fetching && paymentRecords.map((payment) => (
-            <Card key={payment.id} className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {payment.description}
+            <Card key={payment.id} className="p-4">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">
+                    {truncateText(payment.description, 60)}
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-sm text-gray-600">
                     Hóa đơn: {payment.invoiceNumber} • Ngày: {payment.date}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right ml-4 flex-shrink-0">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
                     {getStatusText(payment.status)}
                   </span>
@@ -296,64 +311,173 @@ const PatientPayment = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Phác đồ điều trị</h4>
-                  <p className="text-gray-700 text-sm">{payment.treatmentPlan}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Hạn thanh toán</h4>
-                  <p className="text-gray-700 text-sm">{payment.dueDate}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Phương thức thanh toán</h4>
-                  <p className="text-gray-700 text-sm">
-                    {payment.paymentMethod || 'Chưa chọn'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex space-x-3">
-                    <Button variant="outline" size="sm">
-                      Xem hóa đơn
+              <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between items-center">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleViewInvoice(payment)}
+                >
+                  Xem hóa đơn
+                </Button>
+                {(payment.status === 'pending' || payment.status === 'overdue') && (
+                  <PermissionGuard permission="UPDATE_PAYMENT_COST" fallback={
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      disabled
+                      className="bg-gray-400 text-white cursor-not-allowed"
+                    >
+                      Không có quyền thanh toán
                     </Button>
-                    <Button variant="outline" size="sm">
-                      Tải xuống
+                  }>
+                    <Button 
+                      onClick={() => handlePayNow(payment.id)}
+                      variant="primary" 
+                      size="sm"
+                      disabled={isLoading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
                     </Button>
-                  </div>
-                  {(payment.status === 'pending' || payment.status === 'overdue') && (
-                    <PermissionGuard permission="UPDATE_PAYMENT_COST" fallback={
-                      <Button 
-                        variant="primary" 
-                        size="sm"
-                        disabled
-                        className="bg-gray-400 text-white cursor-not-allowed"
-                      >
-                        Không có quyền thanh toán
-                      </Button>
-                    }>
-                      <Button 
-                        onClick={() => handlePayNow(payment.id)}
-                        variant="primary" 
-                        size="sm"
-                        disabled={isLoading}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
-                      </Button>
-                    </PermissionGuard>
-                  )}
-                </div>
+                  </PermissionGuard>
+                )}
               </div>
             </Card>
           ))}
           {fetching && <Card className="p-6">Đang tải giao dịch...</Card>}
         </div>
       </div>
+
+      {/* Invoice Detail Modal */}
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chi tiết hóa đơn</DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về thanh toán này
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCostDetail && (
+            <div className="space-y-6 mt-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Mã hóa đơn</p>
+                  <p className="text-base font-semibold text-gray-900">AUTO-{selectedCostDetail.id.slice(0, 6)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Trạng thái</p>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCostDetail.status === 'paid' ? 'paid' : 'pending')}`}>
+                    {getStatusText(selectedCostDetail.status === 'paid' ? 'paid' : 'pending')}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Ngày thanh toán</p>
+                  <p className="text-base text-gray-900">{selectedCostDetail.paymentDate || 'Chưa thanh toán'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Phương thức thanh toán</p>
+                  <p className="text-base text-gray-900">{selectedCostDetail.paymentMethod || 'Chưa chọn'}</p>
+                </div>
+                {selectedCostDetail.vnpTxnRef && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Mã giao dịch VNPay</p>
+                    <p className="text-base text-gray-900">{selectedCostDetail.vnpTxnRef}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Tổng tiền</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedCostDetail.totalCost)}</p>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-2">Mô tả</p>
+                <p className="text-base text-gray-900 whitespace-pre-wrap">{selectedCostDetail.title}</p>
+              </div>
+
+              {/* Dental Services */}
+              {selectedCostDetail.listDentalServiceEntityOrder && selectedCostDetail.listDentalServiceEntityOrder.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-3">Dịch vụ nha khoa</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tên dịch vụ</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Đơn vị</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Số lượng</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Đơn giá</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Thành tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {selectedCostDetail.listDentalServiceEntityOrder.map((service, idx) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-2 text-sm text-gray-900">{service.name}</td>
+                            <td className="px-4 py-2 text-sm text-center text-gray-600">{service.unit}</td>
+                            <td className="px-4 py-2 text-sm text-center text-gray-600">{service.quantity}</td>
+                            <td className="px-4 py-2 text-sm text-right text-gray-600">{formatCurrency(service.unitPrice)}</td>
+                            <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">{formatCurrency(service.cost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Prescriptions */}
+              {selectedCostDetail.listPrescriptionOrder && selectedCostDetail.listPrescriptionOrder.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-3">Đơn thuốc</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tên thuốc</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Liều dùng</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tần suất</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Thời gian</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Số lượng</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Đơn giá</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Thành tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {selectedCostDetail.listPrescriptionOrder.map((prescription, idx) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-2 text-sm text-gray-900">{prescription.name}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.dosage || '-'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.frequency || '-'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.duration || '-'}</td>
+                            <td className="px-4 py-2 text-sm text-center text-gray-600">{prescription.quantity}</td>
+                            <td className="px-4 py-2 text-sm text-right text-gray-600">{formatCurrency(prescription.unitPrice)}</td>
+                            <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">{formatCurrency(prescription.cost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {selectedCostDetail.listPrescriptionOrder.some(p => p.notes) && (
+                    <div className="mt-3 space-y-2">
+                      {selectedCostDetail.listPrescriptionOrder.map((prescription, idx) => (
+                        prescription.notes && (
+                          <div key={idx} className="text-sm text-gray-600">
+                            <span className="font-medium">{prescription.name}:</span> {prescription.notes}
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

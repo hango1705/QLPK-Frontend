@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui';
 import { FileTextOutlined, TeamOutlined, HistoryOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
@@ -40,7 +40,7 @@ const PatientInitialExamination = () => {
       .then(data => {
         setExaminations(data);
       })
-      .catch(() => setError('Không thể tải hồ sơ khám ban đầu'))
+      .catch(() => setError('Không thể tải hồ sơ khám'))
       .finally(() => setFetching(false));
   }, []);
 
@@ -113,10 +113,7 @@ const PatientInitialExamination = () => {
         <div className="pl-4 sm:pl-6 lg:pl-8 pr-0">
           <div className="flex justify-between items-center py-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Hồ sơ khám ban đầu</h1>
-              <p className="text-gray-600 mt-1">
-                Lịch sử khám bệnh và chẩn đoán ban đầu
-              </p>
+              <h1 className="text-3xl font-bold text-gray-900">Hồ sơ khám</h1>
             </div>
             {/* Nút thêm hồ sơ được ẩn theo yêu cầu */}
           </div>
@@ -233,16 +230,12 @@ const PatientInitialExamination = () => {
         )}
 
         {/* Detail Modal */}
-        {detailId && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Chi tiết hồ sơ khám</h3>
-                  <button onClick={() => setDetailId(null)} className="text-gray-400 hover:text-gray-600">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
+        <Dialog open={!!detailId} onOpenChange={(open) => !open && setDetailId(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Chi tiết hồ sơ khám</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
                 {detailLoading && <div>Đang tải...</div>}
                 {!detailLoading && detail && (
                   <div className="space-y-4">
@@ -308,29 +301,20 @@ const PatientInitialExamination = () => {
                     )}
                   </div>
                 )}
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Add New Examination Modal (kept; not wired to BE) */}
-        {isAdding && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Thêm hồ sơ khám mới
-                  </h3>
-                  <button
-                    onClick={() => setIsAdding(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={isAdding} onOpenChange={setIsAdding}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Thêm hồ sơ khám mới</DialogTitle>
+              <DialogDescription>
+                Thêm hồ sơ khám mới cho bệnh nhân
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4">
 
                 <form className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -409,10 +393,9 @@ const PatientInitialExamination = () => {
                     </Button>
                   </div>
                 </form>
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

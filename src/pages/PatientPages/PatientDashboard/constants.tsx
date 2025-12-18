@@ -27,8 +27,8 @@ export const SECTION_CONFIG: Record<
     icon: <User className="h-4 w-4" />,
   },
   initial: {
-    label: 'Hồ sơ khám ban đầu',
-    description: 'Xem hồ sơ khám lần đầu',
+    label: 'Hồ sơ khám',
+    description: 'Xem hồ sơ khám',
     icon: <FileText className="h-4 w-4" />,
   },
   plan: {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Button, Input, Alert, AlertTitle, AlertDescription } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
 import { doctorAPI } from '@/services/api/doctor';
@@ -230,9 +230,6 @@ const PatientTreatmentPlan = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Phác đồ điều trị</h1>
-              <p className="text-gray-600 mt-1">
-                Kế hoạch điều trị được bác sĩ chỉ định
-              </p>
             </div>
             {/* Ẩn nút thêm phác đồ theo yêu cầu */}
           </div>
@@ -349,23 +346,15 @@ const PatientTreatmentPlan = () => {
         )}
 
         {/* Add New Treatment Plan Modal */}
-        {isAdding && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Thêm phác đồ điều trị mới
-                  </h3>
-                  <button
-                    onClick={() => setIsAdding(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={isAdding} onOpenChange={setIsAdding}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Thêm phác đồ điều trị mới</DialogTitle>
+              <DialogDescription>
+                Tạo phác đồ điều trị mới cho bệnh nhân
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4">
 
                 <form className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -442,33 +431,23 @@ const PatientTreatmentPlan = () => {
                     </Button>
                   </div>
                 </form>
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog hiển thị các tiến trình */}
-        {showPhasesDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Danh sách tiến trình điều trị
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setShowPhasesDialog(false);
-                      setSelectedPlanId(null);
-                      setPhases([]);
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={showPhasesDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowPhasesDialog(false);
+            setSelectedPlanId(null);
+            setPhases([]);
+          }
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Danh sách tiến trình điều trị</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
 
                 {loadingPhases ? (
                   <div className="text-center py-8">Đang tải...</div>
@@ -567,32 +546,22 @@ const PatientTreatmentPlan = () => {
                     ))}
                   </div>
                 )}
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog hiển thị thông tin bác sĩ */}
-        {showDoctorDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-2xl">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Thông tin bác sĩ
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setShowDoctorDialog(false);
-                      setDoctorInfo(null);
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={showDoctorDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowDoctorDialog(false);
+            setDoctorInfo(null);
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Thông tin bác sĩ</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
 
                 {loadingDoctor ? (
                   <div className="text-center py-8">Đang tải...</div>
@@ -608,10 +577,6 @@ const PatientTreatmentPlan = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                      <div>
-                        <span className="text-sm font-medium text-gray-500">ID: </span>
-                        <span className="text-sm text-gray-900">{doctorInfo.id || '-'}</span>
-                      </div>
                       {doctorInfo.licenseNumber && (
                         <div>
                           <span className="text-sm font-medium text-gray-500">Số giấy phép: </span>
@@ -663,32 +628,22 @@ const PatientTreatmentPlan = () => {
                 ) : (
                   <div className="text-center py-8 text-gray-500">Không có thông tin bác sĩ</div>
                 )}
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog hiển thị thông tin y tá */}
-        {showNurseDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-2xl">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Thông tin y tá
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setShowNurseDialog(false);
-                      setNurseInfo(null);
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={showNurseDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowNurseDialog(false);
+            setNurseInfo(null);
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Thông tin y tá</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
 
                 {loadingNurse ? (
                   <div className="text-center py-8">Đang tải...</div>
@@ -702,15 +657,39 @@ const PatientTreatmentPlan = () => {
                         <h4 className="text-xl font-semibold text-gray-900">{nurseInfo.fullName || '-'}</h4>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                      <div>
-                        <span className="text-sm text-gray-500">ID: </span>
-                        <span className="text-sm text-gray-900">{nurseInfo.id || '-'}</span>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                       {nurseInfo.phone && (
                         <div>
-                          <span className="text-sm text-gray-500">Số điện thoại: </span>
+                          <span className="text-sm font-medium text-gray-500">Số điện thoại: </span>
                           <span className="text-sm text-gray-900">{nurseInfo.phone}</span>
+                        </div>
+                      )}
+                      {nurseInfo.email && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Email: </span>
+                          <span className="text-sm text-gray-900">{nurseInfo.email}</span>
+                        </div>
+                      )}
+                      {nurseInfo.address && (
+                        <div className="md:col-span-2">
+                          <span className="text-sm font-medium text-gray-500">Địa chỉ: </span>
+                          <span className="text-sm text-gray-900">{nurseInfo.address}</span>
+                        </div>
+                      )}
+                      {nurseInfo.gender && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Giới tính: </span>
+                          <span className="text-sm text-gray-900">
+                            {nurseInfo.gender === 'MALE' ? 'Nam' : nurseInfo.gender === 'FEMALE' ? 'Nữ' : nurseInfo.gender}
+                          </span>
+                        </div>
+                      )}
+                      {nurseInfo.dob && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Ngày sinh: </span>
+                          <span className="text-sm text-gray-900">
+                            {new Date(nurseInfo.dob).toLocaleDateString('vi-VN')}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -718,10 +697,9 @@ const PatientTreatmentPlan = () => {
                 ) : (
                   <div className="text-center py-8 text-gray-500">Không có thông tin y tá</div>
                 )}
-              </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
