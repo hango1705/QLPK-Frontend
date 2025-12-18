@@ -54,7 +54,34 @@ export const loginUser = createAsyncThunk(
         throw new Error('Login failed: Invalid response format');
       }
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || error.message || 'Login failed');
+      // Xử lý lỗi một cách thân thiện, không hiển thị lỗi kỹ thuật cho end user
+      if (error.response) {
+        // Server trả về lỗi
+        const status = error.response.status;
+        const serverMessage = error.response?.data?.message;
+        
+        // Nếu server có message thân thiện, dùng nó
+        if (serverMessage && !serverMessage.includes('status code') && !serverMessage.includes('Request failed')) {
+          return rejectWithValue(serverMessage);
+        }
+        
+        // Nếu không, tạo message thân thiện dựa trên status code
+        if (status === 400 || status === 401) {
+          return rejectWithValue('Tên đăng nhập hoặc mật khẩu không đúng');
+        } else if (status === 403) {
+          return rejectWithValue('Bạn không có quyền truy cập');
+        } else if (status >= 500) {
+          return rejectWithValue('Lỗi hệ thống. Vui lòng thử lại sau.');
+        } else {
+          return rejectWithValue('Đăng nhập thất bại. Vui lòng thử lại.');
+        }
+      } else if (error.request) {
+        // Lỗi mạng
+        return rejectWithValue('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+      } else {
+        // Lỗi khác
+        return rejectWithValue('Đăng nhập thất bại. Vui lòng thử lại.');
+      }
     }
   }
 );

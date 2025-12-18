@@ -120,17 +120,6 @@ const LoginPage = () => {
               <p className="text-muted-foreground">Đăng nhập bằng tài khoản</p>
             </div>
 
-            {/* Error Alert */}
-            {error && (
-              <Alert
-                variant="destructive"
-                className="mb-6"
-              >
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             {/* Login Form */}
             <form 
               onSubmit={handleSubmit(
