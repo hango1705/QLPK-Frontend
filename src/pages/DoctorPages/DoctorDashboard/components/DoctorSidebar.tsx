@@ -3,6 +3,8 @@ import { Sparkles, Menu } from 'lucide-react';
 import { SECTION_CONFIG, SECTION_ORDER } from '../constants';
 import type { DoctorSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
+import { isDoctorLV2 } from '@/utils/auth';
+import { useAuth } from '@/hooks';
 
 interface SidebarProps extends DoctorSidebarProps {
   isCollapsed: boolean;
@@ -17,7 +19,20 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
   scheduledCount,
-}) => (
+}) => {
+  const { token } = useAuth();
+  const isLV2 = isDoctorLV2(token);
+
+  // Filter sections based on role
+  const visibleSections = SECTION_ORDER.filter((section) => {
+    // Only show 'doctors' section for DOCTORLV2
+    if (section === 'doctors' && !isLV2) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
   <aside
     className={cn(
       'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300',
@@ -46,7 +61,7 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
     </div>
 
     <div className="flex-1 space-y-1 px-3">
-      {SECTION_ORDER.map((section) => {
+      {visibleSections.map((section) => {
         const { label } = SECTION_CONFIG[section];
         const isActive = activeSection === section;
         return (
@@ -75,7 +90,8 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
       })}
     </div>
   </aside>
-);
+  );
+};
 
 export default DoctorSidebar;
 

@@ -71,6 +71,8 @@ export const queryKeys = {
     treatmentPhases: (planId: string) => ['doctor', 'treatmentPhases', planId] as const,
     catalog: ['doctor', 'catalog'] as const,
     doctorDirectory: ['doctor', 'directory'] as const,
+    examinationsByDoctor: (doctorId: string) => ['doctor', 'examinations', 'byDoctor', doctorId] as const,
+    treatmentPlansByDoctor: (doctorId: string) => ['doctor', 'treatmentPlans', 'byDoctor', doctorId] as const,
   },
   
   // Notification queries

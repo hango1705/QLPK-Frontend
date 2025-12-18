@@ -231,6 +231,16 @@ export const doctorAPI = {
     }
   },
 
+  getExaminationsByDoctorId: async (doctorId: string): Promise<ExaminationSummary[]> => {
+    const response = await apiClient.get(`/api/v1/doctor/${doctorId}/examinations`);
+    return unwrap<ExaminationSummary[]>(response.data);
+  },
+
+  getTreatmentPlansByDoctorId: async (doctorId: string): Promise<TreatmentPlan[]> => {
+    const response = await apiClient.get(`/api/v1/doctor/${doctorId}/treatmentPlans`);
+    return unwrap<TreatmentPlan[]>(response.data);
+  },
+
   getMyAppointments: async (filter: AppointmentFilter = 'all'): Promise<AppointmentSummary[]> => {
     const endpoint =
       filter === 'scheduled'

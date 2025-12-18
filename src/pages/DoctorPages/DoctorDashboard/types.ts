@@ -12,6 +12,7 @@ import type {
 export type Section =
   | 'overview'
   | 'appointments'
+  | 'doctors'
   | 'examinations'
   | 'treatment'
   | 'catalog'

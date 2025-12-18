@@ -15,6 +15,7 @@ import { Stethoscope } from 'lucide-react';
 import InsightsSection from './InsightsSection';
 import PatientsSection from './PatientsSection';
 import AppointmentsCalendar from './AppointmentsCalendar';
+import DoctorsSection from './DoctorsSection';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 
 const DoctorContent: React.FC<ContentSectionProps> = (props) => {
@@ -86,6 +87,8 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
             services={services}
           />
         );
+      case 'doctors':
+        return <DoctorsSection doctors={props.doctors || []} />;
       case 'patients':
         return (
           <PatientsSection
