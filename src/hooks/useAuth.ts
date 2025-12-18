@@ -27,7 +27,7 @@ export const useAuth = () => {
   const dispatch = useDispatch<AppDispatch>();
   const auth = useSelector((state: RootState) => state.auth);
 
-  const login = useCallback((credentials: { username: string; password: string }) => {
+  const login = useCallback((credentials: { username: string; password: string; rememberMe?: boolean }) => {
     return dispatch(loginUser(credentials));
   }, [dispatch]);
 

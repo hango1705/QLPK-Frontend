@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from '@/services/api/auth';
-import { decodeTokenPayload, extractRoleFromToken } from '@/utils/auth';
+import { decodeTokenPayload, extractRoleFromToken, isTokenExpired } from '@/utils/auth';
+import { tokenStorage } from '@/utils/tokenStorage';
 
 export interface User {
   id: string;
@@ -36,7 +37,7 @@ const initialState: AuthState = {
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: { username: string; password: string }, { rejectWithValue }) => {
+  async (credentials: { username: string; password: string; rememberMe?: boolean }, { rejectWithValue }) => {
     try {
       const response = await authAPI.login(credentials);
       
@@ -44,11 +45,16 @@ export const loginUser = createAsyncThunk(
       if (response.data.code === 1000 && response.data.result.authenticated) {
         const token = response.data.result.token;
         const refreshToken = response.data.result.refreshToken || null;
+        const rememberMe = credentials.rememberMe ?? false;
+        
+        // Lưu token vào storage dựa trên rememberMe flag
+        tokenStorage.saveToken(token, refreshToken, rememberMe);
         
         return {
           token,
           refreshToken,
-          authenticated: response.data.result.authenticated
+          authenticated: response.data.result.authenticated,
+          rememberMe,
         };
       } else {
         throw new Error('Login failed: Invalid response format');
@@ -196,8 +202,14 @@ export const logoutUser = createAsyncThunk(
       // Even if logout fails on server (e.g., token expired), we should clear local state
       // Don't log 401 errors for logout - it's expected that token might be expired
       if (error?.response?.status !== 401) {
+        // Log other errors if needed
+      }
     }
-    }
+    
+    // Clear tokens from storage regardless of server response
+    tokenStorage.clearTokens();
+    
+    return { success: true };
   }
 );
 
@@ -298,6 +310,56 @@ const authSlice = createSlice({
       state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
+      // Clear tokens from storage
+      tokenStorage.clearTokens();
+    },
+    // Initialize auth state from storage (called on app load)
+    initializeAuth: (state) => {
+      const token = tokenStorage.getToken();
+      const refreshToken = tokenStorage.getRefreshToken();
+      
+      if (token) {
+        // Check if token is expired before restoring
+        if (isTokenExpired(token)) {
+          // Token expired, clear it
+          tokenStorage.clearTokens();
+          state.token = null;
+          state.refreshToken = null;
+          state.isAuthenticated = false;
+          state.user = null;
+          return;
+        }
+        
+        // Token is valid, restore state
+        state.token = token;
+        state.refreshToken = refreshToken;
+        state.isAuthenticated = true;
+        
+        // Decode token to get user info
+        try {
+          const payload = decodeTokenPayload<{ sub?: string }>(token);
+          const derivedRole = extractRoleFromToken(token);
+          state.user = {
+            id: payload?.sub ?? 'unknown',
+            username: payload?.sub ?? 'user',
+            disable: false,
+            role: derivedRole,
+          };
+        } catch (error) {
+          // If token is invalid, clear it
+          tokenStorage.clearTokens();
+          state.token = null;
+          state.refreshToken = null;
+          state.isAuthenticated = false;
+          state.user = null;
+        }
+      } else {
+        // No token found, ensure state is cleared
+        state.token = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.user = null;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -362,6 +424,9 @@ const authSlice = createSlice({
       .addCase(refreshToken.fulfilled, (state, action) => {
         state.token = action.payload.token;
         state.refreshToken = action.payload.refreshToken;
+        // Update token in storage (preserve rememberMe preference)
+        const rememberMe = tokenStorage.getRememberMe();
+        tokenStorage.saveToken(action.payload.token, action.payload.refreshToken, rememberMe);
       })
       .addCase(refreshToken.rejected, (state) => {
         state.user = null;
@@ -465,5 +530,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, resetLoading, setCredentials, clearCredentials } = authSlice.actions;
+export const { clearError, resetLoading, setCredentials, clearCredentials, initializeAuth } = authSlice.actions;
 export default authSlice.reducer;

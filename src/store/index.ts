@@ -9,10 +9,12 @@ import userReducer from './slices/userSlice';
 import registerStepReducer from './slices/registerStepSlice';
 
 // Persist config
+// Note: auth slice is NOT persisted here because we manually manage token storage
+// based on "Remember Me" preference (localStorage vs sessionStorage)
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth'], // Only persist auth slice
+  whitelist: [], // Auth is handled manually via tokenStorage utility
 };
 
 // Combine reducers

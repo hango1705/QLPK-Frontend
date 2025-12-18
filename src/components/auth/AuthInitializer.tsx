@@ -1,17 +1,21 @@
 import React, { useEffect } from 'react';
-import { useAuth } from '@/hooks';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store';
+import { initializeAuth } from '@/store/slices/authSlice';
 
 interface AuthInitializerProps {
   children: React.ReactNode;
 }
 
 const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) => {
-  const { token, isAuthenticated } = useAuth();
+  const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
-    // Không cần fetch user info vì backend không có API /auth/me
-    // Chỉ cần kiểm tra token có tồn tại hay không
-  }, [token, isAuthenticated]);
+    // Initialize auth state from storage (localStorage or sessionStorage)
+    // This is called after PersistGate has rehydrated redux state
+    // Since auth is NOT in redux-persist whitelist, we manually restore from tokenStorage
+    dispatch(initializeAuth());
+  }, [dispatch]);
 
   return <>{children}</>;
 };
