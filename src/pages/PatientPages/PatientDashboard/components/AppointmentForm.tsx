@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Alert, AlertTitle, AlertDescription, Button, Input } from '@/components/ui';
 import { Select as AntSelect } from 'antd';
 import { X } from 'lucide-react';
@@ -8,6 +8,7 @@ import { doctorAPI } from '@/services';
 import { adminAPI } from '@/services/api/admin';
 import type { AppointmentFormProps } from '../types';
 import { formatBackendDateTime, normalizeDateTime } from '../utils';
+import type { CategoryDentalService, DentalService } from '@/types/admin';
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
   const [doctorId, setDoctorId] = useState('');
@@ -19,7 +20,10 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [services, setServices] = useState<Array<{ id: string; name: string; unit: string; unitPrice: number }>>([]);
+  const [services, setServices] = useState<DentalService[]>([]);
+  const [categories, setCategories] = useState<CategoryDentalService[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [bookedSet, setBookedSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -35,11 +39,30 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
         const listS = await adminAPI.getAllServices();
         if (mounted) setServices(listS);
       } catch {}
+      try {
+        const listC = await adminAPI.getAllCategories();
+        if (mounted) setCategories(listC);
+      } catch {
+        // ignore category load errors
+      }
     })();
     return () => {
       mounted = false;
     };
   }, []);
+
+  const filteredServices = useMemo(() => {
+    if (!selectedCategoryId) {
+      return services;
+    }
+    const category = categories.find((c) => c.id === selectedCategoryId);
+    if (category && category.listDentalServiceEntity && category.listDentalServiceEntity.length > 0) {
+      // Ưu tiên danh sách dịch vụ lấy trực tiếp từ category
+      return category.listDentalServiceEntity;
+    }
+    // Fallback: nếu category không có list, dùng toàn bộ services (không lọc)
+    return services;
+  }, [services, categories, selectedCategoryId]);
 
   // Fetch booked time slots of selected doctor using bookingDateTime API
   useEffect(() => {
@@ -85,17 +108,18 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
 
   const submit = async () => {
     const payloadDate = formatBackendDateTime(date, time);
-    if (!doctorId || !payloadDate || !type) return setError('Thiếu bác sĩ, thời gian hoặc loại dịch vụ');
+    if (!doctorId || !payloadDate || !selectedServiceId)
+      return setError('Thiếu bác sĩ, thời gian hoặc dịch vụ');
     setLoading(true);
     setError(null);
     setMsg(null);
     try {
+      const selectedService = services.find((s) => s.id === selectedServiceId);
       await patientAPI.bookAppointment({
         doctorId,
         dateTime: payloadDate,
-        type,
+        type: selectedService?.name || type,
         notes,
-        listDentalServicesEntity: services.filter((s) => s.name === type).slice(0, 1).map((s) => ({ id: s.id! })),
       });
       setMsg('Đặt lịch thành công!');
       onBooked();
@@ -175,19 +199,47 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Loại dịch vụ</label>
-          <AntSelect
-            showSearch
-            placeholder="Chọn dịch vụ"
-            className="w-full"
-            value={type || undefined}
-            onChange={(v) => setType(v)}
-            optionFilterProp="label"
-            options={services.map((s) => ({
-              label: `${s.name} — ${s.unit} (${s.unitPrice.toLocaleString('vi-VN')} đ)`,
-              value: s.name,
-            }))}
-          />
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Danh mục dịch vụ</label>
+              <AntSelect
+                showSearch
+                placeholder="Chọn danh mục"
+                className="w-full"
+                value={selectedCategoryId || undefined}
+                onChange={(v) => {
+                  setSelectedCategoryId(v);
+                  setSelectedServiceId('');
+                  setType('');
+                }}
+                optionFilterProp="label"
+                options={categories.map((c) => ({
+                  label: c.name,
+                  value: c.id,
+                }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Loại dịch vụ</label>
+              <AntSelect
+                showSearch
+                placeholder={selectedCategoryId ? 'Chọn dịch vụ' : 'Chọn danh mục trước'}
+                className="w-full"
+                value={selectedServiceId || undefined}
+                onChange={(v) => {
+                  setSelectedServiceId(v);
+                  const svc = services.find((s) => s.id === v);
+                  setType(svc?.name || '');
+                }}
+                optionFilterProp="label"
+                disabled={!selectedCategoryId || filteredServices.length === 0}
+                options={filteredServices.map((s) => ({
+                  label: `${s.name} — ${s.unit} (${s.unitPrice.toLocaleString('vi-VN')} đ)`,
+                  value: s.id,
+                }))}
+              />
+            </div>
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Ngày</label>
@@ -209,7 +261,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
                   setTime('');
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
-                title="Reset ngày"
+                title="Đặt lại ngày"
               >
                 <X className="h-4 w-4 text-gray-500" />
               </button>
@@ -223,11 +275,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
               <button
                 type="button"
                 onClick={() => setTime('')}
-                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
+                className="inline-flex items-center gap-1 rounded-full border border-blue-500 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 shadow-sm hover:bg-blue-600 hover:text-white transition-colors"
                 title="Reset khung giờ"
               >
                 <X className="h-3 w-3" />
-                Reset
+                Đặt lại
               </button>
             )}
           </div>

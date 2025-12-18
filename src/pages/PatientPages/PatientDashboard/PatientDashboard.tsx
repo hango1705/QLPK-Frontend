@@ -69,7 +69,7 @@ const PatientDashboard: React.FC = () => {
   const [treatments, setTreatments] = useState<Array<any>>([]);
 
   // Filters and pagination
-  const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'scheduled' | 'done' | 'cancel'>('all');
+  const [appointmentFilter, setAppointmentFilter] = useState<'scheduled' | 'done' | 'cancel'>('scheduled');
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [appointmentPageSize] = useState(10);
   const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'in-progress' | 'completed' | 'planned'>('all');
@@ -412,9 +412,73 @@ const PatientDashboard: React.FC = () => {
     }
   }, [mockPrescriptions, prescriptions.length]);
 
-  const handleRefreshData = () => {
-    // Reload overview data
-    window.location.reload(); // Simple refresh for now
+  const handleRefreshData = async () => {
+    // Sau khi đặt lịch, reload lại danh sách lịch hẹn và chuyển sang tab "Xem lịch hẹn"
+    try {
+      const appList = await patientAPI.getMyAppointments();
+      const nonCancelled = appList.filter((a: any) => (a.status || '').toLowerCase() !== 'cancel');
+      setAppointmentCount(nonCancelled.length);
+
+      // Cập nhật tất cả lịch hẹn (bao gồm cả đã huỷ) cho tab xem lịch
+      const allAppsSorted = appList.sort((a: any, b: any) => {
+        const dateA = new Date(a.dateTime || 0).getTime();
+        const dateB = new Date(b.dateTime || 0).getTime();
+        return dateB - dateA;
+      });
+      setAllAppointments(allAppsSorted);
+
+      // Cập nhật lịch hẹn gần nhất đã hoàn thành
+      const completed = nonCancelled
+        .filter((a: any) => (a.status || '').toLowerCase().includes('done'))
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.dateTime || 0).getTime();
+          const dateB = new Date(b.dateTime || 0).getTime();
+          return dateB - dateA;
+        });
+      if (completed.length > 0) {
+        const lastDate = completed[0].dateTime;
+        if (lastDate) {
+          try {
+            const d = new Date(lastDate);
+            if (!isNaN(d.getTime())) {
+              setLastVisit(d.toLocaleDateString('vi-VN'));
+            }
+          } catch {}
+        }
+      }
+
+      // Cập nhật lịch hẹn sắp tới
+      const scheduled = nonCancelled
+        .filter((a: any) => (a.status || '').toLowerCase().includes('scheduled'))
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.dateTime || 0).getTime();
+          const dateB = new Date(b.dateTime || 0).getTime();
+          return dateA - dateB;
+        });
+      if (scheduled.length > 0) {
+        const nextDate = scheduled[0].dateTime;
+        if (nextDate) {
+          try {
+            const d = new Date(nextDate);
+            if (!isNaN(d.getTime())) {
+              setNextAppointment(d.toLocaleDateString('vi-VN'));
+            }
+          } catch {}
+        }
+      }
+
+      // Cập nhật danh sách 3 lịch hẹn gần nhất (không tính huỷ)
+      const sortedApps = nonCancelled.sort((a: any, b: any) => {
+        const dateA = new Date(a.dateTime || 0).getTime();
+        const dateB = new Date(b.dateTime || 0).getTime();
+        return dateB - dateA;
+      });
+      setRecentAppointments(sortedApps.slice(0, 3));
+    } catch (e) {
+      // Nếu lỗi thì bỏ qua, vẫn chuyển tab
+    } finally {
+      setSection('appointments');
+    }
   };
 
   const handleBookAppointment = () => {

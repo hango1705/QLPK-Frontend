@@ -43,26 +43,55 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleDoctorId, setRescheduleDoctorId] = useState<string | null>(null);
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
-  const [services, setServices] = useState<Array<{ id: string; name: string }>>([]);
+  const [services, setServices] = useState<Array<{ id: string; name: string; categoryName?: string }>>([]);
   const [detailOpenId, setDetailOpenId] = useState<string | null>(null);
   const [examDetail, setExamDetail] = useState<any | null>(null);
-  const [doctorsMap, setDoctorsMap] = useState<Map<string, string>>(new Map());
+  const [doctorById, setDoctorById] = useState<
+    Map<string, { fullName: string; specialization?: string }>
+  >(new Map());
   const [bookedSet, setBookedSet] = useState<Set<string>>(new Set());
+  const [appointmentDetail, setAppointmentDetail] = useState<{
+    id: string;
+    doctorFullName: string;
+    doctorSpecialization?: string;
+    dateTime: string;
+    type: string;
+    status: string;
+    notes?: string;
+    categoryName?: string;
+  } | null>(null);
+  const [appointmentDetailOpen, setAppointmentDetailOpen] = useState(false);
 
-  // Load doctors map and services for lookup
+  // Load doctors map and dịch vụ + danh mục for lookup
   useEffect(() => {
     (async () => {
       try {
         const list = await doctorAPI.getDoctorDirectory();
-        const map = new Map<string, string>();
+        const map = new Map<string, { fullName: string; specialization?: string }>();
         list.forEach((d) => {
-          if (d.fullName) map.set(d.fullName, d.id);
+          if (d.id) {
+            map.set(d.id, { fullName: d.fullName, specialization: d.specialization });
+          }
         });
-        setDoctorsMap(map);
+        setDoctorById(map);
       } catch {}
       try {
-        const listS = await adminAPI.getAllServices();
-        setServices(listS.map((s) => ({ id: s.id!, name: s.name })));
+        const categories = await adminAPI.getAllCategories();
+        const flatServices: Array<{ id: string; name: string; categoryName?: string }> = [];
+        categories.forEach((cat) => {
+          if (cat.listDentalServiceEntity && cat.listDentalServiceEntity.length > 0) {
+            cat.listDentalServiceEntity.forEach((s) => {
+              if (s.id && s.name) {
+                flatServices.push({
+                  id: s.id,
+                  name: s.name,
+                  categoryName: cat.name,
+                });
+              }
+            });
+          }
+        });
+        setServices(flatServices);
       } catch {}
     })();
   }, []);
@@ -70,13 +99,17 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   // Sync items with appointments prop
   useEffect(() => {
     if (appointments && appointments.length > 0) {
-      const enriched = appointments.map((item: any) => ({
-        ...item,
-        doctorId: doctorsMap.get(item.doctorFullName) || item.doctorId || undefined,
-      }));
+      const enriched = appointments.map((item: any) => {
+        const doctorInfo = item.doctorId ? doctorById.get(item.doctorId) : undefined;
+        return {
+          ...item,
+          doctorFullName: item.doctorFullName || doctorInfo?.fullName || '',
+          doctorSpecialization: item.doctorSpecialization || doctorInfo?.specialization || '',
+        };
+      });
       setItems(enriched);
     }
-  }, [appointments, doctorsMap]);
+  }, [appointments, doctorById]);
 
   const formatDateTimeVi = (s?: string) => {
     if (!s) return '';
@@ -89,6 +122,14 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     if (k.includes('scheduled')) return 'bg-blue-100 text-blue-700 border border-blue-200';
     if (k.includes('cancel')) return 'bg-red-100 text-red-700 border border-red-200';
     return 'bg-gray-100 text-gray-700 border border-gray-200';
+  };
+
+  const statusLabel = (s?: string) => {
+    const k = (s || '').toLowerCase();
+    if (k.includes('done')) return 'Hoàn thành';
+    if (k.includes('scheduled')) return 'Sắp tới';
+    if (k.includes('cancel')) return 'Đã hủy';
+    return s || 'Không xác định';
   };
 
   const toVietnamDate = (isoDate: string) => {
@@ -272,6 +313,29 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     }
   };
 
+  const openAppointmentDetail = (a: {
+    id: string;
+    doctorFullName: string;
+    doctorSpecialization?: string;
+    dateTime: string;
+    status: string;
+    type: string;
+    notes?: string;
+  }) => {
+    const matchedService = services.find((s) => s.name === a.type);
+    setAppointmentDetail({
+      id: a.id,
+      doctorFullName: a.doctorFullName,
+      doctorSpecialization: a.doctorSpecialization,
+      dateTime: a.dateTime,
+      status: a.status,
+      type: a.type,
+      notes: a.notes,
+      categoryName: matchedService?.categoryName,
+    });
+    setAppointmentDetailOpen(true);
+  };
+
   return (
     <div>
       {error && (
@@ -281,19 +345,8 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         </Alert>
       )}
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs (chỉ hiển thị Sắp tới, Đã hoàn thành, Đã hủy) */}
       <div className="flex gap-2 mb-4 border-b border-gray-200 pb-2">
-        <button
-          onClick={() => {
-            onFilterChange('all');
-            onPageChange(1);
-          }}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition ${
-            filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          Tất cả ({items.length})
-        </button>
         <button
           onClick={() => {
             onFilterChange('scheduled');
@@ -373,6 +426,9 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
 
                   {/* Actions & Status */}
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => openAppointmentDetail(a)}>
+                      Chi tiết
+                    </Button>
                     {a.status && a.status.toLowerCase().includes('scheduled') && (
                       <>
                         <Button
@@ -405,9 +461,11 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                       </Button>
                     )}
                     <span
-                      className={`text-xs font-medium rounded-full px-2.5 py-1 ${statusClass(a.status)} min-w-[80px] text-center`}
+                      className={`text-xs font-medium rounded-full px-2.5 py-1 ${statusClass(
+                        a.status,
+                      )} min-w-[80px] text-center`}
                     >
-                      {a.status}
+                      {statusLabel(a.status)}
                     </span>
                   </div>
                 </div>
@@ -453,6 +511,64 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         okButtonProps={{ danger: true }}
       >
         <p>Bạn có chắc chắn muốn hủy lịch hẹn này? Hành động này không thể hoàn tác.</p>
+      </Modal>
+
+      {/* Appointment Detail Modal */}
+      <Modal
+        title="Chi tiết lịch hẹn"
+        open={appointmentDetailOpen}
+        onOk={() => setAppointmentDetailOpen(false)}
+        onCancel={() => setAppointmentDetailOpen(false)}
+        okText="Đóng"
+        cancelText="Hủy"
+      >
+        {appointmentDetail && (
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Bác sĩ</p>
+              <p className="text-sm text-gray-900">
+                {appointmentDetail.doctorFullName}
+                {appointmentDetail.doctorSpecialization ? ` — ${appointmentDetail.doctorSpecialization}` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Ngày giờ</p>
+              <p className="text-sm text-blue-700 font-medium">{formatDateTimeVi(appointmentDetail.dateTime)}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-500">Danh mục dịch vụ</p>
+                <p className="text-sm text-gray-900">
+                  {appointmentDetail.categoryName || 'Khác'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500">Dịch vụ</p>
+                <p className="text-sm text-gray-900">{appointmentDetail.type || 'N/A'}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Trạng thái</p>
+              <p className="text-sm">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(
+                    appointmentDetail.status,
+                  )}`}
+                >
+                  {statusLabel(appointmentDetail.status)}
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Ghi chú</p>
+              <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">
+                {appointmentDetail.notes && appointmentDetail.notes.trim()
+                  ? appointmentDetail.notes
+                  : 'Không có ghi chú.'}
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Reschedule Modal */}

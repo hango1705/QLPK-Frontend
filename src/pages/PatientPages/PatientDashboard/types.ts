@@ -114,10 +114,10 @@ export interface AppointmentFormProps {
 
 export interface AppointmentListProps {
   appointments: Array<any>;
-  filter: 'all' | 'scheduled' | 'done' | 'cancel';
+  filter: 'scheduled' | 'done' | 'cancel';
   page: number;
   pageSize: number;
-  onFilterChange: (filter: 'all' | 'scheduled' | 'done' | 'cancel') => void;
+  onFilterChange: (filter: 'scheduled' | 'done' | 'cancel') => void;
   onPageChange: (page: number) => void;
   onBookNew: () => void;
 }
