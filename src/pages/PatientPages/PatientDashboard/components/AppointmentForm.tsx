@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Alert, AlertTitle, AlertDescription, Button, Input } from '@/components/ui';
+import { Alert, AlertTitle, AlertDescription, Button, Input, showNotification } from '@/components/ui';
 import { Select as AntSelect } from 'antd';
 import { X } from 'lucide-react';
 import apiClient from '@/services/api/client';
@@ -110,6 +110,19 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     const payloadDate = formatBackendDateTime(date, time);
     if (!doctorId || !payloadDate || !selectedServiceId)
       return setError('Thiếu bác sĩ, thời gian hoặc dịch vụ');
+
+    // Không cho đặt lịch trong quá khứ
+    if (date) {
+      const [y, m, d] = date.split('-').map(Number);
+      const selectedDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      if (selectedDay.getTime() < today.getTime()) {
+        setError('Bạn không thể đặt lịch trong ngày đã qua');
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     setMsg(null);
@@ -121,7 +134,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
         type: selectedService?.name || type,
         notes,
       });
-      setMsg('Đặt lịch thành công!');
+      showNotification.success('Đặt lịch hẹn thành công!');
       onBooked();
     } catch {
       setError('Đặt lịch thất bại');
@@ -134,6 +147,14 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     // iso yyyy-mm-dd -> dd/MM/yyyy
     const [y, m, d] = isoDate.split('-');
     return `${d}/${m}/${y}`;
+  };
+
+  const getTodayIso = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const generateSlots = () => {
@@ -247,6 +268,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
             <Input
               type="date"
               value={date}
+              min={getTodayIso()}
               onChange={(e) => {
                 setDate(e.target.value);
                 setTime('');
