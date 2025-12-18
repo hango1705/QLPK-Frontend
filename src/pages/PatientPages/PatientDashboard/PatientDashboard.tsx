@@ -46,6 +46,13 @@ const PatientDashboard: React.FC = () => {
     enabled: canGetAllTreatmentPhases,
   });
 
+  // Fetch costs to count payment records
+  const { data: costs = [] } = useQuery({
+    queryKey: ['patient', 'costs'],
+    queryFn: patientAPI.getAllMyCost,
+    enabled: true,
+  });
+
   // Fetch phases for all plans in parallel
   const phaseQueries = useQueries({
     queries: treatmentPlans.map((plan) => ({
@@ -268,9 +275,22 @@ const PatientDashboard: React.FC = () => {
         });
         setAllAppointments(allAppsSorted);
 
-        // Get last visit (most recent completed appointment)
+        // Get last visit (most recent completed appointment with dateTime <= today)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const completed = nonCancelled
-          .filter((a: any) => (a.status || '').toLowerCase().includes('done'))
+          .filter((a: any) => {
+            const status = (a.status || '').toLowerCase();
+            if (!status.includes('done')) return false;
+            if (!a.dateTime) return false;
+            try {
+              const appDate = new Date(a.dateTime);
+              appDate.setHours(0, 0, 0, 0);
+              return appDate.getTime() <= today.getTime();
+            } catch {
+              return false;
+            }
+          })
           .sort((a: any, b: any) => {
             const dateA = new Date(a.dateTime || 0).getTime();
             const dateB = new Date(b.dateTime || 0).getTime();
@@ -286,18 +306,30 @@ const PatientDashboard: React.FC = () => {
               }
             } catch {}
           }
+        } else {
+          setLastVisit(null);
         }
 
-        // Get next appointment (most upcoming scheduled appointment)
-        const scheduled = nonCancelled
-          .filter((a: any) => (a.status || '').toLowerCase().includes('scheduled'))
+        // Get next appointment (closest appointment date >= today) or next phase in treatment
+        const upcoming = nonCancelled
+          .filter((a: any) => {
+            if (!a.dateTime) return false;
+            try {
+              const appDate = new Date(a.dateTime);
+              appDate.setHours(0, 0, 0, 0);
+              return appDate.getTime() >= today.getTime();
+            } catch {
+              return false;
+            }
+          })
           .sort((a: any, b: any) => {
             const dateA = new Date(a.dateTime || 0).getTime();
             const dateB = new Date(b.dateTime || 0).getTime();
             return dateA - dateB;
           });
-        if (scheduled.length > 0) {
-          const nextDate = scheduled[0].dateTime;
+        
+        if (upcoming.length > 0) {
+          const nextDate = upcoming[0].dateTime;
           if (nextDate) {
             try {
               const d = new Date(nextDate);
@@ -306,6 +338,9 @@ const PatientDashboard: React.FC = () => {
               }
             } catch {}
           }
+        } else {
+          // If no upcoming appointment, check for next phase in treatment plans
+          setNextAppointment(null);
         }
 
         // Store recent appointments (last 3) - only non-cancelled
@@ -401,9 +436,50 @@ const PatientDashboard: React.FC = () => {
     setPlanCount(computedTreatmentData.planCount);
     setTreatments(computedTreatmentData.treatments);
     setPhaseCount(computedTreatmentData.phasesTotal);
-    setPaymentCount(computedTreatmentData.payments);
+    // paymentCount is now set from costs array, not from computedTreatmentData
     setActivities(computedTreatmentData.activities);
   }, [computedTreatmentData]);
+
+  // Update payment count from costs
+  useEffect(() => {
+    setPaymentCount(costs.length);
+  }, [costs]);
+
+  // Update next appointment from treatment phases if no upcoming appointment
+  useEffect(() => {
+    if (!nextAppointment && canGetAllTreatmentPhases && treatmentPlans.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Find next phase appointment date
+      let nextPhaseDate: Date | null = null;
+      treatmentPlans.forEach((plan, index) => {
+        const phases = phaseQueries[index]?.data || [];
+        phases.forEach((ph: any) => {
+          if (ph.nextAppointment) {
+            try {
+              // Parse nextAppointment format: "HH:mm dd/MM/yyyy"
+              const match = ph.nextAppointment.match(/^(\d{2}):(\d{2})\s(\d{2})\/(\d{2})\/(\d{4})$/);
+              if (match) {
+                const [, , , dd, MM, yyyy] = match;
+                const phaseDate = new Date(`${yyyy}-${MM}-${dd}`);
+                phaseDate.setHours(0, 0, 0, 0);
+                if (phaseDate.getTime() >= today.getTime()) {
+                  if (!nextPhaseDate || phaseDate.getTime() < nextPhaseDate.getTime()) {
+                    nextPhaseDate = phaseDate;
+                  }
+                }
+              }
+            } catch {}
+          }
+        });
+      });
+      
+      if (nextPhaseDate) {
+        setNextAppointment(nextPhaseDate.toLocaleDateString('vi-VN'));
+      }
+    }
+  }, [nextAppointment, treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
 
   // Update prescriptions with mock data from React Query
   useEffect(() => {
@@ -427,9 +503,22 @@ const PatientDashboard: React.FC = () => {
       });
       setAllAppointments(allAppsSorted);
 
-      // Cập nhật lịch hẹn gần nhất đã hoàn thành
+      // Cập nhật lịch hẹn gần nhất đã hoàn thành (dateTime <= today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const completed = nonCancelled
-        .filter((a: any) => (a.status || '').toLowerCase().includes('done'))
+        .filter((a: any) => {
+          const status = (a.status || '').toLowerCase();
+          if (!status.includes('done')) return false;
+          if (!a.dateTime) return false;
+          try {
+            const appDate = new Date(a.dateTime);
+            appDate.setHours(0, 0, 0, 0);
+            return appDate.getTime() <= today.getTime();
+          } catch {
+            return false;
+          }
+        })
         .sort((a: any, b: any) => {
           const dateA = new Date(a.dateTime || 0).getTime();
           const dateB = new Date(b.dateTime || 0).getTime();
@@ -445,18 +534,29 @@ const PatientDashboard: React.FC = () => {
             }
           } catch {}
         }
+      } else {
+        setLastVisit(null);
       }
 
-      // Cập nhật lịch hẹn sắp tới
-      const scheduled = nonCancelled
-        .filter((a: any) => (a.status || '').toLowerCase().includes('scheduled'))
+      // Cập nhật lịch hẹn sắp tới (closest appointment date >= today)
+      const upcoming = nonCancelled
+        .filter((a: any) => {
+          if (!a.dateTime) return false;
+          try {
+            const appDate = new Date(a.dateTime);
+            appDate.setHours(0, 0, 0, 0);
+            return appDate.getTime() >= today.getTime();
+          } catch {
+            return false;
+          }
+        })
         .sort((a: any, b: any) => {
           const dateA = new Date(a.dateTime || 0).getTime();
           const dateB = new Date(b.dateTime || 0).getTime();
           return dateA - dateB;
         });
-      if (scheduled.length > 0) {
-        const nextDate = scheduled[0].dateTime;
+      if (upcoming.length > 0) {
+        const nextDate = upcoming[0].dateTime;
         if (nextDate) {
           try {
             const d = new Date(nextDate);
@@ -465,6 +565,9 @@ const PatientDashboard: React.FC = () => {
             }
           } catch {}
         }
+      } else {
+        // If no upcoming appointment, check for next phase in treatment plans
+        setNextAppointment(null);
       }
 
       // Cập nhật danh sách 3 lịch hẹn gần nhất (không tính huỷ)
