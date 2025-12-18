@@ -81,6 +81,7 @@ export interface TreatmentPlan {
   notes: string;
   status: string;
   totalCost: number;
+  doctorId?: string; // Doctor ID from backend
   doctorFullname: string;
   nurseId?: string; // Nurse ID from backend
   nurseFullname?: string; // Tên y tá

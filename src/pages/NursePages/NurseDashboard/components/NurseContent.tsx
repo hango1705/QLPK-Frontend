@@ -3,17 +3,19 @@ import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Butto
 import type { ContentSectionProps, Section } from '../types';
 import { formatCurrency, formatDate, formatDateTime } from '../utils';
 import { STATUS_BADGE } from '../constants';
-import { Stethoscope, User, Phone, Mail, MapPin, Calendar } from 'lucide-react';
+import { Stethoscope, User, Phone, Mail, MapPin, Calendar, Eye, ClipboardList, DollarSign } from 'lucide-react';
 import AppointmentsCalendar from './AppointmentsCalendar';
 import DoctorDetailDialog from './DoctorDetailDialog';
 import ProfileSection from './ProfileSection';
 import AccountSection from './AccountSection';
+import TreatmentPlanDetailDialog from './TreatmentPlanDetailDialog';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { usePermission } from '@/hooks';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { nurseAPI } from '@/services';
 import { queryKeys } from '@/services/queryClient';
 import { showNotification } from '@/components/ui';
+import type { TreatmentPlan } from '@/types/doctor';
 
 const NurseContent: React.FC<ContentSectionProps> = ({
   activeSection,
@@ -30,6 +32,7 @@ const NurseContent: React.FC<ContentSectionProps> = ({
   const canNotificationAppointment = hasPermission('NOTIFICATION_APPOINMENT');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedDoctorDetail, setSelectedDoctorDetail] = useState<string | null>(null);
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<TreatmentPlan | null>(null);
   const queryClient = useQueryClient();
 
   // Mutation for updating appointment notification
@@ -51,7 +54,21 @@ const NurseContent: React.FC<ContentSectionProps> = ({
   const renderContent = () => {
     switch (activeSection) {
       case 'treatment':
-        return <TreatmentPlansSection plans={treatmentPlans} />;
+        return (
+          <>
+            <TreatmentPlansSection 
+              plans={treatmentPlans} 
+              onViewDetail={(plan) => setSelectedPlanDetail(plan)}
+            />
+            <TreatmentPlanDetailDialog
+              open={!!selectedPlanDetail}
+              plan={selectedPlanDetail}
+              onOpenChange={(open) => {
+                if (!open) setSelectedPlanDetail(null);
+              }}
+            />
+          </>
+        );
       case 'appointments':
         return (
           <AppointmentsCalendar
@@ -102,8 +119,12 @@ const NurseContent: React.FC<ContentSectionProps> = ({
   return <div className="space-y-4">{renderContent()}</div>;
 };
 
-const TreatmentPlansSection: React.FC<{ plans: ContentSectionProps['treatmentPlans'] }> = ({
+const TreatmentPlansSection: React.FC<{ 
+  plans: ContentSectionProps['treatmentPlans'];
+  onViewDetail: (plan: TreatmentPlan) => void;
+}> = ({
   plans,
+  onViewDetail,
 }) => (
   <Card className="border-none bg-white/90 shadow-medium">
     <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -115,37 +136,79 @@ const TreatmentPlansSection: React.FC<{ plans: ContentSectionProps['treatmentPla
         {plans.length} phác đồ
       </Badge>
     </CardHeader>
-    <CardContent className="space-y-3">
+    <CardContent className="space-y-4">
       {plans.map((plan) => (
         <div
           key={plan.id}
-          className="rounded-2xl border border-border/70 bg-white/70 px-4 py-4 shadow-sm transition hover:shadow-medium"
+          className="group relative rounded-2xl border border-border/70 bg-gradient-to-br from-white to-gray-50/50 px-6 py-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30"
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-base font-semibold text-foreground">{plan.title}</h3>
-                <Badge className={STATUS_BADGE[plan.status] || STATUS_BADGE.Inprogress}>
-                  {plan.status}
-                </Badge>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <ClipboardList className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-1">{plan.title}</h3>
+                      <Badge className={`${STATUS_BADGE[plan.status] || STATUS_BADGE.Inprogress} text-xs`}>
+                        {plan.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{plan.description}</p>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mb-2">{plan.description}</p>
-              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Stethoscope className="h-3 w-3" />
-                  {plan.doctorFullname}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(plan.createAt)}
-                </span>
-                <span className="font-medium text-primary">{formatCurrency(plan.totalCost)}</span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    <Stethoscope className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bác sĩ</p>
+                    <p className="font-medium text-foreground">{plan.doctorFullname || 'Chưa xác định'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ngày tạo</p>
+                    <p className="font-medium text-foreground">{formatDate(plan.createAt)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tổng chi phí</p>
+                    <p className="font-semibold text-primary">{formatCurrency(plan.totalCost)}</p>
+                  </div>
+                </div>
               </div>
+
               {plan.notes && (
-                <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-                  <strong>Ghi chú:</strong> {plan.notes}
+                <div className="mt-3 rounded-lg bg-amber-50/80 border border-amber-200 p-3">
+                  <p className="text-xs font-medium text-amber-900 mb-1">Ghi chú:</p>
+                  <p className="text-xs text-amber-800 line-clamp-2">{plan.notes}</p>
                 </div>
               )}
+            </div>
+            
+            <div className="flex items-center gap-2 md:flex-col md:items-end">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onViewDetail(plan)}
+                className="flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <Eye className="h-4 w-4" />
+                Xem chi tiết
+              </Button>
             </div>
           </div>
         </div>

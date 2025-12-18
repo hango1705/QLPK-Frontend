@@ -43,6 +43,7 @@ export {
   DialogTrigger,
 } from './dialog';
 export { Label } from './label';
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './tooltip';
 
 // Types
 export type { ButtonProps } from './Button';
