@@ -79,6 +79,8 @@ const RegisterPage = () => {
   const [step3Submitted, setStep3Submitted] = useState(false);
   const [step4Submitted, setStep4Submitted] = useState(false);
   const [isVerificationSent, setIsVerificationSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const step1Form = useForm<Step1Data>({
     resolver: yupResolver(step1Schema) as any,
@@ -189,19 +191,33 @@ const RegisterPage = () => {
 
   const handleStep1Submit = async (data: Step1Data) => {
     try {
+      console.log('Sending verification code for email:', data.email);
       const result = await dispatch(sendVerificationCodeAction(data.email));
+      console.log('Send verification code result:', result);
+      console.log('Result type:', result.type);
+      console.log('Is fulfilled?', sendVerificationCodeAction.fulfilled.match(result));
+      console.log('Is rejected?', sendVerificationCodeAction.rejected.match(result));
       
       // Check if the action was fulfilled (successful) using Redux Toolkit pattern
       if (sendVerificationCodeAction.fulfilled.match(result)) {
+        console.log('Verification code sent successfully, moving to step 2');
+        // Set form data first
         dispatch(setFormData(data));
+        // Then set other states
         setIsVerificationSent(true);
         dispatch(setCountdown(120)); // 2 minutes countdown
+        // Set step immediately after setting form data
         dispatch(setCurrentStep(2));
         notification.success('Mã xác thực đã được gửi đến email của bạn!');
       } else if (sendVerificationCodeAction.rejected.match(result)) {
+        console.error('Verification code send failed:', result.payload);
         notification.error((result.payload as string) || 'Không thể gửi mã xác thực. Vui lòng thử lại.');
+      } else {
+        console.warn('Unexpected result type:', result);
+        notification.error('Phản hồi không hợp lệ từ server. Vui lòng thử lại.');
       }
     } catch (error: any) {
+      console.error('Error in handleStep1Submit:', error);
       notification.error(error.message || 'Không thể gửi mã xác thực. Vui lòng thử lại.');
     }
   };
@@ -297,15 +313,17 @@ const RegisterPage = () => {
         />
       </div>
 
-      <Button 
-        variant="primary" 
-        size="lg" 
-        className="w-full" 
-        htmlType="submit"
-        loading={isLoading}
-      >
-        Gửi mã xác thực
-      </Button>
+      <div className="flex justify-center">
+        <Button 
+          variant="primary" 
+          size="lg" 
+          className="min-w-[200px]" 
+          htmlType="submit"
+          loading={isLoading}
+        >
+          Gửi mã xác thực
+        </Button>
+      </div>
     </form>
   );
 
@@ -356,11 +374,11 @@ const RegisterPage = () => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <Button variant="primary" size="lg" className="w-full" htmlType="submit">
+      <div className="flex flex-col gap-6 items-center">
+        <Button variant="primary" size="lg" className="min-w-[200px]" htmlType="submit">
           Xác thực
         </Button>
-        <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
+        <Button variant="outline" size="lg" className="min-w-[200px]" onClick={goToPreviousStep}>
           Quay lại
         </Button>
       </div>
@@ -385,70 +403,144 @@ const RegisterPage = () => {
         <label className="block text-sm font-medium text-foreground mb-2">
           Tên đăng nhập
         </label>
-        <Input
-          {...step3Form.register('username')}
-          placeholder="nguyenvana"
-          error={!!step3Form.formState.errors.username}
-          helperText={step3Form.formState.errors.username?.message}
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <Input
+            {...step3Form.register('username')}
+            placeholder="nguyenvana"
+            className="pl-10"
+            error={!!step3Form.formState.errors.username}
+            helperText={step3Form.formState.errors.username?.message}
+          />
+        </div>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           Họ và tên
         </label>
-        <Input
-          {...step3Form.register('fullName')}
-          placeholder="Nguyễn Văn A"
-          error={!!step3Form.formState.errors.fullName}
-          helperText={step3Form.formState.errors.fullName?.message}
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <Input
+            {...step3Form.register('fullName')}
+            placeholder="Nguyễn Văn A"
+            className="pl-10"
+            error={!!step3Form.formState.errors.fullName}
+            helperText={step3Form.formState.errors.fullName?.message}
+          />
+        </div>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           Số điện thoại
         </label>
-        <Input
-          {...step3Form.register('phone')}
-          type="tel"
-          placeholder="0123456789"
-          error={!!step3Form.formState.errors.phone}
-          helperText={step3Form.formState.errors.phone?.message}
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+            </svg>
+          </div>
+          <Input
+            {...step3Form.register('phone')}
+            type="tel"
+            placeholder="0123456789"
+            className="pl-10"
+            error={!!step3Form.formState.errors.phone}
+            helperText={step3Form.formState.errors.phone?.message}
+          />
+        </div>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           Mật khẩu
         </label>
-        <Input
-          {...step3Form.register('password')}
-          type="password"
-          placeholder="••••••••"
-          error={!!step3Form.formState.errors.password}
-          helperText={step3Form.formState.errors.password?.message}
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <Input
+            {...step3Form.register('password')}
+            type={showPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            className="pl-10 pr-10"
+            error={!!step3Form.formState.errors.password}
+            helperText={step3Form.formState.errors.password?.message}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? (
+              <svg className="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           Xác nhận mật khẩu
         </label>
-        <Input
-          {...step3Form.register('confirmPassword')}
-          type="password"
-          placeholder="••••••••"
-          error={!!step3Form.formState.errors.confirmPassword}
-          helperText={step3Form.formState.errors.confirmPassword?.message}
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <Input
+            {...step3Form.register('confirmPassword')}
+            type={showConfirmPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            className="pl-10 pr-10"
+            error={!!step3Form.formState.errors.confirmPassword}
+            helperText={step3Form.formState.errors.confirmPassword?.message}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+          >
+            {showConfirmPassword ? (
+              <svg className="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <Button variant="primary" size="lg" className="w-full" htmlType="submit">
+      <div className="flex flex-col gap-6 items-center">
+        <Button variant="primary" size="lg" className="min-w-[200px]" htmlType="submit">
           Tiếp tục
         </Button>
-        <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
+        <Button variant="outline" size="lg" className="min-w-[200px]" onClick={goToPreviousStep}>
           Quay lại
         </Button>
       </div>
@@ -532,17 +624,17 @@ const RegisterPage = () => {
         <p className="text-sm text-destructive">{step4Form.formState.errors.agreeToTerms.message}</p>
       )}
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 items-center">
         <Button 
           variant="primary" 
           size="lg" 
-          className="w-full"
+          className="min-w-[200px]"
           loading={isLoading}
           htmlType="submit"
         >
           Hoàn tất đăng ký
         </Button>
-        <Button variant="outline" size="lg" className="w-full" onClick={goToPreviousStep}>
+        <Button variant="outline" size="lg" className="min-w-[200px]" onClick={goToPreviousStep}>
           Quay lại
         </Button>
       </div>

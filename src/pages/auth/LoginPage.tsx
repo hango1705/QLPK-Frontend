@@ -213,14 +213,14 @@ const LoginPage = () => {
               </div>
 
               {/* Login Button */}
-              <div className="mt-8">
+              <div className="mt-8 flex justify-center">
                 <Button
                   htmlType="submit"
                   variant="primary"
                   size="lg"
                   loading={isSubmitting} // isSubmitting từ react-hook-form là đủ
                   disabled={isSubmitting}
-                  block
+                  className="min-w-[200px]"
                 >
                   {isSubmitting ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
                 </Button>

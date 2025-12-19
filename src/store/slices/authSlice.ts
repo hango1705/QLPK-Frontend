@@ -119,12 +119,27 @@ export const sendVerificationCode = createAsyncThunk(
   'auth/sendVerificationCode',
   async (email: string, { rejectWithValue }) => {
     try {
+      console.log('sendVerificationCode thunk: Sending request for email:', email);
       const response = await authAPI.sendVerificationCode(email);
-      return response.data;
+      console.log('sendVerificationCode thunk: Response received:', response.data);
+      
+      // Backend returns ApiResponses with structure: { code: int, result: string }
+      // Check if code is 1000 (success)
+      if (response.data && response.data.code === 1000) {
+        console.log('sendVerificationCode thunk: Success, returning result:', response.data.result);
+        return { success: true, message: response.data.result };
+      } else {
+        // If code is not 1000, treat as error
+        const errorMsg = response.data?.result || 'Failed to send verification code';
+        console.error('sendVerificationCode thunk: Code is not 1000, rejecting with:', errorMsg);
+        return rejectWithValue(errorMsg);
+      }
     } catch (error: any) {
+      console.error('sendVerificationCode thunk: Error caught:', error);
       // Backend returns ApiResponses with structure: { code: int, result: string }
       // Error message is in result field, not message field
       const errorMessage = error.response?.data?.result || error.response?.data?.message || error.message || 'Failed to send verification code';
+      console.error('sendVerificationCode thunk: Rejecting with error message:', errorMessage);
       return rejectWithValue(errorMessage);
     }
   }

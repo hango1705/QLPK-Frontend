@@ -71,7 +71,8 @@ export interface UserResponse {
 }
 
 export interface VerificationResponse {
-  message: string;
+  code: number;
+  result: string;
 }
 
 export interface RefreshTokenResponse {
@@ -92,7 +93,9 @@ export const authAPI = {
     
   // Bước 1: Gửi mã xác thực email
   sendVerificationCode: (email: string) =>
-    apiClient.post<VerificationResponse>(`/api/v1/auth/verifiedCode/${email}`),
+    apiClient.post<VerificationResponse>(`/api/v1/auth/verifiedCode/${email}`, {}, {
+      timeout: 60000, // 60 seconds timeout for email sending
+    }),
     
   // Bước 2: Hoàn tất đăng ký với mã xác thực
   register: (userData: RegisterData) =>
