@@ -70,8 +70,10 @@ export interface ClinicSectionProps {
   prescriptions: Prescription[];
   onCreateCategory: () => void;
   onEditCategory: (category: CategoryDentalService) => void;
-  onCreateService: () => void;
+  onDeleteCategory: (categoryId: string) => void;
+  onCreateService: (categoryId: string) => void;
   onEditService: (service: DentalService) => void;
+  onDeleteService: (serviceId: string) => void;
   onCreatePrescription: () => void;
   onEditPrescription: (prescription: Prescription) => void;
   isLoading: boolean;
@@ -99,8 +101,10 @@ export interface ContentSectionProps {
   onFilterAudit: (filters: AuditLogFilters) => void;
   onCreateCategory: () => void;
   onEditCategory: (category: CategoryDentalService) => void;
-  onCreateService: () => void;
+  onDeleteCategory: (categoryId: string) => void;
+  onCreateService: (categoryId: string) => void;
   onEditService: (service: DentalService) => void;
+  onDeleteService: (serviceId: string) => void;
   onCreatePrescription: () => void;
   onEditPrescription: (prescription: Prescription) => void;
   isLoading: boolean;

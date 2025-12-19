@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from '@/components/ui';
-import { Package, Plus, Edit, Pill, FolderTree, DollarSign } from 'lucide-react';
+import { Package, Plus, Edit, Pill, FolderTree, DollarSign, Trash2, ArrowLeft } from 'lucide-react';
 import type { ClinicSectionProps } from '../types';
+import type { CategoryDentalService, DentalService } from '@/types/admin';
 import { formatCurrency } from '../utils';
 import { cn } from '@/utils/cn';
 
@@ -11,13 +12,16 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
   prescriptions,
   onCreateCategory,
   onEditCategory,
+  onDeleteCategory,
   onCreateService,
   onEditService,
+  onDeleteService,
   onCreatePrescription,
   onEditPrescription,
   isLoading,
 }) => {
-  const [activeTab, setActiveTab] = useState<'categories' | 'services' | 'prescriptions'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'prescriptions'>('categories');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryDentalService | null>(null);
 
   return (
     <div className="space-y-6">
@@ -25,10 +29,13 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
       <div className="flex gap-2 border-b border-border/70">
         <button
           type="button"
-          onClick={() => setActiveTab('categories')}
+          onClick={() => {
+            setActiveTab('categories');
+            setSelectedCategory(null);
+          }}
           className={cn(
             'px-4 py-2 text-sm font-medium transition',
-            activeTab === 'categories'
+            activeTab === 'categories' && !selectedCategory
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
           )}
@@ -38,20 +45,10 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('services')}
-          className={cn(
-            'px-4 py-2 text-sm font-medium transition',
-            activeTab === 'services'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <Package className="mr-2 inline h-4 w-4" />
-          Dịch vụ ({services.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('prescriptions')}
+          onClick={() => {
+            setActiveTab('prescriptions');
+            setSelectedCategory(null);
+          }}
           className={cn(
             'px-4 py-2 text-sm font-medium transition',
             activeTab === 'prescriptions'
@@ -65,7 +62,7 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
       </div>
 
       {/* Categories Tab */}
-      {activeTab === 'categories' && (
+      {activeTab === 'categories' && !selectedCategory && (
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
@@ -99,7 +96,8 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
               categories.map((category) => (
                 <div
                   key={category.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-white/60 px-4 py-4 transition hover:shadow-medium"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-white/60 px-4 py-4 transition hover:shadow-medium cursor-pointer"
+                  onClick={() => setSelectedCategory(category)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
@@ -130,15 +128,25 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
                       )}
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onEditCategory(category)}
-                    className="border-border/70"
-                  >
-                    <Edit className="mr-2 h-3.5 w-3.5" />
-                    Chỉnh sửa
-                  </Button>
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onEditCategory(category)}
+                      className="border-border/70"
+                    >
+                      <Edit className="mr-2 h-3.5 w-3.5" />
+                      Chỉnh sửa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onDeleteCategory(category.id)}
+                      className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
@@ -146,18 +154,28 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
         </Card>
       )}
 
-      {/* Services Tab */}
-      {activeTab === 'services' && (
+      {/* Services of Selected Category */}
+      {activeTab === 'categories' && selectedCategory && (
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="text-lg">Dịch vụ nha khoa</CardTitle>
-              <CardDescription>Quản lý các dịch vụ nha khoa</CardDescription>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedCategory(null)}
+                className="p-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <CardTitle className="text-lg">Dịch vụ: {selectedCategory.name}</CardTitle>
+                <CardDescription>Quản lý các dịch vụ trong danh mục này</CardDescription>
+              </div>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={onCreateService}
+              onClick={() => onCreateService(selectedCategory.id)}
               className="border-primary/40 text-primary hover:bg-primary/10"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -165,17 +183,17 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
             </Button>
           </CardHeader>
           <CardContent>
-            {services.length === 0 ? (
+            {!selectedCategory.listDentalServiceEntity || selectedCategory.listDentalServiceEntity.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/70 bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
                 <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                <p>Chưa có dịch vụ nào</p>
-                <Button variant="outline" size="sm" onClick={onCreateService} className="mt-4">
+                <p>Chưa có dịch vụ nào trong danh mục này</p>
+                <Button variant="outline" size="sm" onClick={() => onCreateService(selectedCategory.id)} className="mt-4">
                   Tạo dịch vụ đầu tiên
                 </Button>
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {services.map((service) => (
+                {selectedCategory.listDentalServiceEntity.map((service: DentalService) => (
                   <div
                     key={service.id}
                     className="flex flex-col gap-2 rounded-xl border border-border/70 bg-white/60 px-4 py-3 transition hover:shadow-sm"
@@ -191,14 +209,24 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
                           </span>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEditService(service)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onEditService(service)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onDeleteService(service.id!)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -207,6 +235,7 @@ const ClinicSection: React.FC<ClinicSectionProps> = ({
           </CardContent>
         </Card>
       )}
+
 
       {/* Prescriptions Tab */}
       {activeTab === 'prescriptions' && (

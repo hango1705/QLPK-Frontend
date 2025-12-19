@@ -124,6 +124,11 @@ export const adminAPI = {
     return unwrap<CategoryDentalService>(response);
   },
 
+  deleteCategory: async (categoryId: string): Promise<string> => {
+    const response = await apiClient.delete(`/api/v1/categoryDentalService/${categoryId}`);
+    return unwrap<string>(response);
+  },
+
   // Dental Service
   getAllServices: async (): Promise<DentalService[]> => {
     const response = await apiClient.get('/api/v1/dentalService');

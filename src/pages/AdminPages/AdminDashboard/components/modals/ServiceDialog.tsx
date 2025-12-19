@@ -14,6 +14,7 @@ interface ServiceDialogProps {
   open: boolean;
   service?: DentalService | null;
   categories: CategoryDentalService[];
+  defaultCategoryId?: string; // Category ID to pre-select when creating new service
   onOpenChange: (open: boolean) => void;
   onSubmit: (categoryId: string, data: DentalServiceRequest) => void;
   isLoading: boolean;
@@ -23,6 +24,7 @@ const ServiceDialog: React.FC<ServiceDialogProps> = ({
   open,
   service,
   categories,
+  defaultCategoryId,
   onOpenChange,
   onSubmit,
   isLoading,
@@ -47,10 +49,10 @@ const ServiceDialog: React.FC<ServiceDialogProps> = ({
         name: '',
         unit: '',
         unitPrice: 0,
-        categoryId: categories.length > 0 ? categories[0].id : '',
+        categoryId: defaultCategoryId || (categories.length > 0 ? categories[0].id : ''),
       });
     }
-  }, [service, categories, open]);
+  }, [service, categories, open, defaultCategoryId]);
 
   const handleSubmit = () => {
     if (!form.name.trim() || !form.unit.trim() || !form.categoryId) {

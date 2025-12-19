@@ -76,8 +76,10 @@ const AdminContent: React.FC<ContentSectionProps> = (props) => {
           prescriptions={props.prescriptions}
           onCreateCategory={props.onCreateCategory}
           onEditCategory={props.onEditCategory}
+          onDeleteCategory={props.onDeleteCategory}
           onCreateService={props.onCreateService}
           onEditService={props.onEditService}
+          onDeleteService={props.onDeleteService}
           onCreatePrescription={props.onCreatePrescription}
           onEditPrescription={props.onEditPrescription}
           isLoading={isLoading}

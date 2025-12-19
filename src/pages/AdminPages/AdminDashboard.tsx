@@ -231,6 +231,29 @@ const AdminDashboard: React.FC = () => {
     },
   });
 
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (categoryId: string) => adminAPI.deleteCategory(categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
+      showNotification.success('Đã xóa danh mục');
+    },
+    onError: (error: any) => {
+      showNotification.error('Không thể xóa danh mục', error?.message || 'Đã xảy ra lỗi');
+    },
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: (serviceId: string) => adminAPI.deleteService(serviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.services });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
+      showNotification.success('Đã xóa dịch vụ');
+    },
+    onError: (error: any) => {
+      showNotification.error('Không thể xóa dịch vụ', error?.message || 'Đã xảy ra lỗi');
+    },
+  });
+
   const createPrescriptionMutation = useMutation({
     mutationFn: (payload: PrescriptionRequest) => adminAPI.createPrescription(payload),
     onSuccess: () => {
@@ -410,14 +433,28 @@ const AdminDashboard: React.FC = () => {
     setCategoryDialogOpen(true);
   };
 
-  const handleCreateService = () => {
+  const handleCreateService = (categoryId: string) => {
     setSelectedService(null);
+    // Store categoryId for service creation
+    setSelectedCategory(categories.find(c => c.id === categoryId) || null);
     setServiceDialogOpen(true);
   };
 
   const handleEditService = (service: DentalService) => {
     setSelectedService(service);
     setServiceDialogOpen(true);
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa danh mục này? Lưu ý: Chỉ có thể xóa danh mục khi không còn dịch vụ nào.')) {
+      deleteCategoryMutation.mutate(categoryId);
+    }
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa dịch vụ này?')) {
+      deleteServiceMutation.mutate(serviceId);
+    }
   };
 
   const handleCreatePrescription = () => {
@@ -518,8 +555,10 @@ const AdminDashboard: React.FC = () => {
               onFilterAudit={handleFilterAudit}
               onCreateCategory={handleCreateCategory}
               onEditCategory={handleEditCategory}
+              onDeleteCategory={handleDeleteCategory}
               onCreateService={handleCreateService}
               onEditService={handleEditService}
+              onDeleteService={handleDeleteService}
               onCreatePrescription={handleCreatePrescription}
               onEditPrescription={handleEditPrescription}
               isLoading={loadingUsers}
@@ -573,7 +612,13 @@ const AdminDashboard: React.FC = () => {
         open={serviceDialogOpen}
         service={selectedService}
         categories={categories}
-        onOpenChange={setServiceDialogOpen}
+        defaultCategoryId={selectedCategory?.id}
+        onOpenChange={(open) => {
+          setServiceDialogOpen(open);
+          if (!open) {
+            setSelectedCategory(null);
+          }
+        }}
         onSubmit={handleServiceSubmit}
         isLoading={createServiceMutation.isPending || updateServiceMutation.isPending}
       />
