@@ -16,8 +16,6 @@ import { AnimatedRoutes } from '@/components/animations/AnimatedRoutes';
 const HomePage = createLazyPage(() => import('./pages/Homepage/index'));
 const NotFound = createLazyPage(() => import('./pages/NotFound'));
 const UnauthorizedPage = createLazyPage(() => import('./pages/Unauthorized'));
-const ComponentsDemo = createLazyPage(() => import('./pages/ComponentsDemo'));
-const StateManagementDemo = createLazyPage(() => import('./pages/StateManagementDemo'));
 
 // Auth pages with public route guards
 const LoginPage = createLazyPage(() => import('./pages/auth/LoginPage'));
@@ -59,8 +57,6 @@ const App = () => (
                 <AnimatedRoutes>
                   {/* Public routes */}
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/components" element={<ComponentsDemo />} />
-                  <Route path="/state-management" element={<StateManagementDemo />} />
                   
                   {/* Auth routes - only accessible when not authenticated */}
                   <Route 

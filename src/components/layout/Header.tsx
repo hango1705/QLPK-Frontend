@@ -30,8 +30,6 @@ const Header = () => {
     { label: 'Dịch vụ', href: '#services' },
     { label: 'Bác sĩ', href: '#doctors' },
     { label: 'Giới thiệu', href: '#about' },
-    { label: 'Components', href: '/components' },
-    { label: 'State Management', href: '/state-management' },
     { label: 'Liên hệ', href: '#contact' },
   ];
 
