@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import {
   AppointmentSummary,
@@ -232,6 +232,35 @@ const ExaminationBoard: React.FC<{
   );
 };
 
+// Helper function to calculate cost from services and prescriptions (same as in NurseContent)
+const calculatePhaseCost = (phase: TreatmentPhase): number | null => {
+  const services = phase.listDentalServicesEntityOrder || [];
+  const prescriptions = phase.listPrescriptionOrder || [];
+  
+  // If no services and prescriptions, return null to use phase.cost
+  if (services.length === 0 && prescriptions.length === 0) {
+    return null;
+  }
+
+  const calculateServiceCost = (service: typeof services[0]) => {
+    if (service.cost && service.cost > 0) {
+      return service.cost;
+    }
+    return (service.quantity || 0) * (service.unitPrice || 0);
+  };
+
+  const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+    if (prescription.cost && prescription.cost > 0) {
+      return prescription.cost;
+    }
+    return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+  };
+
+  const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+  const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+  return servicesTotal + prescriptionsTotal;
+};
+
 const TreatmentBoard: React.FC<{
   plans: TreatmentPlan[];
   phasesByPlan: Record<string, TreatmentPhase[]>;
@@ -242,6 +271,22 @@ const TreatmentBoard: React.FC<{
   onUpdatePlanStatus: (plan: TreatmentPlan, status: string) => void;
   onViewPlanDetail?: (plan: TreatmentPlan) => void;
 }> = ({ plans, phasesByPlan, examinations, onCreatePhase, onEditPhase, onCreatePlan, onUpdatePlanStatus, onViewPlanDetail }) => {
+  // Calculate total cost from phases for each plan (same as NurseContent)
+  const planTotalCosts = useMemo(() => {
+    const costsMap: Record<string, number> = {};
+    
+    plans.forEach((plan) => {
+      const phases = phasesByPlan[plan.id] || [];
+      const totalCostFromPhases = phases.reduce((sum, phase) => {
+        const calculatedCost = calculatePhaseCost(phase);
+        return sum + (calculatedCost || phase.cost || 0);
+      }, 0);
+      
+      costsMap[plan.id] = totalCostFromPhases || plan.totalCost;
+    });
+    
+    return costsMap;
+  }, [plans, phasesByPlan]);
   return (
   <Card className="border-none bg-white/90 shadow-medium">
     <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -282,7 +327,11 @@ const TreatmentBoard: React.FC<{
               <PermissionGuard permission="UPDATE_TREATMENT_PLANS">
                 <select
                   value={plan.status}
-                  onChange={(event) => onUpdatePlanStatus(plan, event.target.value)}
+                  onChange={(event) => {
+                    event.stopPropagation();
+                    onUpdatePlanStatus(plan, event.target.value);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="rounded-full border border-border/60 bg-white/70 px-3 py-1 text-xs"
                 >
                 {['Inprogress', 'Done', 'Paused', 'Cancelled'].map((status) => (
@@ -313,7 +362,7 @@ const TreatmentBoard: React.FC<{
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="font-medium text-foreground">Tổng chi phí:</span>
-                    <span className="text-primary font-semibold">{formatCurrency(plan.totalCost)}</span>
+                    <span className="text-primary font-semibold">{formatCurrency(planTotalCosts[plan.id] || plan.totalCost)}</span>
                   </div>
                 </div>
               </div>
@@ -325,7 +374,10 @@ const TreatmentBoard: React.FC<{
                   <button
                     type="button"
                     className="rounded-2xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-primary hover:bg-primary/10 transition"
-                    onClick={() => onEditPhase(plan, phase)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditPhase(plan, phase);
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <span>Giai đoạn {phase.phaseNumber}</span>
@@ -340,7 +392,10 @@ const TreatmentBoard: React.FC<{
                 <button
                   type="button"
                   className="rounded-2xl border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/50 hover:text-primary"
-                  onClick={() => onCreatePhase(plan)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreatePhase(plan);
+                  }}
                 >
                   + Thêm tiến trình
                 </button>
@@ -369,7 +424,10 @@ const TreatmentBoard: React.FC<{
                     <div>
                       <span className="text-muted-foreground">Chi phí tiến trình:</span>
                       <span className="ml-1 font-semibold text-primary">
-                        {formatCurrency(phases.reduce((sum, p) => sum + (p.cost || 0), 0))}
+                        {formatCurrency(phases.reduce((sum, p) => {
+                          const calculatedCost = calculatePhaseCost(p);
+                          return sum + (calculatedCost || p.cost || 0);
+                        }, 0))}
                       </span>
                     </div>
                   </div>

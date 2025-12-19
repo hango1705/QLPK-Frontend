@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,8 +8,13 @@ import {
   Badge,
   Button,
   Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui';
-import { Image as ImageIcon, MessageSquare, Send, Calendar, DollarSign, FileText } from 'lucide-react';
+import { Image as ImageIcon, MessageSquare, Send, Calendar, DollarSign, FileText, GitCompare } from 'lucide-react';
 import type { TreatmentPhase, TreatmentPlan } from '@/types/doctor';
 import { formatDate, formatCurrency } from '../../utils';
 import { doctorAPI } from '@/services';
@@ -21,6 +26,7 @@ interface TreatmentPhaseDetailDialogProps {
   open: boolean;
   phase: TreatmentPhase | null;
   plan: TreatmentPlan | null;
+  allPhases?: TreatmentPhase[]; // All phases of the same plan for comparison
   onOpenChange: (open: boolean) => void;
   onEdit?: (phase: TreatmentPhase, plan: TreatmentPlan) => void;
   onRefresh?: () => void;
@@ -30,6 +36,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   open,
   phase,
   plan,
+  allPhases = [],
   onOpenChange,
   onEdit,
   onRefresh,
@@ -39,11 +46,67 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   const [comment, setComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [phaseData, setPhaseData] = useState<TreatmentPhase | null>(phase);
+  const [selectedComparePhaseId, setSelectedComparePhaseId] = useState<string | null>(null);
+  const [compareKey, setCompareKey] = useState(0); // Force re-render key
 
   // Update phase data when prop changes
   useEffect(() => {
     setPhaseData(phase);
+    setSelectedComparePhaseId(null); // Reset comparison when phase changes
   }, [phase]);
+
+  // Get other phases for comparison (all phases except current one, sorted by phaseNumber or startDate)
+  const otherPhases = useMemo(() => {
+    if (!phaseData || !allPhases.length) {
+      console.log('TreatmentPhaseDetailDialog: No phases for comparison', { phaseData: !!phaseData, allPhasesLength: allPhases.length });
+      return [];
+    }
+    
+    const filtered = allPhases.filter((p) => p.id !== phaseData.id); // Exclude current phase
+    console.log('TreatmentPhaseDetailDialog: Filtered phases for comparison', { 
+      totalPhases: allPhases.length, 
+      currentPhaseId: phaseData.id,
+      filteredCount: filtered.length,
+      filteredPhases: filtered.map(p => ({ id: p.id, phaseNumber: p.phaseNumber }))
+    });
+    
+    return filtered.sort((a, b) => {
+      // Sort by phaseNumber if available (descending - newest first)
+      if (a.phaseNumber && b.phaseNumber) {
+        const aNum = parseInt(a.phaseNumber, 10);
+        const bNum = parseInt(b.phaseNumber, 10);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return bNum - aNum;
+        }
+      }
+      // Otherwise sort by startDate (newest first)
+      if (a.startDate && b.startDate) {
+        const aDate = new Date(a.startDate).getTime();
+        const bDate = new Date(b.startDate).getTime();
+        if (!isNaN(aDate) && !isNaN(bDate)) {
+          return bDate - aDate;
+        }
+      }
+      return 0;
+    });
+  }, [phaseData, allPhases]);
+
+  // Get selected phase for comparison
+  const comparePhase = useMemo(() => {
+    if (!selectedComparePhaseId) return null;
+    // Try to find in otherPhases first, then fallback to allPhases
+    const found = otherPhases.find((p) => p.id === selectedComparePhaseId) 
+      || allPhases.find((p) => p.id === selectedComparePhaseId);
+    console.log('TreatmentPhaseDetailDialog: comparePhase', { 
+      selectedComparePhaseId, 
+      found: !!found,
+      foundPhaseNumber: found?.phaseNumber,
+      foundImagesCount: found?.listImage?.length || 0,
+      otherPhasesCount: otherPhases.length,
+      allPhasesCount: allPhases.length
+    });
+    return found || null;
+  }, [selectedComparePhaseId, otherPhases, allPhases]);
 
   if (!phaseData || !plan) return null;
 
@@ -210,48 +273,204 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
 
           {/* Images */}
           {phaseData.listImage && phaseData.listImage.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Hình ảnh</h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                {phaseData.listImage.map((image) => {
-                  // Map type từ database sang label tiếng Việt
-                  const getImageTypeLabel = (type: string) => {
-                    switch (type) {
-                      case 'treatmentPhasesTeeth':
-                      case 'examinationTeeth':
-                        return 'Ảnh răng';
-                      case 'treatmentPhasesFace':
-                      case 'examinationFace':
-                        return 'Ảnh mặt';
-                      case 'treatmentPhasesXray':
-                      case 'examinationXray':
-                        return 'Ảnh X-quang';
-                      default:
-                        return type; // Fallback nếu có type khác
-                    }
-                  };
-
-                  return (
-                    <div
-                      key={image.publicId}
-                      className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium"
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Hình ảnh
+                </h3>
+                {otherPhases.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <GitCompare className="h-4 w-4 text-muted-foreground" />
+                    <Select
+                      key={`select-compare-${compareKey}`}
+                      value={selectedComparePhaseId || undefined}
+                      onValueChange={(value) => {
+                        setSelectedComparePhaseId(value || null);
+                        setCompareKey(prev => prev + 1); // Force re-render
+                      }}
                     >
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ImageIcon className="h-4 w-4" />
-                        <span>{getImageTypeLabel(image.type || '')}</span>
-                      </div>
-                      {image.url && (
-                        <img
-                          src={image.url}
-                          alt={getImageTypeLabel(image.type || '')}
-                          className="mt-2 h-32 w-full rounded-xl object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                      <SelectTrigger className="w-[220px] h-8 text-xs">
+                        <SelectValue placeholder="So sánh với tiến trình khác" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {otherPhases.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            Giai đoạn {p.phaseNumber || 'N/A'}
+                            {p.startDate && ` (${formatDate(p.startDate)})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedComparePhaseId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedComparePhaseId(null);
+                          setCompareKey(prev => prev + 1); // Force re-render to reset Select
+                        }}
+                        className="h-8 text-xs"
+                      >
+                        Hủy
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Group images by type for comparison */}
+              {(() => {
+                const getImageTypeLabel = (type: string) => {
+                  switch (type) {
+                    case 'treatmentPhasesTeeth':
+                    case 'examinationTeeth':
+                      return 'Ảnh răng';
+                    case 'treatmentPhasesFace':
+                    case 'examinationFace':
+                      return 'Ảnh mặt';
+                    case 'treatmentPhasesXray':
+                    case 'examinationXray':
+                      return 'Ảnh X-quang';
+                    default:
+                      return type;
+                  }
+                };
+
+                const getImageTypeKey = (type: string) => {
+                  if (type?.includes('Teeth')) return 'teeth';
+                  if (type?.includes('Face')) return 'face';
+                  if (type?.includes('Xray')) return 'xray';
+                  return 'other';
+                };
+
+                // Group current phase images by type
+                const currentImagesByType = (phaseData.listImage || []).reduce((acc, img) => {
+                  const key = getImageTypeKey(img.type || '');
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(img);
+                  return acc;
+                }, {} as Record<string, typeof phaseData.listImage>);
+
+                // Group compare phase images by type
+                const compareImagesByType = (comparePhase?.listImage || []).reduce((acc, img) => {
+                  const key = getImageTypeKey(img.type || '');
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(img);
+                  return acc;
+                }, {} as Record<string, typeof comparePhase.listImage>) || {};
+
+                // Get all unique types
+                const allTypes = new Set([
+                  ...Object.keys(currentImagesByType),
+                  ...Object.keys(compareImagesByType),
+                ]);
+
+                return (
+                  <div key={`images-${selectedComparePhaseId || 'none'}-${compareKey}`} className="space-y-4">
+                    {Array.from(allTypes).map((typeKey) => {
+                      const currentImages = currentImagesByType[typeKey] || [];
+                      const compareImages = compareImagesByType[typeKey] || [];
+                      const typeLabel = currentImages[0]?.type 
+                        ? getImageTypeLabel(currentImages[0].type) 
+                        : compareImages[0]?.type 
+                        ? getImageTypeLabel(compareImages[0].type)
+                        : 'Hình ảnh';
+
+                      return (
+                        <div key={`${typeKey}-${selectedComparePhaseId || 'none'}`} className="space-y-2">
+                          {!comparePhase && (
+                            <h4 className="text-xs font-medium text-muted-foreground">{typeLabel}</h4>
+                          )}
+                          {comparePhase ? (
+                            // Comparison view: side by side
+                            <div className="grid grid-cols-2 gap-3">
+                              {/* Current Phase */}
+                              <div className="space-y-2">
+                                <div className="text-xs font-medium text-primary">
+                                  Giai đoạn {phaseData.phaseNumber} (Hiện tại)
+                                </div>
+                                <div className="grid gap-2">
+                                  {currentImages.length > 0 ? (
+                                    currentImages.map((image) => (
+                                      <div
+                                        key={image.publicId}
+                                        className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md"
+                                      >
+                                        {image.url && (
+                                          <img
+                                            src={image.url}
+                                            alt={typeLabel}
+                                            className="h-40 w-full rounded-lg object-cover"
+                                            loading="lazy"
+                                          />
+                                        )}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 text-xs text-muted-foreground">
+                                      Không có hình ảnh
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Compare Phase */}
+                              <div className="space-y-2">
+                                <div className="text-xs font-medium text-blue-600">
+                                  Giai đoạn {comparePhase.phaseNumber} (Trước đó)
+                                </div>
+                                <div className="grid gap-2">
+                                  {compareImages.length > 0 ? (
+                                    compareImages.map((image) => (
+                                      <div
+                                        key={image.publicId}
+                                        className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md"
+                                      >
+                                        {image.url && (
+                                          <img
+                                            src={image.url}
+                                            alt={typeLabel}
+                                            className="h-40 w-full rounded-lg object-cover"
+                                            loading="lazy"
+                                          />
+                                        )}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 text-xs text-muted-foreground">
+                                      Không có hình ảnh
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            // Normal view: grid
+                            <div className="grid gap-3 md:grid-cols-3">
+                              {currentImages.map((image) => (
+                                <div
+                                  key={image.publicId}
+                                  className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium"
+                                >
+                                  {image.url && (
+                                    <img
+                                      src={image.url}
+                                      alt={typeLabel}
+                                      className="h-32 w-full rounded-xl object-cover"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

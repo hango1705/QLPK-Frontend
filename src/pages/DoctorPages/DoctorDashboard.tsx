@@ -601,6 +601,7 @@ const DoctorDashboard: React.FC = () => {
         open={!!phaseDetailDialog}
         phase={phaseDetailDialog?.phase || null}
         plan={phaseDetailDialog?.plan || null}
+        allPhases={phaseDetailDialog?.plan ? phasesByPlan[phaseDetailDialog.plan.id] || [] : []}
         onOpenChange={(open) => !open && setPhaseDetailDialog(null)}
         onEdit={(phase, plan) => {
           setPhaseDetailDialog(null);
@@ -622,6 +623,7 @@ const DoctorDashboard: React.FC = () => {
           setPlanDialog({ open: true, plan });
         }}
         onCreatePhase={(plan) => {
+          // Close detail dialog and open phase dialog
           setPlanDetailDialog(null);
           setPhaseDialog({ mode: 'create', plan });
         }}
