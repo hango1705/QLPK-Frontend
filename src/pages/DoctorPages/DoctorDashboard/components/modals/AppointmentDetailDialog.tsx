@@ -12,7 +12,7 @@ import { Calendar, Clock, User, FileText, Bell, CheckCircle2, Stethoscope, Plus 
 import type { AppointmentSummary, TreatmentPlan } from '@/types/doctor';
 import { formatDateTime } from '../../utils';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nurseAPI } from '@/services';
 import { queryKeys } from '@/services/queryClient';
 import { showNotification } from '@/components/ui';
@@ -41,6 +41,20 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
   const canCreateTreatmentPhase = hasPermission('CREATE_TREATMENT_PHASES');
   const queryClient = useQueryClient();
 
+  // Fetch patient info if patientId exists
+  const { data: patientInfo } = useQuery({
+    queryKey: queryKeys.nurse.patient(appointment?.patientId || ''),
+    queryFn: () => nurseAPI.getPatientById(appointment!.patientId!),
+    enabled: open && !!appointment?.patientId,
+  });
+
+  // Fetch doctor info if doctorId exists but doctorFullName doesn't
+  const { data: doctorInfo } = useQuery({
+    queryKey: queryKeys.nurse.doctor(appointment?.doctorId || ''),
+    queryFn: () => nurseAPI.getDoctorById(appointment!.doctorId!),
+    enabled: open && !!appointment?.doctorId && !appointment?.doctorFullName,
+  });
+
   // Mutation for updating appointment notification
   const updateNotificationMutation = useMutation({
     mutationFn: (appointmentId: string) => nurseAPI.updateAppointmentNotification(appointmentId),
@@ -63,6 +77,17 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
   });
 
   if (!appointment) return null;
+
+  // Function to localize status
+  const getStatusLabel = (status?: string): string => {
+    if (!status) return 'N/A';
+    const s = status.toLowerCase();
+    if (s.includes('done') || s.includes('completed')) return 'Hoàn thành';
+    if (s.includes('scheduled')) return 'Đã lên lịch';
+    if (s.includes('cancel') || s.includes('cancelled')) return 'Đã hủy';
+    if (s.includes('in-progress') || s.includes('progress')) return 'Đang điều trị';
+    return status; // Return original if no match
+  };
 
   const isNotificationDone = appointment.notification === 'Done';
   const isScheduled = appointment.status?.toLowerCase() === 'scheduled';
@@ -134,15 +159,28 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
                 label="Trạng thái"
                 value={
                   <Badge className={getStatusBadge(appointment.status)}>
-                    {appointment.status}
+                    {getStatusLabel(appointment.status)}
                   </Badge>
                 }
               />
-              {appointment.doctorFullName && (
+              {(appointment.doctorFullName || appointment.doctorId || doctorInfo) && (
+                <InfoItem
+                  icon={<Stethoscope className="h-4 w-4" />}
+                  label="Bác sĩ"
+                  value={
+                    doctorInfo 
+                      ? doctorInfo.fullName 
+                      : appointment.doctorFullName 
+                        ? appointment.doctorFullName 
+                        : 'Đang tải...'
+                  }
+                />
+              )}
+              {(patientInfo || appointment.patientId) && (
                 <InfoItem
                   icon={<User className="h-4 w-4" />}
-                  label="Bác sĩ"
-                  value={appointment.doctorFullName}
+                  label="Bệnh nhân"
+                  value={patientInfo ? patientInfo.fullName : 'Đang tải...'}
                 />
               )}
             </div>

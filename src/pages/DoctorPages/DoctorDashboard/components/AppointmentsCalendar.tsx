@@ -80,6 +80,19 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
   const { hasPermission } = usePermission();
   const canCreateExamination = hasPermission('CREATE_EXAMINATION');
   
+  // Filter appointments within last 30 days
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+
+  const appointmentsInLast30Days = appointments.filter((app) => {
+    if (!app.dateTime) return false;
+    const appointmentDate = new Date(app.dateTime);
+    appointmentDate.setHours(0, 0, 0, 0);
+    return appointmentDate >= thirtyDaysAgo && appointmentDate <= today;
+  });
+
   // Update events when appointments change
   // Events will be recalculated when appointments change
   
@@ -141,7 +154,7 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
           <Badge className="bg-primary/10 text-primary">
             {scheduledAppointments.length} lịch chờ
           </Badge>
-          <Badge variant="outline">Tổng {appointments.length} lịch</Badge>
+          <Badge variant="outline">Tổng {appointmentsInLast30Days.length} lịch</Badge>
         </div>
       </div>
 
@@ -154,6 +167,12 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
             left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
+          buttonText={{
+            today: 'Hôm nay',
+            month: 'Tháng',
+            week: 'Tuần',
+            day: 'Ngày',
           }}
           events={events}
           eventClick={handleEventClick}
@@ -194,10 +213,6 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
         <div className="flex items-center gap-2">
           <div className="h-3 w-3 rounded bg-green-500"></div>
           <span className="text-muted-foreground">Hoàn thành</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded bg-red-500"></div>
-          <span className="text-muted-foreground">Đã hủy</span>
         </div>
       </div>
     </div>
