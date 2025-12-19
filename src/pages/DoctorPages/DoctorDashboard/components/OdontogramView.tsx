@@ -340,7 +340,7 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
   }, [toothStatusMap, initialSelected]);
 
   return (
-    <Card className="border-none bg-white/90 shadow-medium rounded-2xl">
+    <Card className="border-none bg-white/90 shadow-medium rounded-2xl h-full">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Smile className="h-5 w-5 text-primary" />

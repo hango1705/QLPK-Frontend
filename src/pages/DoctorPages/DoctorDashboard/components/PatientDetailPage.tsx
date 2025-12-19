@@ -5,7 +5,7 @@ import PatientInfoCard from './PatientInfoCard';
 import OdontogramView from './OdontogramView';
 import TreatmentHistoryTimeline from './TreatmentHistoryTimeline';
 import type { ExaminationSummary, TreatmentPlan, TreatmentPhase } from '@/types/doctor';
-import { patientAPI, type PatientResponse } from '@/services/api/patient';
+import { nurseAPI } from '@/services/api/nurse';
 import { showNotification } from '@/components/ui';
 
 interface PatientDetailPageProps {
@@ -21,6 +21,8 @@ interface PatientDetailPageProps {
     bloodGroup?: string;
     allergy?: string;
     medicalHistory?: string;
+    emergencyContactName?: string;
+    emergencyPhoneNumber?: string;
     avatar?: string;
   };
   examinations: ExaminationSummary[];
@@ -47,13 +49,13 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
   const [patientName, setPatientName] = useState<string | undefined>(initialPatientName);
   const [loading, setLoading] = useState(false);
 
-  // Load patient data từ API nếu có patientId nhưng chưa có patientData
+  // Luôn load lại thông tin bệnh nhân từ API (nếu patientId hợp lệ)
   useEffect(() => {
     // Kiểm tra nếu patientId hợp lệ (UUID format, không phải 'unknown')
-    const isValidPatientId = patientId && 
-                             patientId !== 'unknown' && 
-                             patientId.length > 10 && // UUID thường dài hơn 10 ký tự
-                             !initialPatientData?.fullName; // Chưa có data
+    const isValidPatientId =
+      !!patientId &&
+      patientId !== 'unknown' &&
+      patientId.length > 10; // UUID thường dài hơn 10 ký tự
     
     if (!isValidPatientId) {
       // Đã có data hoặc không có patientId hợp lệ, không cần load
@@ -63,7 +65,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
     const loadPatientData = async () => {
       setLoading(true);
       try {
-        const data = await patientAPI.getPatientById(patientId);
+        const data = await nurseAPI.getPatientById(patientId);
         setPatientData({
           fullName: data.fullName,
           email: data.email,
@@ -74,6 +76,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
           bloodGroup: data.bloodGroup,
           allergy: data.allergy,
           medicalHistory: data.medicalHistory,
+          emergencyContactName: data.emergencyContactName,
+          emergencyPhoneNumber: data.emergencyPhoneNumber,
         });
         setPatientName(data.fullName);
       } catch (error: any) {
@@ -219,20 +223,27 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({
             : patientName || patientData?.fullName || `Bệnh nhân ${patientId?.slice(0, 8) || 'unknown'}`
         }
         avatar={patientData?.avatar}
+        email={patientData?.email}
+        phone={patientData?.phone}
+        address={patientData?.address}
+        dob={patientData?.dob}
+        gender={patientData?.gender}
+        emergencyContactName={patientData?.emergencyContactName}
+        emergencyPhoneNumber={patientData?.emergencyPhoneNumber}
         allergy={patientData?.allergy}
         bloodGroup={patientData?.bloodGroup}
         medicalHistory={patientData?.medicalHistory}
       />
 
       {/* Main Content: Odontogram and Timeline */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
         {/* Left: Odontogram */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 h-full">
           <OdontogramView patientId={patientId} teeth={teethData} />
         </div>
 
         {/* Right: Treatment History Timeline */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 h-full">
           <TreatmentHistoryTimeline 
             treatments={treatmentHistory} 
             onPhaseClick={onPhaseClick}

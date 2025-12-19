@@ -81,7 +81,7 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
 
   if (treatments.length === 0) {
     return (
-      <Card className="border-none bg-white/90 shadow-medium rounded-2xl">
+      <Card className="border-none bg-white/90 shadow-medium rounded-2xl h-full">
         <CardHeader>
           <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
           <CardDescription>Timeline các lần khám và điều trị</CardDescription>
@@ -97,7 +97,7 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
   }
 
   return (
-    <Card className="border-none bg-white/90 shadow-medium rounded-2xl">
+    <Card className="border-none bg-white/90 shadow-medium rounded-2xl h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
@@ -115,13 +115,13 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
           </Button>
         )}
       </CardHeader>
-      <CardContent>
-        <div className="relative">
+      <CardContent className="flex-1 overflow-hidden">
+        <div className="relative h-full overflow-y-auto pr-2">
           {/* Vertical line */}
           <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-200 via-blue-300 to-blue-200" />
 
           {/* Timeline items */}
-          <div className="space-y-6">
+          <div className="space-y-6 pb-4">
             {treatments.map((treatment, index) => (
               <div key={treatment.id} className="relative flex gap-4">
                 {/* Icon */}
