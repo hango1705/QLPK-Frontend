@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Button } from '@/components/ui';
+import React, { useState, useMemo } from 'react';
+import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input } from '@/components/ui';
 import type { ContentSectionProps, Section } from '../types';
 import { formatCurrency, formatDate, formatDateTime } from '../utils';
 import { STATUS_BADGE } from '../constants';
-import { Stethoscope, User, Phone, Mail, MapPin, Calendar, Eye, ClipboardList, DollarSign } from 'lucide-react';
+import { Stethoscope, User, Phone, Mail, MapPin, Calendar, Eye, ClipboardList, DollarSign, Search } from 'lucide-react';
 import AppointmentsCalendar from './AppointmentsCalendar';
 import DoctorDetailDialog from './DoctorDetailDialog';
 import ProfileSection from './ProfileSection';
@@ -227,17 +227,48 @@ const PatientsSection: React.FC<{
   selectedPatientId: string | null;
   onPatientSelect: (patientId: string | null) => void;
 }> = ({ patients, selectedPatientId, onPatientSelect }) => {
+  const [searchQuery, setSearchQuery] = useState('');
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+
+  // Filter patients based on search query (name, phone, email)
+  const filteredPatients = useMemo(() => {
+    if (!searchQuery.trim()) return patients;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return patients.filter((patient) => {
+      const fullName = (patient.fullName || '').toLowerCase();
+      const phone = (patient.phone || '').toLowerCase();
+      const email = (patient.email || '').toLowerCase();
+      
+      return fullName.includes(query) || phone.includes(query) || email.includes(query);
+    });
+  }, [patients, searchQuery]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-1 border-none bg-white/90 shadow-medium">
         <CardHeader>
           <CardTitle className="text-lg">Danh sách bệnh nhân</CardTitle>
-          <CardDescription>{patients.length} bệnh nhân</CardDescription>
+          <CardDescription>
+            {filteredPatients.length} {filteredPatients.length === patients.length ? 'bệnh nhân' : `/${patients.length} bệnh nhân`}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {patients.map((patient) => (
+        <CardContent className="space-y-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Tìm theo tên, SĐT, email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          
+          {/* Patient List */}
+          <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            {filteredPatients.map((patient) => (
             <button
               key={patient.id}
               onClick={() => onPatientSelect(patient.id === selectedPatientId ? null : patient.id)}
@@ -250,10 +281,16 @@ const PatientsSection: React.FC<{
               <p className="text-sm font-semibold text-foreground">{patient.fullName}</p>
               <p className="text-xs text-muted-foreground">{patient.phone}</p>
             </button>
-          ))}
-          {patients.length === 0 && (
-            <p className="text-sm text-muted-foreground">Chưa có bệnh nhân nào.</p>
-          )}
+            ))}
+            {filteredPatients.length === 0 && patients.length > 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Không tìm thấy bệnh nhân nào.
+              </p>
+            )}
+            {patients.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Chưa có bệnh nhân nào.</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
