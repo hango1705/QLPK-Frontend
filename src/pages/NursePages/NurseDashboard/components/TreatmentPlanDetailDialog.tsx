@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -10,13 +10,22 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui';
-import { Calendar, DollarSign, User, Stethoscope, FileText, Clock, CheckCircle2, XCircle, Pause, AlertCircle, Heart, Mail, Phone, MapPin, Award, Droplet, AlertTriangle, History } from 'lucide-react';
+import { Calendar, DollarSign, User, Stethoscope, FileText, Clock, CheckCircle2, XCircle, Pause, AlertCircle, Heart, Mail, Phone, MapPin, Award, Droplet, AlertTriangle, History, CreditCard } from 'lucide-react';
 import type { TreatmentPlan, TreatmentPhase } from '@/types/doctor';
 import { formatDate, formatCurrency } from '../utils';
 import { STATUS_BADGE } from '../constants';
-import { doctorAPI, nurseAPI } from '@/services';
+import { doctorAPI, nurseAPI, patientAPI } from '@/services';
 import { queryKeys } from '@/services/queryClient';
+import { usePermission } from '@/hooks';
+import { showNotification } from '@/components/ui';
+import type { CostPaymentUpdateRequest } from '@/services/api/patient';
 
 interface TreatmentPlanDetailDialogProps {
   open: boolean;
@@ -180,6 +189,35 @@ const PatientTooltip: React.FC<{
   );
 };
 
+// Helper function to calculate cost from services and prescriptions
+const calculatePhaseCost = (phase: TreatmentPhase): number | null => {
+  const services = phase.listDentalServicesEntityOrder || [];
+  const prescriptions = phase.listPrescriptionOrder || [];
+  
+  // If no services and prescriptions, return null to use phase.cost
+  if (services.length === 0 && prescriptions.length === 0) {
+    return null;
+  }
+
+  const calculateServiceCost = (service: typeof services[0]) => {
+    if (service.cost && service.cost > 0) {
+      return service.cost;
+    }
+    return (service.quantity || 0) * (service.unitPrice || 0);
+  };
+
+  const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+    if (prescription.cost && prescription.cost > 0) {
+      return prescription.cost;
+    }
+    return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+  };
+
+  const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+  const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+  return servicesTotal + prescriptionsTotal;
+};
+
 // Component để hiển thị tooltip chi tiết giá tiền
 const CostTooltip: React.FC<{
   phase: TreatmentPhase;
@@ -191,8 +229,28 @@ const CostTooltip: React.FC<{
 
   if (!hasDetails || phase.cost <= 0) return <>{children}</>;
 
-  const servicesTotal = services.reduce((sum, item) => sum + (item.cost || 0), 0);
-  const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + (item.cost || 0), 0);
+  // Calculate cost from quantity * unitPrice if cost is not provided or seems incorrect
+  const calculateServiceCost = (service: typeof services[0]) => {
+    if (service.cost && service.cost > 0) {
+      // Use provided cost if available
+      return service.cost;
+    }
+    // Calculate from quantity * unitPrice
+    return (service.quantity || 0) * (service.unitPrice || 0);
+  };
+
+  const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+    if (prescription.cost && prescription.cost > 0) {
+      // Use provided cost if available
+      return prescription.cost;
+    }
+    // Calculate from quantity * unitPrice
+    return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+  };
+
+  const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+  const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+  const calculatedTotal = servicesTotal + prescriptionsTotal;
 
   return (
     <TooltipProvider>
@@ -222,7 +280,7 @@ const CostTooltip: React.FC<{
                         </div>
                       </div>
                       <div className="font-semibold text-primary ml-2">
-                        {formatCurrency(service.cost)}
+                        {formatCurrency(calculateServiceCost(service))}
                       </div>
                     </div>
                   ))}
@@ -255,7 +313,7 @@ const CostTooltip: React.FC<{
                         )}
                       </div>
                       <div className="font-semibold text-primary ml-2">
-                        {formatCurrency(prescription.cost)}
+                        {formatCurrency(calculatePrescriptionCost(prescription))}
                       </div>
                     </div>
                   ))}
@@ -269,7 +327,7 @@ const CostTooltip: React.FC<{
 
             <div className="flex items-center justify-between pt-2 border-t-2 font-bold text-base">
               <span>Tổng cộng:</span>
-              <span className="text-primary">{formatCurrency(phase.cost)}</span>
+              <span className="text-primary">{formatCurrency(calculatedTotal)}</span>
             </div>
           </div>
         </TooltipContent>
@@ -344,12 +402,119 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   plan,
   onOpenChange,
 }) => {
+  const { hasPermission } = usePermission();
+  const canUpdatePaymentCost = hasPermission('UPDATE_PAYMENT_COST');
+  const queryClient = useQueryClient();
+  
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedPhase, setSelectedPhase] = useState<TreatmentPhase | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+
   // Fetch treatment phases for this plan
   const { data: phases = [], isLoading: loadingPhases } = useQuery({
     queryKey: queryKeys.doctor.treatmentPhases(plan?.id || ''),
     queryFn: () => doctorAPI.getTreatmentPhases(plan!.id),
     enabled: open && !!plan?.id,
   });
+
+  // Mutation to update payment cost
+  const updatePaymentMutation = useMutation({
+    mutationFn: ({ costId, request }: { costId: string; request: CostPaymentUpdateRequest }) =>
+      nurseAPI.updatePaymentCost(costId, request),
+    onSuccess: () => {
+      showNotification.success('Thanh toán thành công!');
+      setPaymentDialogOpen(false);
+      setSelectedPhase(null);
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPhases(plan?.id || '') });
+    },
+    onError: (error: any) => {
+      showNotification.error(error?.response?.data?.result || 'Có lỗi xảy ra khi thanh toán');
+    },
+  });
+
+  const handlePayForPatient = (phase: TreatmentPhase) => {
+    setSelectedPhase(phase);
+    setPaymentDialogOpen(true);
+    setPaymentMethod('cash');
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedPhase) return;
+
+    // If VNPay, handle differently
+    if (paymentMethod === 'vnpay') {
+      try {
+        const phaseCost = calculatePhaseCost(selectedPhase) || selectedPhase.cost;
+        
+        if (!phaseCost || phaseCost <= 0) {
+          showNotification.error('Số tiền thanh toán không hợp lệ');
+          return;
+        }
+
+        console.log('Creating VNPay payment for phase:', selectedPhase.id, 'Amount:', phaseCost);
+        
+        // Lưu costId và redirect URL vào localStorage để sử dụng trong callback
+        localStorage.setItem('vnpay_costId', selectedPhase.id);
+        localStorage.setItem('vnpay_redirectUrl', '/nurse'); // Redirect về nurse dashboard sau khi thanh toán
+
+        // Gọi API VNPay để tạo payment URL
+        const response = await patientAPI.createVnPayPayment({
+          amount: String(phaseCost),
+        });
+
+        console.log('VNPay payment response:', response);
+
+        // Response structure: { code: "ok", message: "success", paymentUrl: "..." }
+        if (response && response.paymentUrl) {
+          // Redirect đến VNPay payment page
+          console.log('Redirecting to VNPay:', response.paymentUrl);
+          window.location.href = response.paymentUrl;
+        } else {
+          const errorMsg = response?.message || 'Không thể tạo liên kết thanh toán';
+          console.error('Invalid VNPay response:', response);
+          showNotification.error(errorMsg);
+          localStorage.removeItem('vnpay_costId'); // Clean up on error
+          localStorage.removeItem('vnpay_redirectUrl');
+        }
+      } catch (error: any) {
+        console.error('Error creating VNPay payment:', error);
+        localStorage.removeItem('vnpay_costId'); // Clean up on error
+        localStorage.removeItem('vnpay_redirectUrl');
+        
+        // Better error handling
+        let errorMessage = 'Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.';
+        if (error.response) {
+          if (error.response.status === 401) {
+            errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+          } else if (error.response.status === 403) {
+            errorMessage = 'Bạn không có quyền thực hiện thanh toán. Vui lòng liên hệ quản trị viên.';
+          } else if (error.response.data?.result) {
+            errorMessage = error.response.data.result;
+          } else if (error.response.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        showNotification.error(errorMessage);
+      }
+      return;
+    }
+
+    // For cash or transfer, update directly
+    const request: CostPaymentUpdateRequest = {
+      paymentMethod: paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản',
+      status: 'paid',
+      vnpTxnRef: `NURSE-${Date.now()}`,
+    };
+
+    updatePaymentMutation.mutate({
+      costId: selectedPhase.id,
+      request,
+    });
+  };
 
   if (!plan) return null;
 
@@ -358,6 +523,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
     const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
     return dateA - dateB;
   });
+
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -387,6 +553,19 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   const totalPhases = phases.length;
   const completedPhases = phases.filter(p => p.status?.toLowerCase() === 'done').length;
   const inProgressPhases = phases.filter(p => p.status?.toLowerCase() === 'inprogress').length;
+  
+  // Calculate total cost from all phases
+  const totalCostFromPhases = phases.reduce((sum, phase) => {
+    const calculatedCost = calculatePhaseCost(phase);
+    return sum + (calculatedCost || phase.cost || 0);
+  }, 0);
+
+  const getPaymentBadge = (paymentStatus?: string) => {
+    const paid = paymentStatus?.toLowerCase() === 'paid';
+    const label = paid ? 'Đã thanh toán' : 'Chưa thanh toán';
+    const cls = paid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700';
+    return <Badge className={cls}>{label}</Badge>;
+  };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -423,7 +602,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Tổng chi phí:</span>
-                  <span className="font-semibold text-primary">{formatCurrency(plan.totalCost)}</span>
+                  <span className="font-semibold text-primary">{formatCurrency(totalCostFromPhases || plan.totalCost)}</span>
                 </div>
               </div>
             </div>
@@ -506,7 +685,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                 <div className="text-xs text-muted-foreground mt-1">Hoàn thành</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{formatCurrency(plan.totalCost)}</div>
+                <div className="text-2xl font-bold text-primary">{formatCurrency(totalCostFromPhases || plan.totalCost)}</div>
                 <div className="text-xs text-muted-foreground mt-1">Tổng chi phí</div>
               </div>
             </div>
@@ -551,6 +730,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                             Giai đoạn {index + 1}
                           </span>
                           {getStatusBadge(phase.status || 'Inprogress')}
+                          {phase.cost > 0 && getPaymentBadge(phase.paymentStatus)}
                         </div>
                         {phase.description && (
                           <p className="text-sm text-foreground mb-2">{phase.description}</p>
@@ -572,7 +752,9 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                             <CostTooltip phase={phase}>
                               <div className="flex items-center gap-1">
                                 <DollarSign className="h-3 w-3" />
-                                <span className="font-medium text-primary">{formatCurrency(phase.cost)}</span>
+                                <span className="font-medium text-primary">
+                                  {formatCurrency(calculatePhaseCost(phase) || phase.cost)}
+                                </span>
                               </div>
                             </CostTooltip>
                           )}
@@ -591,6 +773,21 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                                 <p key={idx} className="text-xs text-gray-600">{comment}</p>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {canUpdatePaymentCost &&
+                          phase.cost > 0 &&
+                          phase.paymentStatus?.toLowerCase() !== 'paid' && (
+                          <div className="mt-3 pt-3 border-t">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handlePayForPatient(phase)}
+                              className="flex items-center gap-2"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                              Thanh toán hộ bệnh nhân
+                            </Button>
                           </div>
                         )}
                         {phase.listImage && phase.listImage.length > 0 && (
@@ -639,6 +836,64 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
               </div>
             )}
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Payment Dialog */}
+    <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Thanh toán hộ bệnh nhân</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
+          {selectedPhase && (
+            <>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Giai đoạn:</p>
+                <p className="text-sm font-medium">{selectedPhase.description || `Giai đoạn ${selectedPhase.phaseNumber}`}</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Số tiền:</p>
+                <p className="text-lg font-semibold text-primary">
+                  {formatCurrency(calculatePhaseCost(selectedPhase) || selectedPhase.cost)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phương thức thanh toán:</label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn phương thức thanh toán" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Tiền mặt</SelectItem>
+                    <SelectItem value="transfer">Chuyển khoản</SelectItem>
+                    <SelectItem value="vnpay">VNPay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPaymentDialogOpen(false);
+                    setSelectedPhase(null);
+                  }}
+                  className="flex-1"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmPayment}
+                  disabled={updatePaymentMutation.isPending}
+                  className="flex-1"
+                >
+                  {updatePaymentMutation.isPending ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

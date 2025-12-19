@@ -379,5 +379,33 @@ export const patientAPI = {
     const response = await apiClient.put(`/api/v1/cost/${costId}`, data);
     return unwrap<CostResponse>(response);
   },
+
+  /**
+   * Update cost payment information from VNPay callback (public endpoint, no auth required)
+   * @param costId - Cost ID
+   * @param vnpayParams - All VNPay callback parameters
+   * @returns Updated CostResponse
+   */
+  updateCostPaymentFromVNPay: async (
+    costId: string,
+    vnpayParams: Record<string, string>,
+  ): Promise<CostResponse> => {
+    const response = await apiClient.post('/api/v1/cost/vnpay-callback', {
+      costId,
+      vnp_Amount: vnpayParams.vnp_Amount,
+      vnp_BankCode: vnpayParams.vnp_BankCode,
+      vnp_BankTranNo: vnpayParams.vnp_BankTranNo,
+      vnp_CardType: vnpayParams.vnp_CardType,
+      vnp_OrderInfo: vnpayParams.vnp_OrderInfo,
+      vnp_PayDate: vnpayParams.vnp_PayDate,
+      vnp_ResponseCode: vnpayParams.vnp_ResponseCode,
+      vnp_TmnCode: vnpayParams.vnp_TmnCode,
+      vnp_TransactionNo: vnpayParams.vnp_TransactionNo,
+      vnp_TransactionStatus: vnpayParams.vnp_TransactionStatus,
+      vnp_TxnRef: vnpayParams.vnp_TxnRef,
+      vnp_SecureHash: vnpayParams.vnp_SecureHash,
+    });
+    return unwrap<CostResponse>(response);
+  },
 };
 

@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Loading, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
-import type { CostPaymentUpdateRequest } from '@/services/api/patient';
 import { queryKeys } from '@/services/queryClient';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -15,19 +14,31 @@ const PaymentCallback: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(true);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'processing' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // No redirect flags: we avoid redirecting when params are missing to not lose query string
 
-  // Extract VNPay callback parameters
-  const vnpAmount = searchParams.get('vnp_Amount');
-  const vnpBankCode = searchParams.get('vnp_BankCode');
-  const vnpBankTranNo = searchParams.get('vnp_BankTranNo');
-  const vnpCardType = searchParams.get('vnp_CardType');
-  const vnpOrderInfo = searchParams.get('vnp_OrderInfo');
-  const vnpPayDate = searchParams.get('vnp_PayDate');
-  const vnpResponseCode = searchParams.get('vnp_ResponseCode');
-  const vnpTransactionNo = searchParams.get('vnp_TransactionNo');
-  const vnpTransactionStatus = searchParams.get('vnp_TransactionStatus');
-  const vnpTxnRef = searchParams.get('vnp_TxnRef');
-  const vnpSecureHash = searchParams.get('vnp_SecureHash');
+  // Extract VNPay callback parameters (with fallback from sessionStorage if searchParams empty)
+  const getParams = () => {
+    // Primary: current search params
+    if (window.location.search) return new URLSearchParams(window.location.search);
+    // Fallback: cached from initial load before any redirect/guard stripped query
+    const cached = sessionStorage.getItem('vnpay_callback_search');
+    if (cached) return new URLSearchParams(cached);
+    return searchParams;
+  };
+  const params = getParams();
+
+  const vnpAmount = params.get('vnp_Amount');
+  const vnpBankCode = params.get('vnp_BankCode');
+  const vnpBankTranNo = params.get('vnp_BankTranNo');
+  const vnpCardType = params.get('vnp_CardType');
+  const vnpTmnCode = params.get('vnp_TmnCode');
+  const vnpOrderInfo = params.get('vnp_OrderInfo');
+  const vnpPayDate = params.get('vnp_PayDate');
+  const vnpResponseCode = params.get('vnp_ResponseCode');
+  const vnpTransactionNo = params.get('vnp_TransactionNo');
+  const vnpTransactionStatus = params.get('vnp_TransactionStatus');
+  const vnpTxnRef = params.get('vnp_TxnRef');
+  const vnpSecureHash = params.get('vnp_SecureHash');
 
   // Extract costId from orderInfo or localStorage
   // Format: "Thanh toan don hang:78275465" or we can store costId in localStorage before redirect
@@ -48,21 +59,23 @@ const PaymentCallback: React.FC = () => {
   const updatePaymentMutation = useMutation({
     mutationFn: async (data: {
       costId: string;
-      paymentMethod: string;
-      status: string;
-      vnpTxnRef: string;
+      vnpayParams: Record<string, string>;
     }) => {
-      const updateData: CostPaymentUpdateRequest = {
-        paymentMethod: data.paymentMethod,
-        status: data.status,
-        vnpTxnRef: data.vnpTxnRef,
-      };
-      return patientAPI.updateCostPayment(data.costId, updateData);
+      // Use public endpoint for VNPay callback (no auth required)
+      return patientAPI.updateCostPaymentFromVNPay(data.costId, data.vnpayParams);
     },
     onSuccess: () => {
       // Invalidate cost queries to refresh payment list
       queryClient.invalidateQueries({ queryKey: queryKeys.patient.costs });
       queryClient.invalidateQueries({ queryKey: queryKeys.patient.myTreatmentPlans });
+      
+      // Also invalidate nurse queries if this is a nurse payment
+      const redirectUrl = getRedirectUrl(false); // Don't clean yet
+      if (redirectUrl && redirectUrl.includes('/nurse')) {
+        queryClient.invalidateQueries({ queryKey: ['nurse', 'treatmentPlans'] });
+        queryClient.invalidateQueries({ queryKey: ['doctor', 'treatmentPhases'] });
+      }
+      
       setPaymentStatus('success');
       setIsProcessing(false);
       showNotification.success('Cập nhật thanh toán thành công!');
@@ -77,11 +90,45 @@ const PaymentCallback: React.FC = () => {
   });
 
   useEffect(() => {
-    // Check if this is a valid VNPay callback
-    if (!vnpResponseCode && !vnpTransactionStatus) {
+    // Debug: Log all URL parameters
+    const allParams: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      allParams[key] = value;
+    });
+    console.log('VNPay Callback Parameters:', allParams);
+    console.log('Full URL:', window.location.href);
+    console.log('Search params string:', window.location.search || sessionStorage.getItem('vnpay_callback_search') || '');
+    console.log('Referrer:', document.referrer);
+
+    // Check if this is a valid VNPay callback by checking if any VNPay parameter exists
+    const hasAnyVNPayParam = vnpAmount || vnpBankCode || vnpResponseCode || vnpTransactionStatus || 
+                             vnpTransactionNo || vnpTxnRef || vnpSecureHash || vnpOrderInfo;
+    
+    if (!hasAnyVNPayParam) {
+      // No VNPay parameters - could be:
+      // 1. User accessed page directly
+      // 2. VNPay redirected without params (cancelled payment or error)
+      // 3. User cancelled payment in VNPay
+      
+      // Check if there's a stored costId (means user was in payment flow)
+      const storedCostId = localStorage.getItem('vnpay_costId');
+      const redirectUrl = localStorage.getItem('vnpay_redirectUrl');
+      
+      console.log('No VNPay params found. Stored costId:', storedCostId, 'Redirect URL:', redirectUrl);
+      
+      // Dừng xử lý, KHÔNG redirect để tránh mất query params khi VNPay thực sự trả về
       setPaymentStatus('failed');
       setIsProcessing(false);
-      setErrorMessage('Thiếu thông tin từ VNPay. Vui lòng kiểm tra lại.');
+      setErrorMessage('Không nhận được tham số từ VNPay. Vui lòng thử lại.');
+      return;
+    }
+
+    // Check if we have response code or transaction status
+    if (!vnpResponseCode && !vnpTransactionStatus) {
+      // Has some VNPay params but missing critical ones - might be incomplete callback
+      setPaymentStatus('failed');
+      setIsProcessing(false);
+      setErrorMessage('Thiếu thông tin từ VNPay. Có thể thanh toán đã bị hủy hoặc có lỗi xảy ra.');
       return;
     }
 
@@ -93,7 +140,8 @@ const PaymentCallback: React.FC = () => {
     if (!isSuccess) {
       setPaymentStatus('failed');
       setIsProcessing(false);
-      setErrorMessage('Thanh toán không thành công. Vui lòng thử lại.');
+      const responseCodeMsg = vnpResponseCode ? ` (Mã: ${vnpResponseCode})` : '';
+      setErrorMessage(`Thanh toán không thành công${responseCodeMsg}. Vui lòng thử lại.`);
       return;
     }
 
@@ -106,26 +154,48 @@ const PaymentCallback: React.FC = () => {
       return;
     }
 
-    // Determine payment method from bank code
-    const paymentMethod = vnpBankCode ? `VNPay-${vnpBankCode}` : 'VNPay';
+    // Collect all VNPay parameters
+    const vnpayParams: Record<string, string> = {
+      vnp_Amount: vnpAmount || '',
+      vnp_BankCode: vnpBankCode || '',
+      vnp_BankTranNo: vnpBankTranNo || '',
+      vnp_CardType: vnpCardType || '',
+      vnp_OrderInfo: vnpOrderInfo || '',
+      vnp_PayDate: vnpPayDate || '',
+      vnp_ResponseCode: vnpResponseCode || '',
+      vnp_TmnCode: vnpTmnCode || '',
+      vnp_TransactionNo: vnpTransactionNo || '',
+      vnp_TransactionStatus: vnpTransactionStatus || '',
+      vnp_TxnRef: vnpTxnRef || '',
+      vnp_SecureHash: vnpSecureHash || '',
+    };
 
-    // Update payment status
-    // Status: 'paid' for successful payment
+    // Update payment status using public VNPay callback endpoint
     updatePaymentMutation.mutate({
       costId,
-      paymentMethod,
-      status: 'paid',
-      vnpTxnRef: vnpTxnRef || vnpTransactionNo || '',
+      vnpayParams,
     });
   }, []);
 
+  const getRedirectUrl = (shouldClean: boolean = true): string => {
+    // Check if there's a stored redirect URL (for nurse payment)
+    const redirectUrl = localStorage.getItem('vnpay_redirectUrl');
+    if (redirectUrl) {
+      if (shouldClean) {
+        localStorage.removeItem('vnpay_redirectUrl'); // Clean up after use
+      }
+      return redirectUrl;
+    }
+    // Default: redirect to patient payment section
+    return '/patient?section=payment';
+  };
+
   const handleBackToPayment = () => {
-    // Navigate to patient dashboard with payment section
-    navigate('/patient?section=payment');
+    navigate(getRedirectUrl());
   };
 
   const handleBackToHome = () => {
-    navigate('/patient?section=payment');
+    navigate(getRedirectUrl());
   };
 
   return (

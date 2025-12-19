@@ -5,7 +5,7 @@ import type {
   DoctorSummary,
   TreatmentPlan,
 } from '@/types/doctor';
-import type { PatientResponse } from './patient';
+import type { PatientResponse, CostResponse, CostPaymentUpdateRequest } from './patient';
 
 type ApiPayload<T> = ApiEnvelope<T> | T;
 
@@ -158,6 +158,28 @@ export const nurseAPI = {
   updateAppointmentNotification: async (appointmentId: string): Promise<AppointmentSummary> => {
     const response = await apiClient.put(`/api/v1/nurse/appointment/${appointmentId}`);
     return unwrap<AppointmentSummary>(response.data);
+  },
+
+  /**
+   * Update payment cost for a patient (nurse can pay on behalf of patient)
+   * @param costId - Cost ID (can be treatment phase ID or examination ID)
+   * @param request - Payment update request with payment method and status
+   * @returns Updated cost response
+   */
+  updatePaymentCost: async (costId: string, request: CostPaymentUpdateRequest): Promise<CostResponse> => {
+    const response = await apiClient.put(`/api/v1/cost/${costId}`, request);
+    return unwrap<CostResponse>(response.data);
+  },
+
+  /**
+   * Get cost detail by id (for checking payment status in nurse dashboard)
+   * Roles: nurse/admin (UPDATE_PAYMENT_COST)
+   * @param costId - Cost ID (same as treatment phase ID)
+   * @returns CostResponse
+   */
+  getCostById: async (costId: string): Promise<CostResponse> => {
+    const response = await apiClient.get(`/api/v1/cost/${costId}`);
+    return unwrap<CostResponse>(response.data);
   },
 };
 

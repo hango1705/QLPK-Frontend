@@ -212,7 +212,7 @@ const App = () => (
                     path="/payment/paymentCallback" 
                     element={
                       <PrivateRoute>
-                        <RoleBasedRoute allowedRoles={['patient', 'admin']}>
+                        <RoleBasedRoute allowedRoles={['patient', 'admin', 'nurse']}>
                           <PaymentCallback />
                         </RoleBasedRoute>
                       </PrivateRoute>

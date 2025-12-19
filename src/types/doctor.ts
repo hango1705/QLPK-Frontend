@@ -96,6 +96,7 @@ export interface TreatmentPhase {
   description: string;
   cost: number;
   status: string;
+  paymentStatus?: string;
   startDate: string;
   endDate: string;
   nextAppointment?: string;

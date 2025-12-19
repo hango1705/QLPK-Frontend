@@ -11,11 +11,11 @@ import AccountSection from './AccountSection';
 import TreatmentPlanDetailDialog from './TreatmentPlanDetailDialog';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { usePermission } from '@/hooks';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { nurseAPI } from '@/services';
+import { useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
+import { nurseAPI, doctorAPI } from '@/services';
 import { queryKeys } from '@/services/queryClient';
 import { showNotification } from '@/components/ui';
-import type { TreatmentPlan } from '@/types/doctor';
+import type { TreatmentPlan, TreatmentPhase } from '@/types/doctor';
 
 const NurseContent: React.FC<ContentSectionProps> = ({
   activeSection,
@@ -119,13 +119,69 @@ const NurseContent: React.FC<ContentSectionProps> = ({
   return <div className="space-y-4">{renderContent()}</div>;
 };
 
+// Helper function to calculate cost from services and prescriptions (same as in TreatmentPlanDetailDialog)
+const calculatePhaseCost = (phase: TreatmentPhase): number | null => {
+  const services = phase.listDentalServicesEntityOrder || [];
+  const prescriptions = phase.listPrescriptionOrder || [];
+  
+  // If no services and prescriptions, return null to use phase.cost
+  if (services.length === 0 && prescriptions.length === 0) {
+    return null;
+  }
+
+  const calculateServiceCost = (service: typeof services[0]) => {
+    if (service.cost && service.cost > 0) {
+      return service.cost;
+    }
+    return (service.quantity || 0) * (service.unitPrice || 0);
+  };
+
+  const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+    if (prescription.cost && prescription.cost > 0) {
+      return prescription.cost;
+    }
+    return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+  };
+
+  const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+  const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+  return servicesTotal + prescriptionsTotal;
+};
+
 const TreatmentPlansSection: React.FC<{ 
   plans: ContentSectionProps['treatmentPlans'];
   onViewDetail: (plan: TreatmentPlan) => void;
 }> = ({
   plans,
   onViewDetail,
-}) => (
+}) => {
+  // Fetch phases for all plans
+  const phaseQueries = useQueries({
+    queries: plans.map((plan) => ({
+      queryKey: queryKeys.doctor.treatmentPhases(plan.id),
+      queryFn: () => doctorAPI.getTreatmentPhases(plan.id),
+      enabled: !!plan.id,
+    })),
+  });
+
+  // Calculate total cost from phases for each plan
+  const planTotalCosts = useMemo(() => {
+    const costsMap: Record<string, number> = {};
+    
+    plans.forEach((plan, index) => {
+      const phases = phaseQueries[index]?.data || [];
+      const totalCostFromPhases = phases.reduce((sum, phase) => {
+        const calculatedCost = calculatePhaseCost(phase);
+        return sum + (calculatedCost || phase.cost || 0);
+      }, 0);
+      
+      costsMap[plan.id] = totalCostFromPhases || plan.totalCost;
+    });
+    
+    return costsMap;
+  }, [plans, phaseQueries]);
+
+  return (
   <Card className="border-none bg-white/90 shadow-medium">
     <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
       <div>
@@ -161,7 +217,7 @@ const TreatmentPlansSection: React.FC<{
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="flex items-center gap-2 text-sm">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                     <Stethoscope className="h-4 w-4" />
@@ -169,6 +225,15 @@ const TreatmentPlansSection: React.FC<{
                   <div>
                     <p className="text-xs text-muted-foreground">Bác sĩ</p>
                     <p className="font-medium text-foreground">{plan.doctorFullname || 'Chưa xác định'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bệnh nhân</p>
+                    <p className="font-medium text-foreground">{plan.patientName || 'Chưa xác định'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -186,7 +251,9 @@ const TreatmentPlansSection: React.FC<{
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Tổng chi phí</p>
-                    <p className="font-semibold text-primary">{formatCurrency(plan.totalCost)}</p>
+                    <p className="font-semibold text-primary">
+                      {formatCurrency(planTotalCosts[plan.id] || plan.totalCost)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -220,7 +287,8 @@ const TreatmentPlansSection: React.FC<{
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 const PatientsSection: React.FC<{
   patients: ContentSectionProps['patients'];

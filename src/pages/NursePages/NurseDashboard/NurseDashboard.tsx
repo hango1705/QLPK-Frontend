@@ -91,11 +91,11 @@ const NurseDashboard: React.FC = () => {
       }
       // Fallback: If no doctorId, try matching by doctorFullName
       if (!app.doctorId && app.doctorFullName) {
-        const selectedDoctor = doctors.find((d) => d.id === selectedDoctorId);
+    const selectedDoctor = doctors.find((d) => d.id === selectedDoctorId);
         if (selectedDoctor && app.doctorFullName === selectedDoctor.fullName) {
           return true;
         }
-      }
+    }
       // If appointment has neither doctorId nor doctorFullName, exclude it
       return false;
     });
