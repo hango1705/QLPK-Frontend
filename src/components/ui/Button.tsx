@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button as AntButton, ButtonProps as AntButtonProps } from 'antd';
+import { motion } from 'framer-motion';
 import { cn } from '@/utils/cn';
 
 export interface ButtonProps extends Omit<AntButtonProps, 'size' | 'variant' | 'type' | 'htmlType'> {
@@ -51,23 +52,35 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     }
 
     return (
-      <AntButton
-        ref={ref}
-        type={antType as AntButtonProps['type']}
-        htmlType={buttonHtmlType}
-        size={size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'middle'}
-        loading={loading}
-        className={cn(
-          baseClasses,
-          variantClasses[variant],
-          sizeClasses[size],
-          className
-        )}
-        style={mergedStyle}
-        {...props}
+      <motion.div
+        whileHover={{ 
+          scale: 1.02,
+          transition: { type: "spring", stiffness: 400, damping: 17 }
+        }}
+        whileTap={{ 
+          scale: 0.98,
+          transition: { type: "spring", stiffness: 600, damping: 20 }
+        }}
+        style={{ display: 'inline-block' }}
       >
-        {children}
-      </AntButton>
+        <AntButton
+          ref={ref}
+          type={antType as AntButtonProps['type']}
+          htmlType={buttonHtmlType}
+          size={size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'middle'}
+          loading={loading}
+          className={cn(
+            baseClasses,
+            variantClasses[variant],
+            sizeClasses[size],
+            className
+          )}
+          style={mergedStyle}
+          {...props}
+        >
+          {children}
+        </AntButton>
+      </motion.div>
     );
   }
 );

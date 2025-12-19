@@ -10,6 +10,7 @@ import { PublicRoute, PrivateRoute } from '@/components/auth/RouteGuards';
 import RoleBasedRoute from '@/components/auth/RoleBasedRoute';
 import AuthInitializer from '@/components/auth/AuthInitializer';
 import { createLazyPage } from '@/utils/lazyLoading';
+import { AnimatedRoutes } from '@/components/animations/AnimatedRoutes';
 
 // Lazy load pages for code splitting
 const HomePage = createLazyPage(() => import('./pages/Homepage/index'));
@@ -55,7 +56,7 @@ const App = () => (
             <AntApp>
               <AuthInitializer>
                 <BrowserRouter>
-                <Routes>
+                <AnimatedRoutes>
                   {/* Public routes */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/components" element={<ComponentsDemo />} />
@@ -224,7 +225,7 @@ const App = () => (
                   {/* Error pages */}
                   <Route path="/unauthorized" element={<UnauthorizedPage />} />
                   <Route path="*" element={<NotFound />} />
-                </Routes>
+                </AnimatedRoutes>
                 </BrowserRouter>
               </AuthInitializer>
             </AntApp>

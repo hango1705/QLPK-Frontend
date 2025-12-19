@@ -1,4 +1,5 @@
 import * as React from "react"
+import { motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -30,16 +31,48 @@ function Card({
     xl: "p-8",
   }
 
+  const CardComponent = hoverable ? motion.div : 'div';
+  const motionProps = hoverable ? {
+    whileHover: { 
+      scale: 1.02,
+      y: -4,
+      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+      transition: { 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 20,
+        mass: 0.5
+      }
+    },
+    whileTap: { 
+      scale: 0.98,
+      transition: { 
+        type: "spring", 
+        stiffness: 600, 
+        damping: 20 
+      }
+    },
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { 
+      type: "spring", 
+      stiffness: 400, 
+      damping: 25,
+      opacity: { duration: 0.2 }
+    }
+  } : {};
+
   return (
-    <div
+    <CardComponent
       data-slot="card"
       className={cn(
         "flex flex-col gap-6 rounded-xl",
         variantClasses[variant],
         paddingClasses[padding],
-        hoverable && "transition-shadow hover:shadow-lg cursor-pointer",
+        hoverable && "cursor-pointer transition-shadow",
         className
       )}
+      {...(hoverable ? motionProps : {})}
       {...props}
     />
   )
