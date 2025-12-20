@@ -68,7 +68,6 @@ export interface TreatmentPhaseFormState {
 export interface DoctorHeaderProps {
   profile?: { fullName?: string; username?: string };
   activeSection: string;
-  scheduledCount: number;
   onLogout: () => void;
 }
 

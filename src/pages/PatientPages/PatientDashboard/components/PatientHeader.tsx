@@ -1,11 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
-import { Bell, Settings, LogOut, Menu, Stethoscope } from 'lucide-react';
+import { Button } from '@/components/ui';
+import { LogOut, User } from 'lucide-react';
 import type { PatientHeaderProps } from '../types';
 import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
 import { useAuth } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/utils/cn';
 
 interface ExtendedPatientHeaderProps extends PatientHeaderProps {
   onToggleSidebar?: () => void;
@@ -78,59 +79,38 @@ const PatientHeader: React.FC<ExtendedPatientHeaderProps> = ({
     }
   };
 
-  const getInitials = () => {
-    if (isLoading || !profile) return 'L';
-    const ch = profile.fullName && profile.fullName.length > 0 ? profile.fullName.charAt(0) : 'L';
-    return ch.toUpperCase();
-  };
-
-  const handleMenuClick = () => {
-    if (window.innerWidth >= 1024) {
-      onToggleCollapse?.();
-    } else {
-      onToggleSidebar?.();
-    }
-  };
-
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={handleMenuClick}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <Stethoscope className="h-6 w-6 text-white" />
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/60 bg-white/90 px-4 py-4 backdrop-blur-sm lg:px-6 min-w-0">
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <h1 className="text-xl font-semibold text-foreground truncate">{activeSection}</h1>
+      </div>
+
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="hidden items-center gap-3 md:flex">
+          <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
+              <User className="h-4 w-4" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                eDental
-              </h1>
-              <p className="text-xs text-muted-foreground">Patient Dashboard</p>
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-primary">
+                {profile?.fullName || profile?.username || 'Bệnh nhân'}
+              </span>
+              <span className="text-[10px] text-primary/70">Bệnh nhân</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onEditProfile}>
-            <Settings className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Đăng xuất
-          </Button>
-          <Avatar className="h-9 w-9 border-2 border-primary/20">
-            <AvatarImage src="" />
-            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleLogout}
+          className={cn(
+            'border-border/70 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30',
+          )}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Đăng xuất</span>
+        </Button>
       </div>
     </header>
   );

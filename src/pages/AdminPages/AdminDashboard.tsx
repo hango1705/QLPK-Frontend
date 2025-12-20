@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { showNotification, Loading } from '@/components/ui';
+import { showNotification, Loading, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Button } from '@/components/ui';
 import { adminAPI } from '@/services/api/admin';
 import { authAPI } from '@/services/api/auth';
 import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
@@ -53,6 +53,8 @@ const AdminDashboard: React.FC = () => {
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [addUserType, setAddUserType] = useState<'doctor' | 'nurse'>('doctor');
+  const [promoteDoctorDialogOpen, setPromoteDoctorDialogOpen] = useState(false);
+  const [doctorToPromote, setDoctorToPromote] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { logout, token } = useAuth();
@@ -309,10 +311,10 @@ const AdminDashboard: React.FC = () => {
     mutationFn: (doctorId: string) => adminAPI.updateDoctorLevel(doctorId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users });
-      showNotification.success('Đã nâng cấp bác sĩ lên cấp độ 2');
+      showNotification.success('Đã thăng chức bác sĩ lên cấp độ 2 (DOCTORLV2)');
     },
     onError: (error: any) => {
-      showNotification.error('Không thể nâng cấp bác sĩ', error?.message || 'Đã xảy ra lỗi');
+      showNotification.error('Không thể thăng chức bác sĩ', error?.message || 'Đã xảy ra lỗi');
     },
   });
 
@@ -404,9 +406,16 @@ const AdminDashboard: React.FC = () => {
     removePermissionFromRoleMutation.mutate({ roleName, permissionName });
   };
 
-  const handleUpdateDoctorLevel = (doctorId: string) => {
-    if (confirm('Bạn có chắc chắn muốn nâng cấp bác sĩ này lên cấp độ 2 (DOCTORLV2)?')) {
-      updateDoctorLevelMutation.mutate(doctorId);
+  const handleUpdateDoctorLevel = (userId: string) => {
+    setDoctorToPromote(userId);
+    setPromoteDoctorDialogOpen(true);
+  };
+
+  const handleConfirmPromoteDoctor = () => {
+    if (doctorToPromote) {
+      updateDoctorLevelMutation.mutate(doctorToPromote);
+      setPromoteDoctorDialogOpen(false);
+      setDoctorToPromote(null);
     }
   };
 
@@ -512,7 +521,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-fresh text-foreground">
+    <div className="flex min-h-screen bg-gradient-fresh text-foreground overflow-x-hidden">
       <AdminSidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -520,7 +529,7 @@ const AdminDashboard: React.FC = () => {
         onToggleCollapse={() => setIsNavCollapsed((prev) => !prev)}
       />
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
         <AdminHeader
           profile={profile}
           activeSection={SECTION_CONFIG[activeSection].label}
@@ -547,6 +556,7 @@ const AdminDashboard: React.FC = () => {
               onEnableUser={handleEnableUser}
               onAddDoctor={handleAddDoctor}
               onAddNurse={handleAddNurse}
+              onUpdateDoctorLevel={handleUpdateDoctorLevel}
               onCreateRole={handleCreateRole}
               onEditRole={handleEditRole}
               onAddPermission={handleAddPermission}
@@ -638,6 +648,47 @@ const AdminDashboard: React.FC = () => {
         onSubmit={handleAddUserSubmit}
         isLoading={registerDoctorMutation.isPending || registerNurseMutation.isPending}
       />
+
+      {/* Promote Doctor Confirmation Dialog */}
+      <Dialog open={promoteDoctorDialogOpen} onOpenChange={setPromoteDoctorDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Xác nhận thăng chức</DialogTitle>
+            <DialogDescription asChild>
+              <div>
+                <p className="mb-2">
+                  Bạn có chắc chắn muốn thăng chức bác sĩ này lên cấp độ 2 (DOCTORLV2)?
+                </p>
+                <p className="mb-2">Sau khi thăng chức, bác sĩ sẽ có quyền:</p>
+                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                  <li>Chỉ định bác sĩ và y tá cho phác đồ điều trị</li>
+                  <li>Thêm nhận xét vào hồ sơ khám và tiến trình điều trị</li>
+                </ul>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPromoteDoctorDialogOpen(false);
+                setDoctorToPromote(null);
+              }}
+              disabled={updateDoctorLevelMutation.isPending}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmPromoteDoctor}
+              disabled={updateDoctorLevelMutation.isPending}
+              loading={updateDoctorLevelMutation.isPending}
+            >
+              Xác nhận
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

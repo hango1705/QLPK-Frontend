@@ -43,6 +43,16 @@ export const nurseAPI = {
   },
 
   /**
+   * Get nurse information by user ID
+   * @param userId - User ID
+   * @returns NurseInfo with full name and phone
+   */
+  getNurseInfoByUserId: async (userId: string): Promise<NurseInfo> => {
+    const response = await apiClient.get(`/api/v1/nurse/user/${userId}`);
+    return unwrap<NurseInfo>(response.data);
+  },
+
+  /**
    * Get all nurses for selection/pick
    * @returns List of nurses with id and full name
    */
@@ -132,6 +142,16 @@ export const nurseAPI = {
   },
 
   /**
+   * Get patient basic information by user ID
+   * @param userId - User ID
+   * @returns PatientResponse with full patient information
+   */
+  getPatientByUserId: async (userId: string): Promise<PatientResponse> => {
+    const response = await apiClient.get(`/api/v1/nurse/patient/user/${userId}`);
+    return unwrap<PatientResponse>(response.data);
+  },
+
+  /**
    * Get all doctors
    * @returns List of all doctors
    */
@@ -147,6 +167,16 @@ export const nurseAPI = {
    */
   getDoctorById: async (doctorId: string): Promise<DoctorSummary> => {
     const response = await apiClient.get(`/api/v1/nurse/doctors/${doctorId}`);
+    return unwrap<DoctorSummary>(response.data);
+  },
+
+  /**
+   * Get doctor information by user ID
+   * @param userId - User ID
+   * @returns DoctorSummary with doctor information
+   */
+  getDoctorByUserId: async (userId: string): Promise<DoctorSummary> => {
+    const response = await apiClient.get(`/api/v1/doctor/user/${userId}`);
     return unwrap<DoctorSummary>(response.data);
   },
 

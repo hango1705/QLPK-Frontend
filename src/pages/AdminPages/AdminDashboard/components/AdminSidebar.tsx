@@ -4,6 +4,7 @@ import { Shield, Menu } from 'lucide-react';
 import { SECTION_CONFIG } from '../constants';
 import type { AdminSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
+import logo from '@/assets/logo.png';
 
 const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeSection,
@@ -13,25 +14,27 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
 }) => (
   <aside
     className={cn(
-      'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300',
+      'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300 overflow-hidden flex-shrink-0',
       isCollapsed ? 'w-20' : 'w-72',
     )}
   >
-    <div className="flex items-center justify-between px-6 py-5">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Shield className="h-5 w-5" />
-        </div>
+    <div className={cn(
+      "flex items-center py-5",
+      isCollapsed ? "px-3 justify-center" : "px-6 justify-between"
+    )}>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <img 
+          src={logo} 
+          alt="eDental Logo" 
+          className="h-10 w-auto object-contain flex-shrink-0"
+        />
         {!isCollapsed && (
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">DentalCARE</p>
-            <p className="text-base font-semibold text-foreground">Admin Panel</p>
-          </div>
+          <span className="text-base font-semibold text-foreground whitespace-nowrap">Trang quản trị</span>
         )}
       </div>
       <button
         type="button"
-        className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
+        className="rounded-full p-2 text-muted-foreground transition hover:bg-muted flex-shrink-0"
         onClick={onToggleCollapse}
       >
         <Menu className="h-4 w-4" />

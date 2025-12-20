@@ -145,7 +145,7 @@ const UsersSection: React.FC<UsersSectionProps> = ({
                         {user.full_name || user.username || 'Chưa có tên'}
                       </p>
                       {user.role && (
-                        <Badge className={cn('text-xs', ROLE_BADGE[user.role] || ROLE_BADGE.patient)}>
+                        <Badge className={cn('text-xs', ROLE_BADGE[user.role.toLowerCase()] || ROLE_BADGE.patient)}>
                           {user.role.toUpperCase()}
                         </Badge>
                       )}
@@ -175,16 +175,16 @@ const UsersSection: React.FC<UsersSectionProps> = ({
                     <Eye className="mr-2 h-3.5 w-3.5" />
                     Xem
                   </Button>
-                  {user.role === 'doctor' && onUpdateDoctorLevel && !user.disable && (
+                  {user.role && user.role.toLowerCase() === 'doctor' && onUpdateDoctorLevel && !user.disable && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => onUpdateDoctorLevel(user.id)}
                       className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                      title="Nâng cấp bác sĩ lên cấp độ 2 (DOCTORLV2)"
+                      title="Thăng chức bác sĩ lên cấp độ 2 (DOCTORLV2)"
                     >
                       <TrendingUp className="mr-2 h-3.5 w-3.5" />
-                      Nâng cấp
+                      Thăng chức
                     </Button>
                   )}
                   {user.disable ? (

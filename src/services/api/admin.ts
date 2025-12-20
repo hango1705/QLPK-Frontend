@@ -83,11 +83,11 @@ export const adminAPI = {
 
   /**
    * Update doctor level to DOCTORLV2 (Admin only)
-   * @param doctorId - Doctor ID to upgrade
+   * @param userId - User ID of the doctor to upgrade
    * @returns Success message
    */
-  updateDoctorLevel: async (doctorId: string): Promise<string> => {
-    const response = await apiClient.post(`/api/v1/role/${doctorId}/updateLevel`);
+  updateDoctorLevel: async (userId: string): Promise<string> => {
+    const response = await apiClient.post(`/api/v1/role/user/${userId}/updateLevel`);
     return unwrap<string>(response);
   },
 
@@ -143,6 +143,11 @@ export const adminAPI = {
   updateService: async (serviceId: string, payload: DentalServiceRequest): Promise<DentalService> => {
     const response = await apiClient.put(`/api/v1/dentalService/${serviceId}`, payload);
     return unwrap<DentalService>(response);
+  },
+
+  deleteService: async (serviceId: string): Promise<string> => {
+    const response = await apiClient.delete(`/api/v1/dentalService/${serviceId}`);
+    return unwrap<string>(response);
   },
 
   // Prescription

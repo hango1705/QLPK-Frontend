@@ -14,7 +14,8 @@ import { User, Mail, Phone, MapPin, Calendar, Shield, Ban, CheckCircle, Heart, A
 import type { User as UserType } from '@/types/admin';
 import { ROLE_BADGE, STATUS_BADGE } from '../../constants';
 import { cn } from '@/utils/cn';
-import { patientAPI, type TreatmentPlansResponse } from '@/services/api/patient';
+import { type TreatmentPlansResponse, patientAPI } from '@/services/api/patient';
+import { nurseAPI } from '@/services/api/nurse';
 import { queryKeys } from '@/services/queryClient';
 
 interface UserDetailDialogProps {
@@ -34,21 +35,33 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
 }) => {
   if (!user) return null;
 
+  // Determine user role (normalize to lowercase for comparison)
+  const userRole = user.role?.toLowerCase() || '';
 
-  // Try to fetch patient details for all users (user.id might be patientId)
-  // The API will return 404 if user is not a patient, which is fine
+  // Fetch patient details only if user is a patient
   const { data: patientDetails, isLoading: loadingPatientDetails, error: patientError } = useQuery({
-    queryKey: queryKeys.patient.byId(user.id),
-    queryFn: () => patientAPI.getPatientById(user.id),
-    enabled: open && !!user,
+    queryKey: ['patient', 'user', user.id],
+    queryFn: () => nurseAPI.getPatientByUserId(user.id),
+    enabled: open && !!user && userRole === 'patient',
     retry: false, // Don't retry on 404
+  });
+
+  // Fetch doctor details only if user is a doctor or doctorlv2
+  const { data: doctorDetails, isLoading: loadingDoctorDetails, error: doctorError } = useQuery({
+    queryKey: ['doctor', 'user', user.id],
+    queryFn: () => nurseAPI.getDoctorByUserId(user.id),
+    enabled: open && !!user && (userRole === 'doctor' || userRole === 'doctorlv2'),
+    retry: false,
   });
 
   // Fetch treatment plans if user is a patient (using patientDetails.id which is the actual patientId)
   const { data: treatmentPlans, isLoading: loadingTreatmentPlans, error: treatmentPlansError } = useQuery({
-    queryKey: queryKeys.patient.treatmentPlans(patientDetails?.id || user.id),
-    queryFn: () => patientAPI.getTreatmentPlansByPatientId(patientDetails?.id || user.id),
-    enabled: open && !!user && !!patientDetails, // Only fetch if patient details exist
+    queryKey: queryKeys.patient.treatmentPlans(patientDetails?.id || ''),
+    queryFn: () => {
+      if (!patientDetails?.id) throw new Error('Patient ID not found');
+      return patientAPI.getTreatmentPlansByPatientId(patientDetails.id);
+    },
+    enabled: open && !!user && !!patientDetails?.id && userRole === 'patient', // Only fetch if patient details exist
     retry: false,
   });
 
@@ -142,14 +155,9 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
             )}
           </div>
 
-          {/* Patient Details - Emergency Contact & Medical Info */}
-          {/* Show patient details section if:
-              1. We have patient data
-              2. We're loading patient data
-              3. User role is patient (even if no data yet)
-              4. Error is not 404 (meaning user might be a patient but API failed)
-          */}
-          {(patientDetails || loadingPatientDetails || user.role === 'patient' || (patientError && patientError?.response?.status !== 404)) && (
+          {/* Role-specific Details */}
+          {/* Patient Details */}
+          {userRole === 'patient' && (
             <div className="space-y-4 border-t border-border/70 pt-4">
               <h3 className="text-sm font-semibold text-foreground">Thông tin bệnh nhân</h3>
               
@@ -158,7 +166,7 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
                   <Loading size="md" />
                   <span className="ml-2 text-sm text-muted-foreground">Đang tải thông tin bệnh nhân...</span>
                 </div>
-              ) : patientError && patientError?.response?.status !== 404 ? (
+              ) : patientError ? (
                 <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4">
                   <p className="text-sm text-rose-600">
                     Không thể tải thông tin bệnh nhân. Vui lòng thử lại sau.
@@ -343,6 +351,62 @@ const UserDetailDialog: React.FC<UserDetailDialogProps> = ({
               ) : (
                 <div className="rounded-xl border border-dashed border-border/50 bg-muted/30 p-4 text-center">
                   <p className="text-sm text-muted-foreground">Không có thông tin bệnh nhân bổ sung</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Doctor Details */}
+          {(userRole === 'doctor' || userRole === 'doctorlv2') && (
+            <div className="space-y-4 border-t border-border/70 pt-4">
+              <h3 className="text-sm font-semibold text-foreground">Thông tin bác sĩ</h3>
+              
+              {loadingDoctorDetails ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loading size="md" />
+                  <span className="ml-2 text-sm text-muted-foreground">Đang tải thông tin bác sĩ...</span>
+                </div>
+              ) : doctorError ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4">
+                  <p className="text-sm text-rose-600">
+                    Không thể tải thông tin bác sĩ. Vui lòng thử lại sau.
+                  </p>
+                </div>
+              ) : doctorDetails ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {doctorDetails.specialization && (
+                    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-white/60 p-3">
+                      <Shield className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Chuyên khoa</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">{doctorDetails.specialization}</p>
+                      </div>
+                    </div>
+                  )}
+                  {doctorDetails.licenseNumber && (
+                    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-white/60 p-3">
+                      <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Số giấy phép hành nghề</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">{doctorDetails.licenseNumber}</p>
+                      </div>
+                    </div>
+                  )}
+                  {doctorDetails.yearsExperience !== undefined && doctorDetails.yearsExperience !== null && (
+                    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-white/60 p-3">
+                      <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Kinh nghiệm</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {doctorDetails.yearsExperience} {doctorDetails.yearsExperience === 1 ? 'năm' : 'năm'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/50 bg-muted/30 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Không có thông tin bác sĩ bổ sung</p>
                 </div>
               )}
             </div>

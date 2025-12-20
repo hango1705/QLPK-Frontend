@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react';
 import { SECTION_CONFIG, SECTION_ORDER } from '../constants';
 import type { NurseSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
+import logo from '@/assets/logo.png';
 
 interface SidebarProps extends NurseSidebarProps {
   isCollapsed: boolean;
@@ -17,38 +18,27 @@ const NurseSidebar: React.FC<SidebarProps> = ({
 }) => (
   <aside
     className={cn(
-      'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300',
+      'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300 overflow-hidden flex-shrink-0',
       isCollapsed ? 'w-20' : 'w-72',
     )}
   >
-    <div className="flex items-center justify-between px-6 py-5">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-        </div>
+    <div className={cn(
+      "flex items-center py-5",
+      isCollapsed ? "px-3 justify-center" : "px-6 justify-between"
+    )}>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <img 
+          src={logo} 
+          alt="eDental Logo" 
+          className="h-10 w-auto object-contain flex-shrink-0"
+        />
         {!isCollapsed && (
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">DentalCARE</p>
-            <p className="text-base font-semibold text-foreground">Nurse Workspace</p>
-          </div>
+          <span className="text-base font-semibold text-foreground whitespace-nowrap">Trang y tá</span>
         )}
       </div>
       <button
         type="button"
-        className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
+        className="rounded-full p-2 text-muted-foreground transition hover:bg-muted flex-shrink-0"
         onClick={onToggleCollapse}
       >
         <Menu className="h-4 w-4" />

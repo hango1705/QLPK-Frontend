@@ -451,7 +451,6 @@ const DoctorDashboard: React.FC = () => {
         <DoctorHeader
           profile={profile}
           activeSection={SECTION_CONFIG[activeSection].label}
-          scheduledCount={scheduledAppointments.length}
           onLogout={handleLogout}
         />
 

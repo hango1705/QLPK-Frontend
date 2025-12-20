@@ -93,6 +93,7 @@ export interface ContentSectionProps {
   onEnableUser: (userId: string) => void;
   onAddDoctor?: () => void;
   onAddNurse?: () => void;
+  onUpdateDoctorLevel?: (doctorId: string) => void;
   onCreateRole: () => void;
   onEditRole: (role: Role) => void;
   onAddPermission: (roleName: string, permissionName: string) => void;
