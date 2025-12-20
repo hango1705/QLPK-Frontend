@@ -9,6 +9,7 @@ import {
   MailOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
+import logo from '@/assets/logo.png';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -47,11 +48,12 @@ const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Company info */}
           <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                <span className="text-2xl text-white font-bold">D</span>
-              </div>
-              <span className="text-xl font-bold">eDental</span>
+            <div className="flex items-center">
+              <img 
+                src={logo} 
+                alt="eDental Logo" 
+                className="h-10 w-auto object-contain"
+              />
             </div>
             <p className="text-background/80 leading-relaxed">
               Dịch vụ nha khoa tận tâm và chuyên nghiệp. Nụ cười của bạn là ưu tiên của chúng tôi.

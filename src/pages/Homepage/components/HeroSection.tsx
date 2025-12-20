@@ -5,6 +5,7 @@ import { Button } from '@/components/ui';
 // 2. Import các icon từ @ant-design/icons
 import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import heroImage from '@/assets/hero-dental.jpg';
+import premiumQualityIcon from '@/assets/premium-quality.png';
 import { useAuth } from '@/hooks';
 
 const HeroSection = () => {
@@ -49,9 +50,14 @@ const HeroSection = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              <span className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-                Đối tác nha khoa đáng tin cậy của bạn
-              </span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
+                <img 
+                  src={premiumQualityIcon} 
+                  alt="Premium Quality" 
+                  className="w-5 h-5 object-contain"
+                />
+                <span>Đối tác nha khoa đáng tin cậy của bạn</span>
+              </div>
             </motion.div>
 
             <motion.h1

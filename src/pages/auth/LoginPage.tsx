@@ -101,10 +101,10 @@ const LoginPage = () => {
           {/* Text Overlay */}
           <div className="relative z-10 flex flex-col justify-center items-center text-center p-12 h-full">
             <div className="max-w-md">
-              <h1 className="text-5xl font-bold mb-6 font-sans tracking-wide" style={{ color: '#0ea5e9' }}>
+              <h1 className="text-5xl font-bold mb-6 font-sans tracking-wide" style={{ color: '#fff' }}>
                 Smile Dental Clinic
               </h1>
-              <p className="text-xl leading-relaxed font-light" style={{ color: '#0ea5e9' }}>
+              <p className="text-xl leading-relaxed font-light" style={{ color: '#fff' }}>
                 "Nụ cười của bạn là ưu tiên của chúng tôi - Chăm sóc nha khoa chuyên nghiệp với tình yêu thương"
               </p>
             </div>

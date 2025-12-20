@@ -6,6 +6,7 @@ import { Button } from '@/components/ui';
 import { MenuOutlined, CloseOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks';
+import logo from '@/assets/logo.png';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,7 +46,7 @@ const Header = () => {
           </div>
           <div className="flex items-center gap-2">
             <MailOutlined className="w-4 h-4" />
-            <span>dentalcare@gmail.com</span>
+            <span>qtdentalcare@gmail.com</span>
           </div>
         </div>
       </div>
@@ -53,12 +54,13 @@ const Header = () => {
       {/* Main navigation */}
       <nav className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo (giữ nguyên) */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-              <span className="text-2xl text-white font-bold">D</span>
-            </div>
-            <span className="text-xl font-bold text-foreground">eDental</span>
+          {/* Logo */}
+          <Link to="/" className="flex items-center">
+            <img 
+              src={logo} 
+              alt="eDental Logo" 
+              className="h-12 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop menu (giữ nguyên) */}

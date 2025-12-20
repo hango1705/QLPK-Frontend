@@ -60,7 +60,7 @@ const DoctorsSection = () => {
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
         ) : (
-          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-8 items-center">
             {doctors.map((doctor: DoctorSummary, index: number) => {
               const doctorImage = defaultImages[index % defaultImages.length];
               const email = doctor.email || `doctor${index + 1}@dentalcare.vn`;
@@ -83,7 +83,9 @@ const DoctorsSection = () => {
                       <img
                         src={doctorImage}
                         alt={doctor.fullName}
-                        className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-500"
+                        className={`w-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                          index === 1 && doctors.length >= 3 ? 'h-[440px]' : 'h-80'
+                        }`}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
