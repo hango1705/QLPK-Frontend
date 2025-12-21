@@ -1,58 +1,77 @@
 import React from 'react';
-import { Button, ScrollArea } from '@/components/ui';
-import { SECTION_CONFIG } from '../constants';
+import { Menu } from 'lucide-react';
+import { SECTION_CONFIG, SECTION_ORDER } from '../constants';
 import type { PatientSidebarProps, Section } from '../types';
 import { cn } from '@/utils/cn';
+import logo from '@/assets/logo.png';
 
 const PatientSidebar: React.FC<PatientSidebarProps> = ({
   activeSection,
   onSectionChange,
   isCollapsed,
   onToggleCollapse,
-  sidebarOpen,
-  onToggleSidebar,
+  sidebarOpen: _sidebarOpen,
+  onToggleSidebar: _onToggleSidebar,
 }) => {
-  const handleToggle = () => {
-    if (window.innerWidth >= 1024) {
-      onToggleCollapse();
-    } else {
-      onToggleSidebar();
-    }
-  };
-
   return (
     <aside
       className={cn(
-        'fixed lg:sticky top-16 z-40 h-[calc(100vh-4rem)] border-r border-border bg-background transition-all duration-300',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-        'lg:translate-x-0',
-        isCollapsed ? 'w-16' : 'w-64',
+        'relative hidden flex-col border-r border-border/60 bg-white/80 backdrop-blur lg:flex transition-all duration-300 overflow-hidden flex-shrink-0',
+        isCollapsed ? 'w-20' : 'w-72',
       )}
     >
-      <ScrollArea className="h-full py-6 px-3">
-        <nav className="space-y-2">
-          {(Object.keys(SECTION_CONFIG) as Section[]).map((section) => {
-            const { label, icon } = SECTION_CONFIG[section];
-            const isActive = activeSection === section;
-            return (
-              <Button
-                key={section}
-                variant={isActive ? 'primary' : 'ghost'}
+      <div className={cn(
+        "flex items-center py-5",
+        isCollapsed ? "px-3 justify-center" : "px-6 justify-between"
+      )}>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <img 
+            src={logo} 
+            alt="eDental Logo" 
+            className="h-10 w-auto object-contain flex-shrink-0"
+          />
+          {!isCollapsed && (
+            <span className="text-base font-semibold text-foreground whitespace-nowrap">Trang bệnh nhân</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="rounded-full p-2 text-muted-foreground transition hover:bg-muted flex-shrink-0"
+          onClick={onToggleCollapse}
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-1 px-3">
+        {SECTION_ORDER.map((section) => {
+          const { label } = SECTION_CONFIG[section];
+          const isActive = activeSection === section;
+          return (
+            <button
+              key={section}
+              type="button"
+              onClick={() => onSectionChange(section)}
+              className={cn(
+                'group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200',
+                isActive ? 'bg-primary text-white shadow-glow' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+              )}
+            >
+              <span
                 className={cn(
-                  'w-full justify-start gap-3',
-                  isCollapsed ? 'justify-center px-0' : '',
-                  isActive ? 'bg-primary/5' : 'hover:bg-primary/10',
+                  'flex h-9 w-9 items-center justify-center rounded-xl border',
+                  isActive ? 'border-white/40 bg-white/10' : 'border-border/80 bg-white text-muted-foreground group-hover:text-foreground',
                 )}
-                onClick={() => onSectionChange(section)}
-                title={isCollapsed ? label : ''}
               >
-                <span className="h-5 w-5">{icon}</span>
-                {!isCollapsed && label}
-              </Button>
-            );
-          })}
-        </nav>
-      </ScrollArea>
+                {SECTION_CONFIG[section].icon}
+              </span>
+              {!isCollapsed && (
+                <span className="text-sm font-semibold">{label}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </aside>
   );
 };

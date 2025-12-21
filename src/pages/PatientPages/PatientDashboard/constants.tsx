@@ -58,6 +58,18 @@ export const SECTION_CONFIG: Record<
   },
 };
 
+// Định nghĩa thứ tự hiển thị trong sidebar
+export const SECTION_ORDER: Section[] = [
+  'overview',
+  'basic',
+  'initial',
+  'plan',
+  'payment',
+  'appointment',
+  'appointments',
+  'account',
+];
+
 export const STATUS_BADGE: Record<string, string> = {
   Scheduled: 'bg-blue-50 text-blue-600 border border-blue-100',
   Done: 'bg-green-50 text-green-600 border border-green-100',

@@ -12,6 +12,7 @@ import apiClient from '@/services/api/client';
 import PatientSidebar from './components/PatientSidebar';
 import PatientHeader from './components/PatientHeader';
 import PatientContent from './components/PatientContent';
+import { SECTION_CONFIG } from './constants';
 import type { Section, PatientProfile } from './types';
 
 // Lazy load other patient pages
@@ -637,31 +638,31 @@ const PatientDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      <PatientHeader
-        profile={patient}
-        user={user}
+    <div className="flex min-h-screen bg-gradient-fresh text-foreground">
+      <PatientSidebar
         activeSection={section}
-        onLogout={() => {
-          logout();
-        }}
-        onEditProfile={handleEditProfile}
-        isLoading={loading}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onSectionChange={setSection}
+        isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      <div className="flex">
-        <PatientSidebar
-          activeSection={section}
-          onSectionChange={setSection}
-          isCollapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          sidebarOpen={sidebarOpen}
+      <div className="flex flex-1 flex-col">
+        <PatientHeader
+          profile={patient}
+          user={user}
+          activeSection={SECTION_CONFIG[section].label}
+          onLogout={() => {
+            logout();
+          }}
+          onEditProfile={handleEditProfile}
+          isLoading={loading}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 lg:px-6">
           <PatientContent
             activeSection={section}
             patient={patient}
