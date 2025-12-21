@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Alert, AlertTitle, AlertDescription, Button, Input, Modal } from '@/components/ui';
 import { Tag } from 'antd';
+import { Select as AntSelect } from 'antd';
+import { X } from 'lucide-react';
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -12,6 +14,7 @@ import { doctorAPI } from '@/services';
 import { adminAPI } from '@/services/api/admin';
 import type { AppointmentListProps } from '../types';
 import { normalizeDateTime, formatDateTime } from '../utils';
+import type { CategoryDentalService, DentalService } from '@/types/admin';
 
 const AppointmentList: React.FC<AppointmentListProps> = ({
   appointments,
@@ -21,6 +24,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   onFilterChange,
   onPageChange,
   onBookNew,
+  onRefreshData,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +38,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
       doctorSpecialization?: string;
       doctorId?: string;
       notes?: string;
-      listDentalServicesEntity?: Array<{ id: string }>;
+      listDentalServicesEntity?: Array<{ id: string; name?: string; unit?: string; unitPrice?: number }>;
     }>
   >([]);
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
@@ -42,8 +46,21 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleDoctorId, setRescheduleDoctorId] = useState<string | null>(null);
+  const [rescheduleType, setRescheduleType] = useState('');
+  const [rescheduleNotes, setRescheduleNotes] = useState('');
+  const [rescheduleCategoryId, setRescheduleCategoryId] = useState<string>('');
+  const [rescheduleServiceOrders, setRescheduleServiceOrders] = useState<Array<{
+    id: string;
+    name: string;
+    unit: string;
+    unitPrice: number;
+    categoryName?: string;
+  }>>([]);
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [services, setServices] = useState<Array<{ id: string; name: string; categoryName?: string }>>([]);
+  const [allServices, setAllServices] = useState<DentalService[]>([]);
+  const [categories, setCategories] = useState<CategoryDentalService[]>([]);
+  const [doctors, setDoctors] = useState<Array<{ id: string; fullName: string; specialization: string }>>([]);
   const [detailOpenId, setDetailOpenId] = useState<string | null>(null);
   const [examDetail, setExamDetail] = useState<any | null>(null);
   const [doctorById, setDoctorById] = useState<
@@ -58,7 +75,13 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     type: string;
     status: string;
     notes?: string;
-    categoryName?: string;
+    listDentalServicesEntity?: Array<{
+      id: string;
+      name?: string;
+      unit?: string;
+      unitPrice?: number;
+      categoryName?: string;
+    }>;
   } | null>(null);
   const [appointmentDetailOpen, setAppointmentDetailOpen] = useState(false);
 
@@ -67,6 +90,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     (async () => {
       try {
         const list = await doctorAPI.getDoctorDirectory();
+        setDoctors(list);
         const map = new Map<string, { fullName: string; specialization?: string }>();
         list.forEach((d) => {
           if (d.id) {
@@ -76,9 +100,10 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         setDoctorById(map);
       } catch {}
       try {
-        const categories = await adminAPI.getAllCategories();
+        const categoriesList = await adminAPI.getAllCategories();
+        setCategories(categoriesList);
         const flatServices: Array<{ id: string; name: string; categoryName?: string }> = [];
-        categories.forEach((cat) => {
+        categoriesList.forEach((cat) => {
           if (cat.listDentalServiceEntity && cat.listDentalServiceEntity.length > 0) {
             cat.listDentalServiceEntity.forEach((s) => {
               if (s.id && s.name) {
@@ -93,23 +118,30 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         });
         setServices(flatServices);
       } catch {}
+      try {
+        const allServicesList = await adminAPI.getAllServices();
+        setAllServices(allServicesList);
+      } catch {}
     })();
   }, []);
 
   // Sync items with appointments prop
   useEffect(() => {
-    if (appointments && appointments.length > 0) {
-      const enriched = appointments.map((item: any) => {
-        const doctorInfo = item.doctorId ? doctorById.get(item.doctorId) : undefined;
-        return {
-          ...item,
-          doctorFullName: item.doctorFullName || doctorInfo?.fullName || '',
-          doctorSpecialization: item.doctorSpecialization || doctorInfo?.specialization || '',
-        };
-      });
-      setItems(enriched);
+    if (!appointments) {
+      setItems([]);
+      return;
     }
-  }, [appointments, doctorById]);
+    
+    const enriched = appointments.map((item: any) => {
+      const doctorInfo = item.doctorId ? doctorById.get(item.doctorId) : undefined;
+      return {
+        ...item,
+        doctorFullName: item.doctorFullName || doctorInfo?.fullName || '',
+        doctorSpecialization: item.doctorSpecialization || doctorInfo?.specialization || '',
+      };
+    });
+    setItems(enriched);
+  }, [appointments, doctorById.size, JSON.stringify(Array.from(doctorById.keys()))]); // Depend on appointments and doctorById to update when doctors are loaded
 
   const formatDateTimeVi = (s?: string) => {
     if (!s) return '';
@@ -133,8 +165,17 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   };
 
   const toVietnamDate = (isoDate: string) => {
+    if (!isoDate) return '';
     const [y, m, d] = isoDate.split('-');
     return `${d}/${m}/${y}`;
+  };
+
+  const getTodayIso = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const generateSlots = () => {
@@ -211,7 +252,16 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     try {
       await patientAPI.cancelAppointment(cancelConfirmId);
       setCancelConfirmId(null);
-      onBookNew(); // Trigger refresh
+      // Refresh data and switch to cancelled tab
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+      // Switch to cancelled filter to show the cancelled appointment
+      // Use setTimeout to ensure state updates are processed
+      setTimeout(() => {
+        onFilterChange('cancel');
+        onPageChange(1);
+      }, 100);
     } catch {
       setError('Hủy lịch hẹn thất bại');
       setCancelConfirmId(null);
@@ -260,6 +310,81 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
 
   const totalPages = Math.ceil(filteredItems.length / pageSize);
 
+  const filteredRescheduleServices = useMemo(() => {
+    if (!rescheduleCategoryId) return [];
+    const category = categories.find((c) => c.id === rescheduleCategoryId);
+    if (category && category.listDentalServiceEntity && category.listDentalServiceEntity.length > 0) {
+      return category.listDentalServiceEntity;
+    }
+    return [];
+  }, [categories, rescheduleCategoryId]);
+
+  // Group selected services by category for display
+  const rescheduleServicesByCategory = useMemo(() => {
+    const grouped: Record<string, Array<{ service: typeof rescheduleServiceOrders[0]; index: number }>> = {};
+    rescheduleServiceOrders.forEach((serviceOrder, index) => {
+      const categoryName = serviceOrder.categoryName || 'Khác';
+      if (!grouped[categoryName]) {
+        grouped[categoryName] = [];
+      }
+      grouped[categoryName].push({ service: serviceOrder, index });
+    });
+    return grouped;
+  }, [rescheduleServiceOrders]);
+
+  const handleRescheduleServiceAdd = (service: DentalService) => {
+    // Find category name
+    const category = categories.find((c) => 
+      c.listDentalServiceEntity?.some((s) => s.id === service.id)
+    );
+    const categoryName = category?.name || 'Khác';
+    
+    // Check if service already added
+    if (rescheduleServiceOrders.some((s) => s.id === service.id)) {
+      setError('Dịch vụ này đã được chọn');
+      return;
+    }
+    
+    setRescheduleServiceOrders((prev) => {
+      const newOrders = [
+        ...prev,
+        {
+          id: service.id,
+          name: service.name,
+          unit: service.unit,
+          unitPrice: service.unitPrice,
+          categoryName,
+        },
+      ];
+      // Update type field
+      if (newOrders.length === 1) {
+        setRescheduleType(newOrders[0].name);
+      } else {
+        setRescheduleType('Nhiều dịch vụ');
+      }
+      return newOrders;
+    });
+    
+    // Reset selected service dropdown
+    setRescheduleCategoryId('');
+    setError(null);
+  };
+
+  const handleRescheduleServiceRemove = (index: number) => {
+    setRescheduleServiceOrders((prev) => {
+      const newOrders = prev.filter((_, i) => i !== index);
+      // Update type field
+      if (newOrders.length === 0) {
+        setRescheduleType('');
+      } else if (newOrders.length === 1) {
+        setRescheduleType(newOrders[0].name);
+      } else {
+        setRescheduleType('Nhiều dịch vụ');
+      }
+      return newOrders;
+    });
+  };
+
   const updateAppointment = async () => {
     if (!rescheduleId || !rescheduleDoctorId) {
       setError('Thiếu thông tin lịch hẹn');
@@ -270,31 +395,40 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
       setError('Chưa chọn ngày/giờ');
       return;
     }
-    const currentAppointment = items.find((i) => i.id === rescheduleId);
-    if (!currentAppointment) {
-      setError('Không tìm thấy lịch hẹn');
+    if (rescheduleServiceOrders.length === 0) {
+      setError('Chưa chọn dịch vụ');
       return;
     }
 
     setRescheduleLoading(true);
     setError(null);
     try {
-      const listDentalServicesEntity = currentAppointment.type
-        ? services.filter((s) => s.name === currentAppointment.type).slice(0, 1).map((s) => ({ id: s.id }))
-        : currentAppointment.listDentalServicesEntity || [];
+      // Get first service name for type field (for backward compatibility)
+      const typeValue = rescheduleServiceOrders.length === 1
+        ? rescheduleServiceOrders[0].name
+        : 'Nhiều dịch vụ';
+      
+      // Build listDentalServicesEntity array
+      const listDentalServicesEntity = rescheduleServiceOrders.map((s) => ({ id: s.id }));
 
       await patientAPI.updateAppointment(rescheduleId, {
         doctorId: rescheduleDoctorId,
         dateTime,
-        type: currentAppointment.type || '',
-        notes: currentAppointment.notes || '',
+        type: typeValue,
+        notes: rescheduleNotes || '',
         listDentalServicesEntity,
       });
       setRescheduleId(null);
       setRescheduleDoctorId(null);
       setRescheduleDate('');
       setRescheduleTime('');
-      onBookNew(); // Trigger refresh
+      setRescheduleType('');
+      setRescheduleNotes('');
+      setRescheduleCategoryId('');
+      setRescheduleServiceOrders([]);
+      if (onRefreshData) {
+        await onRefreshData();
+      }
     } catch (e: any) {
       setError(e.response?.data?.message || 'Cập nhật lịch hẹn thất bại');
     } finally {
@@ -321,8 +455,31 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     status: string;
     type: string;
     notes?: string;
+    listDentalServicesEntity?: Array<{ id: string; name?: string; unit?: string; unitPrice?: number }>;
   }) => {
-    const matchedService = services.find((s) => s.name === a.type);
+    // Map services with category names
+    const servicesWithCategory = (a.listDentalServicesEntity || []).map((svc) => {
+      // Find category for this service
+      const matchedService = services.find((s) => s.id === svc.id);
+      const categoryName = matchedService?.categoryName;
+      
+      // If not found, try to find from categories
+      if (!categoryName) {
+        const category = categories.find((c) =>
+          c.listDentalServiceEntity?.some((s) => s.id === svc.id)
+        );
+        return {
+          ...svc,
+          categoryName: category?.name || 'Khác',
+        };
+      }
+      
+      return {
+        ...svc,
+        categoryName,
+      };
+    });
+    
     setAppointmentDetail({
       id: a.id,
       doctorFullName: a.doctorFullName,
@@ -331,7 +488,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
       status: a.status,
       type: a.type,
       notes: a.notes,
-      categoryName: matchedService?.categoryName,
+      listDentalServicesEntity: servicesWithCategory,
     });
     setAppointmentDetailOpen(true);
   };
@@ -429,37 +586,115 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                     <Button variant="outline" size="sm" onClick={() => openAppointmentDetail(a)}>
                       Chi tiết
                     </Button>
-                    {a.status && a.status.toLowerCase().includes('scheduled') && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setRescheduleId(a.id);
-                            setRescheduleDoctorId(a.doctorId || null);
-                            if (a.dateTime) {
-                              const dt = normalizeDateTime(a.dateTime);
-                              const match = dt.match(/^(\d{2}):(\d{2})\s(\d{2})\/(\d{2})\/(\d{4})$/);
-                              if (match) {
-                                const [, hh, mm, dd, MM, yyyy] = match;
-                                setRescheduleTime(`${hh}:${mm}`);
-                                setRescheduleDate(`${yyyy}-${MM}-${dd}`);
-                              }
-                            }
-                          }}
-                        >
-                          Đổi giờ
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => cancelAppointment(a.id)}>
-                          Hủy
-                        </Button>
-                      </>
-                    )}
-                    {a.status && a.status.toLowerCase().includes('done') && (
-                      <Button variant="outline" size="sm" onClick={() => openExamDetail(a.id)}>
-                        Xem hồ sơ khám
-                      </Button>
-                    )}
+                    {a.status && a.status.toLowerCase().includes('scheduled') && (() => {
+                      // Check if appointment belongs to TreatmentPhase
+                      // TreatmentPhase appointments have type "TreatmentPhases" (exact match)
+                      // From backend: TreatmentPhasesService.java line 201 sets type to "TreatmentPhases"
+                      const isTreatmentPhase = a.type === 'TreatmentPhases';
+                      
+                      // Only show reschedule and cancel buttons if NOT a TreatmentPhase appointment
+                      if (!isTreatmentPhase) {
+                        return (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setRescheduleId(a.id);
+                                setRescheduleDoctorId(a.doctorId || null);
+                                setRescheduleType(a.type || '');
+                                setRescheduleNotes(a.notes || '');
+                                
+                                // Find services and category from current appointment
+                                // Get all services from appointment's listDentalServicesEntity
+                                const appointmentServiceOrders: Array<{
+                                  id: string;
+                                  name: string;
+                                  unit: string;
+                                  unitPrice: number;
+                                  categoryName?: string;
+                                }> = [];
+                                
+                                if (a.listDentalServicesEntity && a.listDentalServicesEntity.length > 0) {
+                                  a.listDentalServicesEntity.forEach((svc: any) => {
+                                    if (svc.id) {
+                                      // Find full service details
+                                      const fullService = allServices.find((s) => s.id === svc.id);
+                                      if (fullService) {
+                                        // Find category name
+                                        const matchedCategory = categories.find((c) => 
+                                          c.listDentalServiceEntity?.some((s) => s.id === fullService.id)
+                                        );
+                                        appointmentServiceOrders.push({
+                                          id: fullService.id,
+                                          name: fullService.name,
+                                          unit: fullService.unit,
+                                          unitPrice: fullService.unitPrice,
+                                          categoryName: matchedCategory?.name || 'Khác',
+                                        });
+                                      } else {
+                                        // Fallback: use data from svc if available
+                                        appointmentServiceOrders.push({
+                                          id: svc.id,
+                                          name: svc.name || '',
+                                          unit: svc.unit || '',
+                                          unitPrice: svc.unitPrice || 0,
+                                          categoryName: 'Khác',
+                                        });
+                                      }
+                                    }
+                                  });
+                                } else if (a.type) {
+                                  // Fallback: try to find by type name
+                                  const matchedService = services.find((s) => s.name === a.type);
+                                  if (matchedService) {
+                                    const fullService = allServices.find((s) => s.id === matchedService.id);
+                                    if (fullService) {
+                                      const matchedCategory = categories.find((c) => 
+                                        c.listDentalServiceEntity?.some((s) => s.id === fullService.id)
+                                      );
+                                      appointmentServiceOrders.push({
+                                        id: fullService.id,
+                                        name: fullService.name,
+                                        unit: fullService.unit,
+                                        unitPrice: fullService.unitPrice,
+                                        categoryName: matchedCategory?.name || 'Khác',
+                                      });
+                                    }
+                                  }
+                                }
+                                
+                                if (appointmentServiceOrders.length > 0) {
+                                  setRescheduleServiceOrders(appointmentServiceOrders);
+                                  // Set type based on services
+                                  if (appointmentServiceOrders.length === 1) {
+                                    setRescheduleType(appointmentServiceOrders[0].name);
+                                  } else {
+                                    setRescheduleType('Nhiều dịch vụ');
+                                  }
+                                }
+                                
+                                if (a.dateTime) {
+                                  const dt = normalizeDateTime(a.dateTime);
+                                  const match = dt.match(/^(\d{2}):(\d{2})\s(\d{2})\/(\d{2})\/(\d{4})$/);
+                                  if (match) {
+                                    const [, hh, mm, dd, MM, yyyy] = match;
+                                    setRescheduleTime(`${hh}:${mm}`);
+                                    setRescheduleDate(`${yyyy}-${MM}-${dd}`);
+                                  }
+                                }
+                              }}
+                            >
+                              Đổi lịch
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => cancelAppointment(a.id)}>
+                              Hủy
+                            </Button>
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
                     <span
                       className={`text-xs font-medium rounded-full px-2.5 py-1 ${statusClass(
                         a.status,
@@ -520,35 +755,96 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         onOk={() => setAppointmentDetailOpen(false)}
         onCancel={() => setAppointmentDetailOpen(false)}
         okText="Đóng"
-        cancelText="Hủy"
+        footer={[
+          <Button key="close" onClick={() => setAppointmentDetailOpen(false)}>
+            Đóng
+          </Button>
+        ]}
+        width={600}
+        style={{ top: 20 }}
+        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
       >
         {appointmentDetail && (
-          <div className="space-y-3 text-sm">
+          <div className="space-y-4 text-sm">
             <div>
-              <p className="text-xs font-semibold text-gray-500">Bác sĩ</p>
-              <p className="text-sm text-gray-900">
+              <p className="text-xs font-semibold text-gray-500 mb-1">Bác sĩ</p>
+              <p className="text-sm text-gray-900 font-medium">
                 {appointmentDetail.doctorFullName}
                 {appointmentDetail.doctorSpecialization ? ` — ${appointmentDetail.doctorSpecialization}` : ''}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500">Ngày giờ</p>
+              <p className="text-xs font-semibold text-gray-500 mb-1">Ngày giờ</p>
               <p className="text-sm text-blue-700 font-medium">{formatDateTimeVi(appointmentDetail.dateTime)}</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            {/* Dịch vụ sử dụng - nhóm theo category */}
+            {appointmentDetail.listDentalServicesEntity && appointmentDetail.listDentalServicesEntity.length > 0 ? (
               <div>
-                <p className="text-xs font-semibold text-gray-500">Danh mục dịch vụ</p>
-                <p className="text-sm text-gray-900">
-                  {appointmentDetail.categoryName || 'Khác'}
-                </p>
+                <p className="text-xs font-semibold text-gray-500 mb-1">Dịch vụ sử dụng</p>
+                <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
+                  {(() => {
+                    // Group services by category
+                    type ServiceItem = {
+                      id: string;
+                      name?: string;
+                      unit?: string;
+                      unitPrice?: number;
+                      categoryName?: string;
+                    };
+                    const grouped: Record<string, ServiceItem[]> = {};
+                    appointmentDetail.listDentalServicesEntity!.forEach((svc) => {
+                      const categoryName = svc.categoryName || 'Khác';
+                      if (!grouped[categoryName]) {
+                        grouped[categoryName] = [];
+                      }
+                      grouped[categoryName].push(svc);
+                    });
+                    
+                    return (
+                      <div className="space-y-3">
+                        {Object.entries(grouped).map(([categoryName, items]) => (
+                          <div key={categoryName} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className="h-px flex-1 bg-border/50"></div>
+                              <span className="text-xs font-semibold text-muted-foreground uppercase">
+                                {categoryName}
+                              </span>
+                              <div className="h-px flex-1 bg-border/50"></div>
+                            </div>
+                            <div className="space-y-2">
+                              {items.map((service, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
+                                >
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-foreground">{service.name || 'N/A'}</p>
+                                    {service.unitPrice && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {service.unitPrice.toLocaleString('vi-VN')} đ / {service.unit || 'đơn vị'}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
+            ) : (
               <div>
-                <p className="text-xs font-semibold text-gray-500">Dịch vụ</p>
+                <p className="text-xs font-semibold text-gray-500 mb-1">Dịch vụ</p>
                 <p className="text-sm text-gray-900">{appointmentDetail.type || 'N/A'}</p>
               </div>
-            </div>
+            )}
+            
             <div>
-              <p className="text-xs font-semibold text-gray-500">Trạng thái</p>
+              <p className="text-xs font-semibold text-gray-500 mb-1">Trạng thái</p>
               <p className="text-sm">
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(
@@ -559,37 +855,188 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                 </span>
               </p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500">Ghi chú</p>
-              <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">
-                {appointmentDetail.notes && appointmentDetail.notes.trim()
-                  ? appointmentDetail.notes
-                  : 'Không có ghi chú.'}
-              </p>
-            </div>
+            {appointmentDetail.notes && appointmentDetail.notes.trim() && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1">Ghi chú</p>
+                <p className="text-sm text-gray-900 whitespace-pre-wrap break-words bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  {appointmentDetail.notes}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </Modal>
 
       {/* Reschedule Modal */}
       {rescheduleId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-5">
-            <h4 className="text-base font-semibold mb-3">Đổi giờ lịch hẹn</h4>
-            <div className="grid grid-cols-1 gap-3">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col my-4">
+            <div className="p-5 pb-4 border-b border-gray-200 flex-shrink-0">
+              <h4 className="text-base font-semibold">Đổi lịch hẹn</h4>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 min-h-0">
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTitle>Lỗi</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Ngày</label>
-                <Input
-                  type="date"
-                  value={rescheduleDate}
-                  onChange={(e) => {
-                    setRescheduleDate(e.target.value);
+                <label className="block text-sm font-medium mb-1">Chọn bác sĩ</label>
+                <AntSelect
+                  showSearch
+                  placeholder="Chọn bác sĩ"
+                  className="w-full"
+                  value={rescheduleDoctorId || undefined}
+                  onChange={(v) => {
+                    setRescheduleDoctorId(v);
+                    setRescheduleDate('');
                     setRescheduleTime('');
                   }}
+                  optionFilterProp="label"
+                  options={doctors.map((d) => ({
+                    label: `${d.fullName} — ${d.specialization || 'Chưa cập nhật'}`,
+                    value: d.id,
+                  }))}
                 />
               </div>
+              <div className="md:col-span-2">
+                <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+                    <label className="block text-sm font-semibold text-foreground">Dịch vụ sử dụng</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <AntSelect
+                        showSearch
+                        placeholder="Chọn danh mục"
+                        className="w-48"
+                        value={rescheduleCategoryId || undefined}
+                        onChange={(value) => {
+                          setRescheduleCategoryId(value);
+                          setError(null);
+                        }}
+                        optionFilterProp="label"
+                        options={categories.map((c) => ({
+                          label: c.name,
+                          value: c.id,
+                        }))}
+                      />
+                      <AntSelect
+                        showSearch
+                        placeholder={rescheduleCategoryId ? "Chọn dịch vụ" : "Chọn danh mục trước"}
+                        className="w-56"
+                        value=""
+                        onChange={(value) => {
+                          const service = filteredRescheduleServices.find((s) => s.id === value);
+                          if (service) {
+                            handleRescheduleServiceAdd(service);
+                          }
+                        }}
+                        disabled={!rescheduleCategoryId || filteredRescheduleServices.length === 0}
+                        optionFilterProp="label"
+                        options={filteredRescheduleServices.map((s) => ({
+                          label: `${s.name} — ${s.unitPrice.toLocaleString('vi-VN')} đ`,
+                          value: s.id,
+                        }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Hiển thị danh sách dịch vụ đã chọn, nhóm theo category */}
+                  {rescheduleServiceOrders.length > 0 && (
+                    <div className="space-y-3 mt-4">
+                      {Object.entries(rescheduleServicesByCategory).map(([categoryName, items]) => (
+                        <div key={categoryName} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-px flex-1 bg-border/50"></div>
+                            <span className="text-xs font-semibold text-muted-foreground uppercase">
+                              {categoryName}
+                            </span>
+                            <div className="h-px flex-1 bg-border/50"></div>
+                          </div>
+                          <div className="space-y-2">
+                            {items.map(({ service, index }) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
+                              >
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-foreground">{service.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {service.unitPrice.toLocaleString('vi-VN')} đ / {service.unit}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRescheduleServiceRemove(index)}
+                                  className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {rescheduleServiceOrders.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      Chọn danh mục và dịch vụ để thêm vào danh sách
+                    </p>
+                  )}
+                </div>
+              </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Khung giờ</label>
+                <label className="block text-sm font-medium mb-1">Ngày</label>
+                <div className="relative">
+                  <Input
+                    type="date"
+                    value={rescheduleDate}
+                    min={(() => {
+                      const today = new Date();
+                      const y = today.getFullYear();
+                      const m = String(today.getMonth() + 1).padStart(2, '0');
+                      const d = String(today.getDate()).padStart(2, '0');
+                      return `${y}-${m}-${d}`;
+                    })()}
+                    onChange={(e) => {
+                      setRescheduleDate(e.target.value);
+                      setRescheduleTime('');
+                    }}
+                    className={rescheduleDate ? 'pr-10' : ''}
+                  />
+                  {rescheduleDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRescheduleDate('');
+                        setRescheduleTime('');
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Đặt lại ngày"
+                    >
+                      <X className="h-4 w-4 text-gray-500" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium">Khung giờ</label>
+                  {rescheduleTime && (
+                    <button
+                      type="button"
+                      onClick={() => setRescheduleTime('')}
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-500 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 shadow-sm hover:bg-blue-600 hover:text-white transition-colors"
+                      title="Reset khung giờ"
+                    >
+                      <X className="h-3 w-3" />
+                      Đặt lại
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {generateSlots().map((s) => {
                     const disabled = isSlotDisabled(s);
@@ -614,8 +1061,19 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                   })}
                 </div>
               </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Ghi chú</label>
+                <textarea
+                  className="w-full border rounded-md px-3 py-2"
+                  rows={3}
+                  value={rescheduleNotes}
+                  onChange={(e) => setRescheduleNotes(e.target.value)}
+                  placeholder="Ghi chú cho bác sĩ..."
+                />
+              </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4">
+            </div>
+            <div className="p-5 pt-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -623,6 +1081,11 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                   setRescheduleDoctorId(null);
                   setRescheduleDate('');
                   setRescheduleTime('');
+                  setRescheduleType('');
+                  setRescheduleNotes('');
+                  setRescheduleCategoryId('');
+                  setRescheduleServiceOrders([]);
+                  setError(null);
                 }}
               >
                 Đóng

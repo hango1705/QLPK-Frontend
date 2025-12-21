@@ -120,6 +120,7 @@ export interface AppointmentListProps {
   onFilterChange: (filter: 'scheduled' | 'done' | 'cancel') => void;
   onPageChange: (page: number) => void;
   onBookNew: () => void;
+  onRefreshData?: () => void;
 }
 
 export interface AccountPanelProps {

@@ -132,6 +132,7 @@ const PatientContent: React.FC<PatientContentProps> = (props) => {
             // This will be handled by parent to change section
             onBookAppointment();
           }}
+          onRefreshData={onRefreshData}
         />
       )}
 

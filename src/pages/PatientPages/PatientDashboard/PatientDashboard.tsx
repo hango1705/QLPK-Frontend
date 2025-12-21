@@ -147,6 +147,7 @@ const PatientDashboard: React.FC = () => {
   }, [token]);
 
   // Compute treatments, phases, payments, and activities from React Query data
+  // Directly use phaseQueries but with stable dependencies
   const computedTreatmentData = useMemo(() => {
     if (!canGetAllTreatmentPhases || !treatmentPlans.length) {
       return {
@@ -226,7 +227,12 @@ const PatientDashboard: React.FC = () => {
       activities: acts.slice(0, 3),
       planCount: treatmentPlans.length,
     };
-  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+  }, [
+    treatmentPlans.length,
+    canGetAllTreatmentPhases,
+    // Create stable string key from phaseQueries dataUpdatedAt to avoid changing array size
+    phaseQueries.map(q => q.dataUpdatedAt || 0).join(',')
+  ]);
 
   // Generate mock prescriptions from treatment phases
   const mockPrescriptions = useMemo(() => {
@@ -258,7 +264,12 @@ const PatientDashboard: React.FC = () => {
       });
     });
     return prescriptions;
-  }, [treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+  }, [
+    treatmentPlans.length,
+    canGetAllTreatmentPhases,
+    // Create stable string key from phaseQueries dataUpdatedAt to avoid changing array size
+    phaseQueries.map(q => q.dataUpdatedAt || 0).join(',')
+  ]);
 
   // Load overview data
   useEffect(() => {
@@ -480,7 +491,13 @@ const PatientDashboard: React.FC = () => {
         setNextAppointment(nextPhaseDate.toLocaleDateString('vi-VN'));
       }
     }
-  }, [nextAppointment, treatmentPlans, phaseQueries, canGetAllTreatmentPhases]);
+  }, [
+    nextAppointment, 
+    treatmentPlans.length, 
+    canGetAllTreatmentPhases,
+    // Create stable string key from phaseQueries dataUpdatedAt to avoid changing array size
+    phaseQueries.map(q => q.dataUpdatedAt || 0).join(',')
+  ]);
 
   // Update prescriptions with mock data from React Query
   useEffect(() => {
@@ -490,7 +507,7 @@ const PatientDashboard: React.FC = () => {
   }, [mockPrescriptions, prescriptions.length]);
 
   const handleRefreshData = async () => {
-    // Sau khi đặt lịch, reload lại danh sách lịch hẹn và chuyển sang tab "Xem lịch hẹn"
+    // Sau khi đặt lịch hoặc hủy lịch, reload lại danh sách lịch hẹn và chuyển sang tab "Xem lịch hẹn"
     try {
       const appList = await patientAPI.getMyAppointments();
       const nonCancelled = appList.filter((a: any) => (a.status || '').toLowerCase() !== 'cancel');

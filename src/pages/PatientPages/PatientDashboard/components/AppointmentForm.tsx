@@ -23,7 +23,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
   const [services, setServices] = useState<DentalService[]>([]);
   const [categories, setCategories] = useState<CategoryDentalService[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [selectedServiceOrders, setSelectedServiceOrders] = useState<Array<{
+    id: string;
+    name: string;
+    unit: string;
+    unitPrice: number;
+    categoryName?: string;
+  }>>([]);
   const [bookedSet, setBookedSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -51,18 +57,28 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     };
   }, []);
 
+  // Filter services by selected category
   const filteredServices = useMemo(() => {
-    if (!selectedCategoryId) {
-      return services;
-    }
+    if (!selectedCategoryId) return [];
     const category = categories.find((c) => c.id === selectedCategoryId);
     if (category && category.listDentalServiceEntity && category.listDentalServiceEntity.length > 0) {
-      // Ưu tiên danh sách dịch vụ lấy trực tiếp từ category
       return category.listDentalServiceEntity;
     }
-    // Fallback: nếu category không có list, dùng toàn bộ services (không lọc)
-    return services;
-  }, [services, categories, selectedCategoryId]);
+    return services.filter((s: any) => (s as any).categoryDentalServiceId === selectedCategoryId);
+  }, [services, selectedCategoryId, categories]);
+
+  // Group selected services by category for display
+  const servicesByCategory = useMemo(() => {
+    const grouped: Record<string, Array<{ service: any; index: number }>> = {};
+    selectedServiceOrders.forEach((serviceOrder, index) => {
+      const categoryName = serviceOrder.categoryName || 'Khác';
+      if (!grouped[categoryName]) {
+        grouped[categoryName] = [];
+      }
+      grouped[categoryName].push({ service: serviceOrder, index });
+    });
+    return grouped;
+  }, [selectedServiceOrders]);
 
   // Fetch booked time slots of selected doctor using bookingDateTime API
   useEffect(() => {
@@ -106,9 +122,62 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     };
   }, [doctorId]);
 
+  const handleServiceAdd = (service: DentalService) => {
+    // Find category name
+    const category = categories.find((c) => 
+      c.listDentalServiceEntity?.some((s) => s.id === service.id)
+    );
+    const categoryName = category?.name || 'Khác';
+    
+    // Check if service already added
+    if (selectedServiceOrders.some((s) => s.id === service.id)) {
+      setError('Dịch vụ này đã được chọn');
+      return;
+    }
+    
+    setSelectedServiceOrders((prev) => {
+      const newOrders = [
+        ...prev,
+        {
+          id: service.id,
+          name: service.name,
+          unit: service.unit,
+          unitPrice: service.unitPrice,
+          categoryName,
+        },
+      ];
+      // Update type field
+      if (newOrders.length === 1) {
+        setType(newOrders[0].name);
+      } else {
+        setType('Nhiều dịch vụ');
+      }
+      return newOrders;
+    });
+    
+    // Reset selected service dropdown
+    setSelectedCategoryId('');
+    setError(null);
+  };
+
+  const handleServiceRemove = (index: number) => {
+    setSelectedServiceOrders((prev) => {
+      const newOrders = prev.filter((_, i) => i !== index);
+      // Update type field
+      if (newOrders.length === 0) {
+        setType('');
+      } else if (newOrders.length === 1) {
+        setType(newOrders[0].name);
+      } else {
+        setType('Nhiều dịch vụ');
+      }
+      return newOrders;
+    });
+  };
+
   const submit = async () => {
     const payloadDate = formatBackendDateTime(date, time);
-    if (!doctorId || !payloadDate || !selectedServiceId)
+    if (!doctorId || !payloadDate || selectedServiceOrders.length === 0)
       return setError('Thiếu bác sĩ, thời gian hoặc dịch vụ');
 
     // Không cho đặt lịch trong quá khứ
@@ -127,12 +196,20 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
     setError(null);
     setMsg(null);
     try {
-      const selectedService = services.find((s) => s.id === selectedServiceId);
+      // Get first service name for type field (for backward compatibility)
+      const typeValue = selectedServiceOrders.length === 1 
+        ? selectedServiceOrders[0].name
+        : 'Nhiều dịch vụ';
+      
+      // Build listDentalServicesEntity array
+      const listDentalServicesEntity = selectedServiceOrders.map((s) => ({ id: s.id }));
+
       await patientAPI.bookAppointment({
         doctorId,
         dateTime: payloadDate,
-        type: selectedService?.name || type,
+        type: typeValue,
         notes,
+        listDentalServicesEntity,
       });
       showNotification.success('Đặt lịch hẹn thành công!');
       onBooked();
@@ -219,47 +296,91 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onBooked }) => {
             }))}
           />
         </div>
-        <div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Danh mục dịch vụ</label>
-              <AntSelect
-                showSearch
-                placeholder="Chọn danh mục"
-                className="w-full"
-                value={selectedCategoryId || undefined}
-                onChange={(v) => {
-                  setSelectedCategoryId(v);
-                  setSelectedServiceId('');
-                  setType('');
-                }}
-                optionFilterProp="label"
-                options={categories.map((c) => ({
-                  label: c.name,
-                  value: c.id,
-                }))}
-              />
+        <div className="md:col-span-2">
+          <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+              <label className="block text-sm font-semibold text-foreground">Dịch vụ sử dụng</label>
+              <div className="flex gap-2 flex-wrap">
+                <AntSelect
+                  showSearch
+                  placeholder="Chọn danh mục"
+                  className="w-48"
+                  value={selectedCategoryId || undefined}
+                  onChange={(value) => {
+                    setSelectedCategoryId(value);
+                    setError(null);
+                  }}
+                  optionFilterProp="label"
+                  options={categories.map((c) => ({
+                    label: c.name,
+                    value: c.id,
+                  }))}
+                />
+                <AntSelect
+                  showSearch
+                  placeholder={selectedCategoryId ? "Chọn dịch vụ" : "Chọn danh mục trước"}
+                  className="w-56"
+                  value=""
+                  onChange={(value) => {
+                    const service = filteredServices.find((s) => s.id === value);
+                    if (service) {
+                      handleServiceAdd(service);
+                    }
+                  }}
+                  disabled={!selectedCategoryId || filteredServices.length === 0}
+                  optionFilterProp="label"
+                  options={filteredServices.map((s) => ({
+                    label: `${s.name} — ${s.unitPrice.toLocaleString('vi-VN')} đ`,
+                    value: s.id,
+                  }))}
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Loại dịch vụ</label>
-              <AntSelect
-                showSearch
-                placeholder={selectedCategoryId ? 'Chọn dịch vụ' : 'Chọn danh mục trước'}
-                className="w-full"
-                value={selectedServiceId || undefined}
-                onChange={(v) => {
-                  setSelectedServiceId(v);
-                  const svc = services.find((s) => s.id === v);
-                  setType(svc?.name || '');
-                }}
-                optionFilterProp="label"
-                disabled={!selectedCategoryId || filteredServices.length === 0}
-                options={filteredServices.map((s) => ({
-                  label: `${s.name} — ${s.unit} (${s.unitPrice.toLocaleString('vi-VN')} đ)`,
-                  value: s.id,
-                }))}
-              />
-            </div>
+
+            {/* Hiển thị danh sách dịch vụ đã chọn, nhóm theo category */}
+            {selectedServiceOrders.length > 0 && (
+              <div className="space-y-3 mt-4">
+                {Object.entries(servicesByCategory).map(([categoryName, items]) => (
+                  <div key={categoryName} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-border/50"></div>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase">
+                        {categoryName}
+                      </span>
+                      <div className="h-px flex-1 bg-border/50"></div>
+                    </div>
+                    <div className="space-y-2">
+                      {items.map(({ service, index }) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-3 py-2"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">{service.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {service.unitPrice.toLocaleString('vi-VN')} đ / {service.unit}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleServiceRemove(index)}
+                            className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedServiceOrders.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                Chọn danh mục và dịch vụ để thêm vào danh sách
+              </p>
+            )}
           </div>
         </div>
         <div>
