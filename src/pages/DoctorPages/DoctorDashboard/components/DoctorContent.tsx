@@ -16,6 +16,7 @@ import InsightsSection from './InsightsSection';
 import PatientsSection from './PatientsSection';
 import AppointmentsCalendar from './AppointmentsCalendar';
 import DoctorsSection from './DoctorsSection';
+import NursesSection from './NursesSection';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 
 const DoctorContent: React.FC<ContentSectionProps> = (props) => {
@@ -89,6 +90,8 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
         );
       case 'doctors':
         return <DoctorsSection doctors={props.doctors || []} />;
+      case 'nurses':
+        return <NursesSection nurses={props.nurses || []} isLoading={props.isLoadingNurses} />;
       case 'patients':
         return (
           <PatientsSection

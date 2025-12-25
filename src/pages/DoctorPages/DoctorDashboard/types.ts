@@ -13,6 +13,7 @@ export type Section =
   | 'overview'
   | 'appointments'
   | 'doctors'
+  | 'nurses'
   | 'examinations'
   | 'treatment'
   | 'catalog'
@@ -100,6 +101,8 @@ export interface ContentSectionProps {
   services: DentalService[];
   prescriptions: PrescriptionItem[];
   doctors?: any[];
+  nurses?: any[];
+  isLoadingNurses?: boolean;
   onCreateExam: (appointment: AppointmentSummary) => void;
   onEditExam: (examination: ExaminationSummary) => void;
   onViewExamDetail: (examination: ExaminationSummary) => void;

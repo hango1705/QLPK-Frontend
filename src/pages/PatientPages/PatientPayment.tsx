@@ -350,7 +350,7 @@ const PatientPayment = () => {
 
       {/* Invoice Detail Modal */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Chi tiết hóa đơn</DialogTitle>
             <DialogDescription>
@@ -359,7 +359,7 @@ const PatientPayment = () => {
           </DialogHeader>
           
           {selectedCostDetail && (
-            <div className="space-y-6 mt-4">
+            <div className="space-y-6 mt-4 overflow-x-hidden">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -402,25 +402,25 @@ const PatientPayment = () => {
               {selectedCostDetail.listDentalServiceEntityOrder && selectedCostDetail.listDentalServiceEntityOrder.length > 0 && (
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-3">Dịch vụ nha khoa</p>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="w-full table-auto">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tên dịch vụ</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Đơn vị</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Số lượng</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Đơn giá</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Thành tiền</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Tên dịch vụ</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 whitespace-nowrap">Đơn vị</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 whitespace-nowrap">Số lượng</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 whitespace-nowrap">Đơn giá</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 whitespace-nowrap">Thành tiền</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {selectedCostDetail.listDentalServiceEntityOrder.map((service, idx) => (
                           <tr key={idx}>
-                            <td className="px-4 py-2 text-sm text-gray-900">{service.name}</td>
-                            <td className="px-4 py-2 text-sm text-center text-gray-600">{service.unit}</td>
-                            <td className="px-4 py-2 text-sm text-center text-gray-600">{service.quantity}</td>
-                            <td className="px-4 py-2 text-sm text-right text-gray-600">{formatCurrency(service.unitPrice)}</td>
-                            <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">{formatCurrency(service.cost)}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900 break-words">{service.name}</td>
+                            <td className="px-3 py-2 text-sm text-center text-gray-600 whitespace-nowrap">{service.unit}</td>
+                            <td className="px-3 py-2 text-sm text-center text-gray-600 whitespace-nowrap">{service.quantity}</td>
+                            <td className="px-3 py-2 text-sm text-right text-gray-600 whitespace-nowrap">{formatCurrency(service.unitPrice)}</td>
+                            <td className="px-3 py-2 text-sm text-right font-medium text-gray-900 whitespace-nowrap">{formatCurrency(service.cost)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -433,29 +433,29 @@ const PatientPayment = () => {
               {selectedCostDetail.listPrescriptionOrder && selectedCostDetail.listPrescriptionOrder.length > 0 && (
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-3">Đơn thuốc</p>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="w-full table-auto">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tên thuốc</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Liều dùng</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Tần suất</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Thời gian</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Số lượng</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Đơn giá</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">Thành tiền</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Tên thuốc</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Liều dùng</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Tần suất</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Thời gian</th>
+                          <th className="px-2 py-2 text-center text-xs font-medium text-gray-700 whitespace-nowrap">Số lượng</th>
+                          <th className="px-2 py-2 text-right text-xs font-medium text-gray-700 whitespace-nowrap">Đơn giá</th>
+                          <th className="px-2 py-2 text-right text-xs font-medium text-gray-700 whitespace-nowrap">Thành tiền</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {selectedCostDetail.listPrescriptionOrder.map((prescription, idx) => (
                           <tr key={idx}>
-                            <td className="px-4 py-2 text-sm text-gray-900">{prescription.name}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.dosage || '-'}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.frequency || '-'}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{prescription.duration || '-'}</td>
-                            <td className="px-4 py-2 text-sm text-center text-gray-600">{prescription.quantity}</td>
-                            <td className="px-4 py-2 text-sm text-right text-gray-600">{formatCurrency(prescription.unitPrice)}</td>
-                            <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">{formatCurrency(prescription.cost)}</td>
+                            <td className="px-2 py-2 text-sm text-gray-900 break-words max-w-[150px]">{prescription.name}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600 break-words max-w-[100px]">{prescription.dosage || '-'}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600 break-words max-w-[100px]">{prescription.frequency || '-'}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600 break-words max-w-[100px]">{prescription.duration || '-'}</td>
+                            <td className="px-2 py-2 text-sm text-center text-gray-600 whitespace-nowrap">{prescription.quantity}</td>
+                            <td className="px-2 py-2 text-sm text-right text-gray-600 whitespace-nowrap">{formatCurrency(prescription.unitPrice)}</td>
+                            <td className="px-2 py-2 text-sm text-right font-medium text-gray-900 whitespace-nowrap">{formatCurrency(prescription.cost)}</td>
                           </tr>
                         ))}
                       </tbody>

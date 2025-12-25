@@ -11,6 +11,7 @@ import {
   User,
   KeyRound,
   UserCog,
+  Heart,
 } from 'lucide-react';
 
 export const SECTION_CONFIG: Record<
@@ -31,6 +32,11 @@ export const SECTION_CONFIG: Record<
     label: 'Bác sĩ',
     description: 'Danh sách bác sĩ và thông tin điều trị',
     icon: <UserCog className="h-4 w-4" />,
+  },
+  nurses: {
+    label: 'Y tá',
+    description: 'Danh sách y tá và phác đồ được giao',
+    icon: <Heart className="h-4 w-4" />,
   },
   patients: {
     label: 'Bệnh nhân',
@@ -74,6 +80,7 @@ export const SECTION_ORDER: Section[] = [
   'overview',
   'appointments',
   'doctors',
+  'nurses',
   'patients',
   'examinations',
   'treatment',

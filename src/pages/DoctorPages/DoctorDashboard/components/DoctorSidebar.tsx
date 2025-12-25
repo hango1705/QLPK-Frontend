@@ -30,6 +30,8 @@ const DoctorSidebar: React.FC<SidebarProps> = ({
     if (section === 'doctors' && !isLV2) {
       return false;
     }
+    // Show 'nurses' section for both DOCTOR and DOCTORLV2
+    // (no filter needed, already visible for both)
     return true;
   });
 

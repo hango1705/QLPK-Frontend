@@ -2,7 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { showNotification, Loading } from '@/components/ui';
-import { doctorAPI } from '@/services';
+import { doctorAPI, nurseAPI } from '@/services';
+import type { NurseInfo, NursePick } from '@/services/api/nurse';
 import apiClient, { cancelAllPendingRequests, resetLogoutState, isLogoutInProgress } from '@/services/api/client';
 import { queryKeys } from '@/services/queryClient';
 import { useAuth, usePermission } from '@/hooks';
@@ -173,6 +174,54 @@ const DoctorDashboard: React.FC = () => {
     if (!doctorDirectoryRaw) return [];
     return Array.isArray(doctorDirectoryRaw) ? doctorDirectoryRaw : [];
   }, [doctorDirectoryRaw]);
+
+  // Fetch all nurses with their assigned treatment plans
+  const { data: nursesPick = [], isLoading: loadingNursesPick } = useQuery({
+    queryKey: ['nurses', 'pick'],
+    queryFn: () => nurseAPI.getAllNursesForPick(),
+    enabled: isAuthenticated && !!token,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  // Fetch detailed info for each nurse
+  const nurseInfoQueries = useQueries({
+    queries: (nursesPick || []).map((nurse: NursePick) => ({
+      queryKey: ['nurse', 'info', nurse.id],
+      queryFn: () => nurseAPI.getNurseInfo(nurse.id),
+      enabled: !!nurse.id && isAuthenticated && !!token,
+      retry: 1,
+    })),
+  });
+
+  // Combine nurses with their assigned treatment plans
+  const nursesWithPlans = useMemo(() => {
+    if (!nursesPick || nursesPick.length === 0) return [];
+    
+    return nursesPick.map((nursePick: NursePick, index: number) => {
+      const nurseInfo = nurseInfoQueries[index]?.data;
+      if (!nurseInfo) {
+        // Fallback to basic info from pick
+        return {
+          id: nursePick.id,
+          fullName: nursePick.fullName,
+          phone: '',
+          email: '',
+          assignedPlans: [] as TreatmentPlan[],
+        };
+      }
+
+      // Find assigned treatment plans for this nurse
+      const assignedPlans = treatmentPlans.filter(
+        (plan) => plan.nurseId === nurseInfo.id
+      );
+
+      return {
+        ...nurseInfo,
+        assignedPlans,
+      };
+    });
+  }, [nursesPick, nurseInfoQueries, treatmentPlans]);
 
   const createExamMutation = useMutation({
     mutationFn: ({
@@ -493,6 +542,8 @@ const DoctorDashboard: React.FC = () => {
                     services={services}
                     prescriptions={prescriptionCatalog}
                     doctors={doctorDirectory}
+                    nurses={nursesWithPlans}
+                    isLoadingNurses={loadingNursesPick || nurseInfoQueries.some(q => q.isLoading)}
                     onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
                     onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
                     onViewExamDetail={(examination) => setExamDetailDialog(examination)}
