@@ -9,6 +9,7 @@ import {
   Button,
   Textarea,
 } from '@/components/ui';
+import ImageViewer from '@/components/ui/ImageViewer';
 import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send } from 'lucide-react';
 import type { ExaminationSummary } from '@/types/doctor';
 import { formatDate, formatDateTime, formatCurrency } from '../../utils';
@@ -20,6 +21,7 @@ import { showNotification } from '@/components/ui';
 interface ExaminationDetailDialogProps {
   open: boolean;
   examination: ExaminationSummary | null;
+  costData?: { totalCost: number; status: string };
   onOpenChange: (open: boolean) => void;
   onEdit?: (examination: ExaminationSummary) => void;
 }
@@ -27,6 +29,7 @@ interface ExaminationDetailDialogProps {
 const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
   open,
   examination,
+  costData,
   onOpenChange,
   onEdit,
 }) => {
@@ -35,6 +38,7 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
   const [comment, setComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [examinationData, setExaminationData] = useState<ExaminationSummary | null>(examination);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Update examination data when prop changes
   React.useEffect(() => {
@@ -186,7 +190,8 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
                   return (
                     <div
                       key={image.publicId}
-                      className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium"
+                      className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
+                      onClick={() => image.url && setSelectedImage(image.url)}
                     >
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <ImageIcon className="h-4 w-4" />
@@ -207,11 +212,29 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
-            <span className="text-sm font-semibold text-muted-foreground">Tổng chi phí</span>
-            <span className="text-xl font-semibold text-primary">
-              {formatCurrency(examinationData.totalCost)}
-            </span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+              <span className="text-sm font-semibold text-muted-foreground">Tổng chi phí</span>
+              <span className="text-xl font-semibold text-primary">
+                {formatCurrency(examinationData.totalCost)}
+              </span>
+            </div>
+            {costData && (
+              <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <span className="text-sm font-semibold text-muted-foreground">Trạng thái thanh toán</span>
+                <Badge
+                  className={
+                    costData.status?.toLowerCase() === 'paid' || costData.status?.toLowerCase() === 'done'
+                      ? 'bg-green-100 text-green-700 border-green-200'
+                      : 'bg-amber-100 text-amber-700 border-amber-200'
+                  }
+                >
+                  {costData.status?.toLowerCase() === 'paid' || costData.status?.toLowerCase() === 'done'
+                    ? 'Đã thanh toán'
+                    : 'Chưa thanh toán'}
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Comments Section - Only for Doctor LV2 */}
@@ -279,6 +302,12 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
           )}
         </div>
       </DialogContent>
+      <ImageViewer
+        open={!!selectedImage}
+        imageUrl={selectedImage}
+        alt="Examination image"
+        onClose={() => setSelectedImage(null)}
+      />
     </Dialog>
   );
 };

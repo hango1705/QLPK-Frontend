@@ -26,6 +26,7 @@ import { queryKeys } from '@/services/queryClient';
 import { usePermission } from '@/hooks';
 import { showNotification } from '@/components/ui';
 import type { CostPaymentUpdateRequest } from '@/services/api/patient';
+import ImageViewer from '@/components/ui/ImageViewer';
 
 interface TreatmentPlanDetailDialogProps {
   open: boolean;
@@ -409,6 +410,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState<TreatmentPhase | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Fetch treatment phases for this plan
   const { data: phases = [], isLoading: loadingPhases } = useQuery({
@@ -811,7 +813,11 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                                   }
                                 };
                                 return (
-                                  <div key={idx} className="flex flex-col">
+                                  <div 
+                                    key={idx} 
+                                    className="flex flex-col cursor-pointer"
+                                    onClick={() => img.url && setSelectedImage(img.url)}
+                                  >
                                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 text-white shadow-sm mb-1 w-fit">
                                       {getImageTypeLabel(img.type || '')}
                                     </span>
@@ -896,6 +902,12 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
           )}
         </div>
       </DialogContent>
+      <ImageViewer
+        open={!!selectedImage}
+        imageUrl={selectedImage}
+        alt="Treatment phase image"
+        onClose={() => setSelectedImage(null)}
+      />
     </Dialog>
     </TooltipProvider>
   );

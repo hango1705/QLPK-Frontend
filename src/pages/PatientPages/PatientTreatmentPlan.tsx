@@ -9,6 +9,7 @@ import type { DoctorSummary } from '@/types/doctor';
 import type { NurseInfo } from '@/services/api/nurse';
 import { pdf } from '@react-pdf/renderer';
 import TreatmentPlanPDF from './PatientTreatmentPlan/TreatmentPlanPDF';
+import ImageViewer from '@/components/ui/ImageViewer';
 
 interface TreatmentPlanApi {
   id: string;
@@ -47,6 +48,7 @@ const PatientTreatmentPlan = () => {
   const [nurseInfo, setNurseInfo] = useState<NurseInfo | null>(null);
   const [loadingDoctor, setLoadingDoctor] = useState(false);
   const [loadingNurse, setLoadingNurse] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     setFetching(true);
@@ -527,7 +529,11 @@ const PatientTreatmentPlan = () => {
                                 };
 
                                 return (
-                                  <div key={idx} className="flex flex-col">
+                                  <div 
+                                    key={idx} 
+                                    className="flex flex-col cursor-pointer"
+                                    onClick={() => img.url && setSelectedImage(img.url)}
+                                  >
                                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 text-white shadow-sm mb-2 w-fit">
                                       {getImageTypeLabel(img.type || '')}
                                     </span>
@@ -701,6 +707,12 @@ const PatientTreatmentPlan = () => {
           </DialogContent>
         </Dialog>
       </div>
+      <ImageViewer
+        open={!!selectedImage}
+        imageUrl={selectedImage}
+        alt="Treatment phase image"
+        onClose={() => setSelectedImage(null)}
+      />
     </div>
   );
 };

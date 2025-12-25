@@ -3,6 +3,7 @@ import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, Dialo
 import { FileTextOutlined, TeamOutlined, HistoryOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
+import ImageViewer from '@/components/ui/ImageViewer';
 
 interface ExaminationListItem {
   id: string;
@@ -32,6 +33,7 @@ const PatientInitialExamination = () => {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ExaminationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     setFetching(true);
@@ -284,7 +286,11 @@ const PatientInitialExamination = () => {
                             };
 
                             return (
-                              <div key={idx} className="flex flex-col">
+                              <div 
+                                key={idx} 
+                                className="flex flex-col cursor-pointer"
+                                onClick={() => img.url && setSelectedImage(img.url)}
+                              >
                                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 text-white shadow-sm mb-2 w-fit">
                                   {getImageTypeLabel(img.type || '')}
                                 </span>
@@ -397,6 +403,12 @@ const PatientInitialExamination = () => {
           </DialogContent>
         </Dialog>
       </div>
+      <ImageViewer
+        open={!!selectedImage}
+        imageUrl={selectedImage}
+        alt="Examination image"
+        onClose={() => setSelectedImage(null)}
+      />
     </div>
   );
 };

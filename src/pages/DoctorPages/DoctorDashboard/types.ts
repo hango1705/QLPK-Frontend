@@ -86,6 +86,8 @@ export interface OverviewSectionProps {
   examinations: ExaminationSummary[];
   treatmentPlans: TreatmentPlan[];
   activePhases: TreatmentPhase[];
+  phasesByPlan?: Record<string, TreatmentPhase[]>;
+  paidCosts?: Array<{ id: string; totalCost: number; status: string }>;
   onCreateExam: () => void;
   onCreatePhase: (plan: TreatmentPlan) => void;
 }
@@ -103,6 +105,7 @@ export interface ContentSectionProps {
   doctors?: any[];
   nurses?: any[];
   isLoadingNurses?: boolean;
+  examinationCosts?: Record<string, { totalCost: number; status: string }>;
   onCreateExam: (appointment: AppointmentSummary) => void;
   onEditExam: (examination: ExaminationSummary) => void;
   onViewExamDetail: (examination: ExaminationSummary) => void;

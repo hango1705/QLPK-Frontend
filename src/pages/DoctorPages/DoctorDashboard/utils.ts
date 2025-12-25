@@ -117,9 +117,33 @@ export const aggregatePhases = (plans: TreatmentPlan[], phases: Record<string, T
   Object.values(phases ?? {}).flat().filter((phase) => phase.status === 'Inprogress');
 
 export const getNextAppointment = (scheduled: AppointmentSummary[]) => {
-  const sorted = [...scheduled].sort(
-    (a, b) => (parseDate(a.dateTime)?.getTime() ?? 0) - (parseDate(b.dateTime)?.getTime() ?? 0),
+  const now = new Date();
+  now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+  
+  // Filter only future appointments
+  const futureAppointments = scheduled.filter((appointment) => {
+    const appointmentDate = parseDate(appointment.dateTime);
+    if (!appointmentDate || isNaN(appointmentDate.getTime())) {
+      return false;
+    }
+    // Compare with current time (appointment must be in the future)
+    return appointmentDate.getTime() > now.getTime();
+  });
+
+  if (futureAppointments.length === 0) {
+    return undefined;
+  }
+
+  // Sort by dateTime ascending (earliest first)
+  const sorted = futureAppointments.sort(
+    (a, b) => {
+      const dateA = parseDate(a.dateTime)?.getTime() ?? 0;
+      const dateB = parseDate(b.dateTime)?.getTime() ?? 0;
+      return dateA - dateB;
+    }
   );
+
+  // Return the nearest future appointment
   return sorted[0];
 };
 

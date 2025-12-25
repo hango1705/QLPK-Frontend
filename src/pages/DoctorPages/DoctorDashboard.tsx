@@ -55,6 +55,7 @@ const DoctorDashboard: React.FC = () => {
   const { hasPermission } = usePermission();
   const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
   const canPickDoctor = hasPermission('PICK_DOCTOR');
+  const canViewCosts = hasPermission('UPDATE_PAYMENT_COST');
 
   const { data: profile, isLoading: loadingProfile, error: profileError } = useQuery({
     queryKey: queryKeys.doctor.profile,
@@ -133,6 +134,53 @@ const DoctorDashboard: React.FC = () => {
     });
     return results;
   }, [treatmentPlans, phaseQueries]);
+
+  // Get all examination IDs and treatment phase IDs for this doctor
+  const examinationIds = useMemo(() => examinations.map(exam => exam.id), [examinations]);
+  const allPhases = useMemo(() => Object.values(phasesByPlan).flat(), [phasesByPlan]);
+  const treatmentPhaseIds = useMemo(() => allPhases.map(phase => phase.id), [allPhases]);
+  
+  // Fetch costs to check payment status
+  // Cost.id = Examination.id or Cost.id = TreatmentPhase.id
+  // We need to fetch costs and filter by status = "paid" or "Done"
+  const costIds = useMemo(() => [...examinationIds, ...treatmentPhaseIds], [examinationIds, treatmentPhaseIds]);
+  
+  // Fetch costs for each ID (only if doctor has UPDATE_PAYMENT_COST permission)
+  const costQueries = useQueries({
+    queries: (canViewCosts && costIds.length > 0 ? costIds : []).map((costId: string) => ({
+      queryKey: ['cost', costId],
+      queryFn: () => nurseAPI.getCostById(costId),
+      enabled: !!costId && canViewCosts && isAuthenticated && !!token,
+      retry: false,
+    })),
+  });
+  
+  // Calculate revenue from paid costs only
+  const paidCosts = useMemo(() => {
+    if (!canViewCosts) return [];
+    return costQueries
+      .map(query => query.data)
+      .filter((cost): cost is NonNullable<typeof cost> => {
+        if (!cost) return false;
+        const status = cost.status?.toLowerCase();
+        return status === 'paid' || status === 'done';
+      });
+  }, [costQueries, canViewCosts]);
+
+  // Create a map of examination costs for easy lookup
+  const examinationCosts = useMemo(() => {
+    const costsMap: Record<string, { totalCost: number; status: string }> = {};
+    costQueries.forEach((query) => {
+      const cost = query.data;
+      if (cost && examinationIds.includes(cost.id)) {
+        costsMap[cost.id] = {
+          totalCost: cost.totalCost || 0,
+          status: cost.status || 'wait',
+        };
+      }
+    });
+    return costsMap;
+  }, [costQueries, examinationIds]);
 
   // Update planDetailDialog when treatmentPlans data changes
   useEffect(() => {
@@ -443,6 +491,15 @@ const DoctorDashboard: React.FC = () => {
   };
 
   const nextAppointment = useMemo(() => getNextAppointment(scheduledAppointments), [scheduledAppointments]);
+  
+  // Calculate revenue from costs with payment status = "paid" or "Done"
+  // This is a simplified calculation - in production, fetch costs and filter by status
+  const totalRevenue = useMemo(() => {
+    // Revenue calculation will be done in OverviewSection component
+    // using examination and treatment phase data
+    // For accurate calculation, we need to fetch Cost records and check status
+    return 0; // Placeholder - actual calculation in OverviewSection
+  }, []);
   const doneAppointments = useMemo(
     () => Array.isArray(allAppointments) ? allAppointments.filter((app) => app.status?.toLowerCase() === 'done') : [],
     [allAppointments],
@@ -519,6 +576,8 @@ const DoctorDashboard: React.FC = () => {
                     examinations={examinations}
                     treatmentPlans={treatmentPlans}
                     activePhases={activePhases}
+                    phasesByPlan={phasesByPlan}
+                    paidCosts={paidCosts}
                     onCreateExam={() => {
                       if (scheduledAppointments.length) {
                         setExamDialog({ mode: 'create', appointment: scheduledAppointments[0] });
@@ -544,6 +603,7 @@ const DoctorDashboard: React.FC = () => {
                     doctors={doctorDirectory}
                     nurses={nursesWithPlans}
                     isLoadingNurses={loadingNursesPick || nurseInfoQueries.some(q => q.isLoading)}
+                    examinationCosts={examinationCosts}
                     onCreateExam={(appointment) => setExamDialog({ mode: 'create', appointment })}
                     onEditExam={(examination) => setExamDialog({ mode: 'update', examination })}
                     onViewExamDetail={(examination) => setExamDetailDialog(examination)}
@@ -640,6 +700,7 @@ const DoctorDashboard: React.FC = () => {
       <ExaminationDetailDialog
         open={!!examDetailDialog}
         examination={examDetailDialog}
+        costData={examDetailDialog ? examinationCosts[examDetailDialog.id] : undefined}
         onOpenChange={(open) => !open && setExamDetailDialog(null)}
         onEdit={(exam) => {
           setExamDetailDialog(null);

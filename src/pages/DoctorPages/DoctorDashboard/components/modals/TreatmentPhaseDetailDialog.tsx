@@ -21,6 +21,7 @@ import { doctorAPI } from '@/services';
 import { useAuth } from '@/hooks';
 import { isDoctorLV2 } from '@/utils/auth';
 import { showNotification } from '@/components/ui';
+import ImageViewer from '@/components/ui/ImageViewer';
 
 interface TreatmentPhaseDetailDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   const [phaseData, setPhaseData] = useState<TreatmentPhase | null>(phase);
   const [selectedComparePhaseId, setSelectedComparePhaseId] = useState<string | null>(null);
   const [compareKey, setCompareKey] = useState(0); // Force re-render key
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Update phase data when prop changes
   useEffect(() => {
@@ -395,7 +397,8 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                     currentImages.map((image) => (
                                       <div
                                         key={image.publicId}
-                                        className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md"
+                                        className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md cursor-pointer"
+                                        onClick={() => image.url && setSelectedImage(image.url)}
                                       >
                                         {image.url && (
                                           <img
@@ -425,7 +428,8 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                     compareImages.map((image) => (
                                       <div
                                         key={image.publicId}
-                                        className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md"
+                                        className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md cursor-pointer"
+                                        onClick={() => image.url && setSelectedImage(image.url)}
                                       >
                                         {image.url && (
                                           <img
@@ -451,7 +455,8 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                               {currentImages.map((image) => (
                                 <div
                                   key={image.publicId}
-                                  className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium"
+                                  className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
+                                  onClick={() => image.url && setSelectedImage(image.url)}
                                 >
                                   {image.url && (
                                     <img
@@ -550,6 +555,12 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
           )}
         </div>
       </DialogContent>
+      <ImageViewer
+        open={!!selectedImage}
+        imageUrl={selectedImage}
+        alt="Treatment phase image"
+        onClose={() => setSelectedImage(null)}
+      />
     </Dialog>
   );
 };

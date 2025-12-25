@@ -432,6 +432,20 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
     }
   };
 
+  const getPaymentBadge = (paymentStatus?: string) => {
+    if (!paymentStatus) return null;
+    const paid = paymentStatus.toLowerCase() === 'paid' || paymentStatus.toLowerCase() === 'done';
+    const label = paid ? 'Đã thanh toán' : 'Chưa thanh toán';
+    const cls = paid 
+      ? 'bg-green-100 text-green-700 border-green-200' 
+      : 'bg-amber-100 text-amber-700 border-amber-200';
+    return (
+      <Badge className={`${cls} border text-xs font-medium`}>
+        {label}
+      </Badge>
+    );
+  };
+
   const getStatusBadge = (status: string) => {
     const normalizedStatus = status || 'Inprogress';
     const badgeClassName = STATUS_BADGE[normalizedStatus] || STATUS_BADGE.Inprogress;
@@ -653,6 +667,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
                               Giai đoạn {index + 1}
                             </span>
                             {getStatusBadge(phase.status || 'Inprogress')}
+                            {phase.cost > 0 && getPaymentBadge(phase.paymentStatus)}
                           </div>
                           {phase.description && (
                             <p className="text-sm text-foreground mb-2">{phase.description}</p>

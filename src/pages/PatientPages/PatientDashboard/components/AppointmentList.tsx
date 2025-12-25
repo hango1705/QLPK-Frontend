@@ -3,6 +3,7 @@ import { Alert, AlertTitle, AlertDescription, Button, Input, Modal } from '@/com
 import { Tag } from 'antd';
 import { Select as AntSelect } from 'antd';
 import { X } from 'lucide-react';
+import ImageViewer from '@/components/ui/ImageViewer';
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -49,6 +50,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   const [rescheduleType, setRescheduleType] = useState('');
   const [rescheduleNotes, setRescheduleNotes] = useState('');
   const [rescheduleCategoryId, setRescheduleCategoryId] = useState<string>('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [rescheduleServiceOrders, setRescheduleServiceOrders] = useState<Array<{
     id: string;
     name: string;
@@ -1113,12 +1115,10 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                       <h5 className="font-medium text-gray-900 mb-2">Hình ảnh</h5>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                         {examDetail.listImage.map((img: any, idx: number) => (
-                          <a
+                          <div
                             key={idx}
-                            href={img.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block group"
+                            onClick={() => img.url && setSelectedImage(img.url)}
+                            className="block group cursor-pointer"
                           >
                             <div className="aspect-[4/3] overflow-hidden rounded-md border">
                               <img
@@ -1127,7 +1127,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                                 className="w-full h-full object-cover group-hover:opacity-90"
                               />
                             </div>
-                          </a>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1154,6 +1154,12 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         </div>
       )}
     </div>
+    <ImageViewer
+      open={!!selectedImage}
+      imageUrl={selectedImage}
+      alt="Examination image"
+      onClose={() => setSelectedImage(null)}
+    />
   );
 };
 

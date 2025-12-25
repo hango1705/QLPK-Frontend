@@ -30,6 +30,7 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
     serviceCategories,
     services,
     prescriptions,
+    examinationCosts,
     onCreateExam,
     onEditExam,
     onViewExamDetail,
@@ -54,7 +55,7 @@ const DoctorContent: React.FC<ContentSectionProps> = (props) => {
           />
         );
       case 'examinations':
-        return <ExaminationBoard examinations={examinations} appointments={appointments} treatmentPlans={treatmentPlans} onEditExam={onEditExam} onViewDetail={onViewExamDetail} />;
+        return <ExaminationBoard examinations={examinations} appointments={appointments} treatmentPlans={treatmentPlans} onEditExam={onEditExam} onViewDetail={onViewExamDetail} examinationCosts={examinationCosts} />;
       case 'treatment':
         return (
           <TreatmentBoard
@@ -119,7 +120,8 @@ const ExaminationBoard: React.FC<{
   treatmentPlans: TreatmentPlan[];
   onEditExam: (examination: ExaminationSummary) => void;
   onViewDetail: (examination: ExaminationSummary) => void;
-}> = ({ examinations, appointments, treatmentPlans, onEditExam, onViewDetail }) => {
+  examinationCosts?: Record<string, { totalCost: number; status: string }>;
+}> = ({ examinations, appointments, treatmentPlans, onEditExam, onViewDetail, examinationCosts = {} }) => {
   return (
   <Card className="border-none bg-white/90 shadow-medium">
     <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -192,7 +194,8 @@ const ExaminationBoard: React.FC<{
         return (
         <div
           key={exam.id}
-          className="rounded-2xl border border-border/70 bg-white/70 px-4 py-3 text-sm shadow-sm transition hover:shadow-medium"
+          className="rounded-2xl border border-border/70 bg-white/70 px-4 py-3 text-sm shadow-sm transition hover:shadow-medium cursor-pointer"
+          onClick={() => onViewDetail(exam)}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -203,21 +206,14 @@ const ExaminationBoard: React.FC<{
               <p className="text-xs text-muted-foreground">{exam.symptoms}</p>
             </div>
             <div className="flex items-center gap-2">
+              {exam.totalCost > 0 && (
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 bg-emerald-50">
+                  {formatCurrency(exam.totalCost)}
+                </Badge>
+              )}
               <Badge variant="outline" className="border-primary/40 text-primary">
                 {formatDate(exam.createAt)}
               </Badge>
-              <div className="flex items-center gap-2">
-                <PermissionGuard permission="GET_EXAMINATION_DETAIL">
-                  <Button size="sm" variant="outline" onClick={() => onViewDetail(exam)}>
-                    Xem
-                  </Button>
-                </PermissionGuard>
-                <PermissionGuard permission="UPDATE_EXAMINATION">
-                  <Button size="sm" variant="ghost" className="text-primary" onClick={() => onEditExam(exam)}>
-                    Sửa
-                  </Button>
-                </PermissionGuard>
-              </div>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">

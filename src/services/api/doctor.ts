@@ -486,5 +486,20 @@ export const doctorAPI = {
     const response = await apiClient.post(`/api/v1/doctor/commentTreatmentPhases/${treatmentPhasesId}`, { comment });
     return unwrap<TreatmentPhase>(response.data);
   },
+
+  /**
+   * Get all costs for the current doctor
+   * This calculates revenue from examinations and treatment phases that have been paid
+   * Note: Costs are created from examinations and treatment phases, so we need to fetch them
+   * to check payment status. Since there's no direct API, we'll calculate from available data.
+   * In production, you might want to create a dedicated endpoint for this.
+   */
+  getMyRevenue: async (): Promise<number> => {
+    // This is a helper function that calculates revenue
+    // In a real scenario, you'd want a backend endpoint that returns costs filtered by doctor and status
+    // For now, we'll return 0 and calculate on the frontend from examinations and treatment phases
+    // The actual calculation should check Cost.status = "paid" or "Done"
+    return 0;
+  },
 };
 
