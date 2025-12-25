@@ -11,3 +11,9 @@ export { doctorAPI } from './api/doctor';
 export { adminAPI } from './api/admin';
 export { nurseAPI } from './api/nurse';
 export { patientAPI } from './api/patient';
+export { dicomAPI } from './api/dicom';
+export type {
+  DicomStudyResponse,
+  DicomSeriesResponse,
+  DicomInstanceResponse,
+} from './api/dicom';

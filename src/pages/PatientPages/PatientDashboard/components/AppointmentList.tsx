@@ -496,6 +496,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
   };
 
   return (
+    <>
     <div>
       {error && (
         <Alert variant="destructive" className="mb-4">
@@ -1160,6 +1161,7 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
       alt="Examination image"
       onClose={() => setSelectedImage(null)}
     />
+    </>
   );
 };
 

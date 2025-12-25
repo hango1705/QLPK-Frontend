@@ -10,13 +10,16 @@ import {
   Textarea,
 } from '@/components/ui';
 import ImageViewer from '@/components/ui/ImageViewer';
-import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send } from 'lucide-react';
+import DicomViewer from '@/components/ui/DicomViewer';
+import DicomUploadDialog from '@/components/ui/DicomUploadDialog';
+import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send, Scan, Upload } from 'lucide-react';
 import type { ExaminationSummary } from '@/types/doctor';
 import { formatDate, formatDateTime, formatCurrency } from '../../utils';
-import { doctorAPI } from '@/services';
+import { doctorAPI, dicomAPI } from '@/services';
 import { useAuth } from '@/hooks';
 import { isDoctorLV2 } from '@/utils/auth';
 import { showNotification } from '@/components/ui';
+import { useQuery } from '@tanstack/react-query';
 
 interface ExaminationDetailDialogProps {
   open: boolean;
@@ -39,6 +42,27 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [examinationData, setExaminationData] = useState<ExaminationSummary | null>(examination);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedDicomStudyId, setSelectedDicomStudyId] = useState<string | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+  // Get patientId from examination (may be in examination object or need to fetch from appointment)
+  const patientId = React.useMemo(() => {
+    if (!examinationData) return undefined;
+    // Try to get patientId directly from examination
+    const examPatientId = (examinationData as any).patientId;
+    if (examPatientId) return examPatientId;
+    
+    // If not available, we'll need to get it from appointment
+    // For now, return undefined and let the upload dialog handle it
+    return undefined;
+  }, [examinationData]);
+
+  // Fetch DICOM studies for this examination
+  const { data: dicomStudies, isLoading: isLoadingDicom } = useQuery({
+    queryKey: ['dicom-studies', examinationData?.id],
+    queryFn: () => dicomAPI.getStudiesByExaminationId(examinationData!.id),
+    enabled: !!examinationData?.id && open,
+  });
 
   // Update examination data when prop changes
   React.useEffect(() => {
@@ -168,6 +192,40 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
             </div>
           )}
 
+          {/* DICOM Studies Section */}
+          {dicomStudies && dicomStudies.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">DICOM Studies</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                {dicomStudies.map((study) => (
+                  <div
+                    key={study.id}
+                    className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
+                    onClick={() => setSelectedDicomStudyId(study.id)}
+                  >
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Scan className="h-4 w-4" />
+                      <span>DICOM Study</span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {study.studyDescription || 'DICOM Study'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {study.modality} · {study.studyDate}
+                      </p>
+                      {study.numberOfStudyRelatedSeries && (
+                        <p className="text-xs text-muted-foreground">
+                          {study.numberOfStudyRelatedSeries} Series · {study.numberOfStudyRelatedInstances} Images
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {examinationData.listImage && examinationData.listImage.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Hình ảnh</h3>
@@ -213,11 +271,11 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
           )}
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
-              <span className="text-sm font-semibold text-muted-foreground">Tổng chi phí</span>
-              <span className="text-xl font-semibold text-primary">
-                {formatCurrency(examinationData.totalCost)}
-              </span>
+          <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+            <span className="text-sm font-semibold text-muted-foreground">Tổng chi phí</span>
+            <span className="text-xl font-semibold text-primary">
+              {formatCurrency(examinationData.totalCost)}
+            </span>
             </div>
             {costData && (
               <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
@@ -308,6 +366,22 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
         alt="Examination image"
         onClose={() => setSelectedImage(null)}
       />
+      <DicomViewer
+        open={!!selectedDicomStudyId}
+        studyId={selectedDicomStudyId}
+        onClose={() => setSelectedDicomStudyId(null)}
+      />
+      {patientId && (
+        <DicomUploadDialog
+          open={showUploadDialog}
+          patientId={patientId}
+          examinationId={examinationData?.id}
+          onClose={() => setShowUploadDialog(false)}
+          onSuccess={() => {
+            // Query will automatically refetch
+          }}
+        />
+      )}
     </Dialog>
   );
 };

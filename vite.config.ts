@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import tailwindcss from '@tailwindcss/vite';
+import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 
 // https://vite.dev/config/
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,20 @@ const dirname =
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // for dicom-parser (CommonJS support)
+    viteCommonjs(),
+  ],
+  // Cornerstone.js optimization
+  optimizeDeps: {
+    exclude: ['@cornerstonejs/dicom-image-loader'],
+    include: ['dicom-parser'],
+  },
+  worker: {
+    format: 'es',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

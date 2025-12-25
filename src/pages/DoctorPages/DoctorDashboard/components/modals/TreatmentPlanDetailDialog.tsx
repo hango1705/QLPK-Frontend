@@ -13,13 +13,15 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/components/ui';
-import { Calendar, DollarSign, User, Stethoscope, FileText, Clock, CheckCircle2, XCircle, Pause, AlertCircle, Heart, Edit, Mail, Phone, MapPin, Award, Droplet, AlertTriangle } from 'lucide-react';
+import { Calendar, DollarSign, User, Stethoscope, FileText, Clock, CheckCircle2, XCircle, Pause, AlertCircle, Heart, Edit, Mail, Phone, MapPin, Award, Droplet, AlertTriangle, Scan, Upload } from 'lucide-react';
 import type { TreatmentPlan, TreatmentPhase } from '@/types/doctor';
 import { formatDate, formatCurrency } from '../../utils';
 import { STATUS_BADGE } from '../../constants';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { doctorAPI, nurseAPI } from '@/services';
+import { doctorAPI, nurseAPI, dicomAPI } from '@/services';
 import { queryKeys } from '@/services/queryClient';
+import DicomViewer from '@/components/ui/DicomViewer';
+import DicomUploadDialog from '@/components/ui/DicomUploadDialog';
 
 interface TreatmentPlanDetailDialogProps {
   open: boolean;
@@ -286,6 +288,48 @@ const calculatePhaseCost = (phase: TreatmentPhase): number | null => {
   return servicesTotal + prescriptionsTotal;
 };
 
+// Helper function to get payment badge
+const getPaymentBadge = (paymentStatus?: string) => {
+  if (!paymentStatus) return null;
+  const paid = paymentStatus.toLowerCase() === 'paid' || paymentStatus.toLowerCase() === 'done';
+  const label = paid ? 'Đã thanh toán' : 'Chưa thanh toán';
+  const cls = paid 
+    ? 'bg-green-100 text-green-700 border-green-200' 
+    : 'bg-amber-100 text-amber-700 border-amber-200';
+  return (
+    <Badge className={`${cls} border text-xs font-medium`}>
+      {label}
+    </Badge>
+  );
+};
+
+// Helper function to get status badge
+const getStatusBadge = (status: string) => {
+  const normalizedStatus = status || 'Inprogress';
+  const badgeClassName = STATUS_BADGE[normalizedStatus] || STATUS_BADGE.Inprogress;
+  return (
+    <Badge className={badgeClassName}>
+      {normalizedStatus}
+    </Badge>
+  );
+};
+
+// Helper function to get status icon
+const getStatusIcon = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'done':
+      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+    case 'cancelled':
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    case 'paused':
+      return <Pause className="h-4 w-4 text-yellow-600" />;
+    case 'inprogress':
+      return <Clock className="h-4 w-4 text-blue-600" />;
+    default:
+      return <AlertCircle className="h-4 w-4 text-gray-600" />;
+  }
+};
+
 // Component để hiển thị tooltip chi tiết giá tiền
 const CostTooltip: React.FC<{
   phase: TreatmentPhase;
@@ -400,6 +444,119 @@ const CostTooltip: React.FC<{
   );
 };
 
+// Component for individual phase item with DICOM support
+const PhaseItem: React.FC<{
+  phase: TreatmentPhase;
+  index: number;
+  plan: TreatmentPlan;
+  onEditPhase?: (plan: TreatmentPlan, phase: TreatmentPhase) => void;
+  onViewDicom: (studyId: string) => void;
+  onUploadDicom: (phaseId: string) => void;
+  open: boolean;
+}> = ({ phase, index, plan, onEditPhase, onViewDicom, onUploadDicom, open }) => {
+  // Fetch DICOM studies for this phase
+  const { data: phaseDicomStudies } = useQuery({
+    queryKey: ['dicom-studies-phase', phase.id],
+    queryFn: () => dicomAPI.getStudiesByTreatmentPhaseId(phase.id),
+    enabled: !!phase.id && open,
+  });
+
+  return (
+    <div
+      className="border border-border/70 rounded-xl p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+      onClick={() => {
+        if (onEditPhase) {
+          onEditPhase(plan, phase);
+        }
+      }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+              Giai đoạn {index + 1}
+            </span>
+            {getStatusBadge(phase.status || 'Inprogress')}
+            {phase.cost > 0 && getPaymentBadge(phase.paymentStatus)}
+          </div>
+          {phase.description && (
+            <p className="text-sm text-foreground mb-2">{phase.description}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            {phase.startDate && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>Bắt đầu: {formatDate(phase.startDate)}</span>
+              </div>
+            )}
+            {phase.endDate && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>Kết thúc: {formatDate(phase.endDate)}</span>
+              </div>
+            )}
+            {phase.cost > 0 && (
+              <CostTooltip phase={phase}>
+                <div className="flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  <span className="font-medium text-primary">
+                    {formatCurrency(calculatePhaseCost(phase) || phase.cost)}
+                  </span>
+                </div>
+              </CostTooltip>
+            )}
+          </div>
+          {/* DICOM Studies for this phase */}
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Scan className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground">Ảnh DICOM</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-6"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUploadDicom(phase.id);
+                }}
+              >
+                <Upload className="h-3 w-3 mr-1" />
+                Tải lên
+              </Button>
+            </div>
+            {phaseDicomStudies && phaseDicomStudies.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {phaseDicomStudies.map((study) => (
+                  <Button
+                    key={study.id}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDicom(study.id);
+                    }}
+                  >
+                    <Scan className="h-3 w-3 mr-1" />
+                    {study.studyDescription || 'Nghiên cứu DICOM'}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Chưa có ảnh DICOM</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          {getStatusIcon(phase.status || 'Inprogress')}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   open,
   plan,
@@ -409,6 +566,11 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   onCreatePhase,
   onEditPhase,
 }) => {
+  const [selectedDicomStudyId, setSelectedDicomStudyId] = React.useState<string | null>(null);
+  const [selectedPhaseId, setSelectedPhaseId] = React.useState<string | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = React.useState(false);
+  const [uploadPhaseId, setUploadPhaseId] = React.useState<string | null>(null);
+
   if (!plan) return null;
 
   const sortedPhases = [...phases].sort((a, b) => {
@@ -416,45 +578,6 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
     const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
     return dateA - dateB;
   });
-
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'done':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      case 'paused':
-        return <Pause className="h-4 w-4 text-yellow-600" />;
-      case 'inprogress':
-        return <Clock className="h-4 w-4 text-blue-600" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getPaymentBadge = (paymentStatus?: string) => {
-    if (!paymentStatus) return null;
-    const paid = paymentStatus.toLowerCase() === 'paid' || paymentStatus.toLowerCase() === 'done';
-    const label = paid ? 'Đã thanh toán' : 'Chưa thanh toán';
-    const cls = paid 
-      ? 'bg-green-100 text-green-700 border-green-200' 
-      : 'bg-amber-100 text-amber-700 border-amber-200';
-    return (
-      <Badge className={`${cls} border text-xs font-medium`}>
-        {label}
-      </Badge>
-    );
-  };
-
-  const getStatusBadge = (status: string) => {
-    const normalizedStatus = status || 'Inprogress';
-    const badgeClassName = STATUS_BADGE[normalizedStatus] || STATUS_BADGE.Inprogress;
-    return (
-      <Badge className={badgeClassName}>
-        {normalizedStatus}
-      </Badge>
-    );
-  };
 
   const totalPhases = phases.length;
   const completedPhases = phases.filter(p => p.status?.toLowerCase() === 'done').length;
@@ -655,61 +778,22 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
               ) : (
                 <div className="space-y-3">
                   {sortedPhases.map((phase, index) => (
-                    <div
+                    <PhaseItem
                       key={phase.id}
-                      className="border border-border/70 rounded-xl p-4 hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => onEditPhase?.(plan, phase)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                              Giai đoạn {index + 1}
-                            </span>
-                            {getStatusBadge(phase.status || 'Inprogress')}
-                            {phase.cost > 0 && getPaymentBadge(phase.paymentStatus)}
-                          </div>
-                          {phase.description && (
-                            <p className="text-sm text-foreground mb-2">{phase.description}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                            {phase.startDate && (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>Bắt đầu: {formatDate(phase.startDate)}</span>
-                              </div>
-                            )}
-                            {phase.endDate && (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>Kết thúc: {formatDate(phase.endDate)}</span>
-                              </div>
-                            )}
-                            {phase.cost > 0 && (
-                              <CostTooltip phase={phase}>
-                                <div className="flex items-center gap-1">
-                                  <DollarSign className="h-3 w-3" />
-                                  <span className="font-medium text-primary">
-                                    {formatCurrency(calculatePhaseCost(phase) || phase.cost)}
-                                  </span>
-                                </div>
-                              </CostTooltip>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          {getStatusIcon(phase.status || 'Inprogress')}
-                          {onEditPhase && (
-                            <Button variant="ghost" size="sm" onClick={(e) => {
-                              e.stopPropagation();
-                              onEditPhase(plan, phase);
-                            }}>
-                              Xem chi tiết
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                      phase={phase}
+                      index={index}
+                      plan={plan}
+                      onEditPhase={onEditPhase}
+                      onViewDicom={(studyId) => {
+                        setSelectedDicomStudyId(studyId);
+                        setSelectedPhaseId(phase.id);
+                      }}
+                      onUploadDicom={(phaseId) => {
+                        setUploadPhaseId(phaseId);
+                        setShowUploadDialog(true);
+                      }}
+                      open={open}
+                    />
                   ))}
                 </div>
               )}
@@ -717,6 +801,28 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+      <DicomViewer
+        open={!!selectedDicomStudyId}
+        studyId={selectedDicomStudyId}
+        onClose={() => {
+          setSelectedDicomStudyId(null);
+          setSelectedPhaseId(null);
+        }}
+      />
+      {plan.patientId && (
+        <DicomUploadDialog
+          open={showUploadDialog}
+          patientId={plan.patientId}
+          treatmentPhaseId={uploadPhaseId || undefined}
+          onClose={() => {
+            setShowUploadDialog(false);
+            setUploadPhaseId(null);
+          }}
+          onSuccess={() => {
+            // Query will automatically refetch
+          }}
+        />
+      )}
     </TooltipProvider>
   );
 };

@@ -60,17 +60,10 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   // Get other phases for comparison (all phases except current one, sorted by phaseNumber or startDate)
   const otherPhases = useMemo(() => {
     if (!phaseData || !allPhases.length) {
-      console.log('TreatmentPhaseDetailDialog: No phases for comparison', { phaseData: !!phaseData, allPhasesLength: allPhases.length });
       return [];
     }
     
     const filtered = allPhases.filter((p) => p.id !== phaseData.id); // Exclude current phase
-    console.log('TreatmentPhaseDetailDialog: Filtered phases for comparison', { 
-      totalPhases: allPhases.length, 
-      currentPhaseId: phaseData.id,
-      filteredCount: filtered.length,
-      filteredPhases: filtered.map(p => ({ id: p.id, phaseNumber: p.phaseNumber }))
-    });
     
     return filtered.sort((a, b) => {
       // Sort by phaseNumber if available (descending - newest first)
@@ -99,14 +92,6 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
     // Try to find in otherPhases first, then fallback to allPhases
     const found = otherPhases.find((p) => p.id === selectedComparePhaseId) 
       || allPhases.find((p) => p.id === selectedComparePhaseId);
-    console.log('TreatmentPhaseDetailDialog: comparePhase', { 
-      selectedComparePhaseId, 
-      found: !!found,
-      foundPhaseNumber: found?.phaseNumber,
-      foundImagesCount: found?.listImage?.length || 0,
-      otherPhasesCount: otherPhases.length,
-      allPhasesCount: allPhases.length
-    });
     return found || null;
   }, [selectedComparePhaseId, otherPhases, allPhases]);
 
@@ -134,7 +119,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-0 sm:max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-0 sm:max-w-3xl !z-[60]">
         <DialogHeader className="space-y-2 border-b border-border/70 px-6 pb-4 pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -295,7 +280,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                       <SelectTrigger className="w-[220px] h-8 text-xs">
                         <SelectValue placeholder="So sánh với tiến trình khác" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="!z-[65]">
                         {otherPhases.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             Giai đoạn {p.phaseNumber || 'N/A'}
@@ -354,6 +339,16 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                   return acc;
                 }, {} as Record<string, typeof phaseData.listImage>);
 
+                // Debug: Log compare phase data
+                console.log('Compare phase debug:', {
+                  comparePhase,
+                  hasComparePhase: !!comparePhase,
+                  hasListImage: !!comparePhase?.listImage,
+                  listImageLength: comparePhase?.listImage?.length || 0,
+                  listImage: comparePhase?.listImage,
+                  selectedComparePhaseId
+                });
+                
                 // Group compare phase images by type
                 const compareImagesByType = (comparePhase?.listImage || []).reduce((acc, img) => {
                   const key = getImageTypeKey(img.type || '');
@@ -361,6 +356,8 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                   acc[key].push(img);
                   return acc;
                 }, {} as Record<string, typeof comparePhase.listImage>) || {};
+                
+                console.log('Compare images by type:', compareImagesByType);
 
                 // Get all unique types
                 const allTypes = new Set([
@@ -394,22 +391,38 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                 </div>
                                 <div className="grid gap-2">
                                   {currentImages.length > 0 ? (
-                                    currentImages.map((image) => (
-                                      <div
-                                        key={image.publicId}
-                                        className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md cursor-pointer"
-                                        onClick={() => image.url && setSelectedImage(image.url)}
-                                      >
-                                        {image.url && (
-                                          <img
-                                            src={image.url}
-                                            alt={typeLabel}
-                                            className="h-40 w-full rounded-lg object-cover"
-                                            loading="lazy"
-                                          />
-                                        )}
-                                      </div>
-                                    ))
+                                    currentImages.map((image) => {
+                                      // Build image URL: use url if available, otherwise build from publicId
+                                      // Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/image/upload/{public_id}
+                                      const imageUrl = image.url || (image.publicId 
+                                        ? `https://res.cloudinary.com/dn2plfafj/image/upload/${image.publicId}`
+                                        : null);
+                                      
+                                      return (
+                                        <div
+                                          key={image.publicId}
+                                          className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md cursor-pointer"
+                                          onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                                        >
+                                          {imageUrl ? (
+                                            <img
+                                              src={imageUrl}
+                                              alt={typeLabel}
+                                              className="h-40 w-full rounded-lg object-cover"
+                                              loading="lazy"
+                                              onError={(e) => {
+                                                console.error('Failed to load current phase image:', imageUrl, image);
+                                                e.currentTarget.style.display = 'none';
+                                              }}
+                                            />
+                                          ) : (
+                                            <div className="flex h-40 items-center justify-center rounded-lg bg-muted/20 text-xs text-muted-foreground">
+                                              Không có ảnh
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
                                   ) : (
                                     <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 text-xs text-muted-foreground">
                                       Không có hình ảnh
@@ -425,22 +438,93 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                 </div>
                                 <div className="grid gap-2">
                                   {compareImages.length > 0 ? (
-                                    compareImages.map((image) => (
-                                      <div
-                                        key={image.publicId}
-                                        className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md cursor-pointer"
-                                        onClick={() => image.url && setSelectedImage(image.url)}
-                                      >
-                                        {image.url && (
-                                          <img
-                                            src={image.url}
-                                            alt={typeLabel}
-                                            className="h-40 w-full rounded-lg object-cover"
-                                            loading="lazy"
-                                          />
-                                        )}
-                                      </div>
-                                    ))
+                                    compareImages.map((image) => {
+                                      // Debug: Log image data
+                                      console.log('Compare image data:', {
+                                        image,
+                                        url: image.url,
+                                        publicId: image.publicId,
+                                        type: image.type,
+                                        typeLabel
+                                      });
+                                      
+                                      // Build image URL: use url if available, otherwise build from publicId
+                                      // Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/image/upload/{public_id}
+                                      let imageUrl = image.url;
+                                      
+                                      // If url is empty/null but publicId exists, build URL from publicId
+                                      if (!imageUrl && image.publicId) {
+                                        imageUrl = `https://res.cloudinary.com/dn2plfafj/image/upload/${image.publicId}`;
+                                        console.log('Built URL from publicId:', imageUrl);
+                                      }
+                                      
+                                      // Debug logging
+                                      if (!imageUrl) {
+                                        console.warn('Compare phase image missing URL and publicId:', {
+                                          image,
+                                          hasUrl: !!image.url,
+                                          urlValue: image.url,
+                                          hasPublicId: !!image.publicId,
+                                          publicIdValue: image.publicId,
+                                          type: typeLabel
+                                        });
+                                      }
+                                      
+                                      return (
+                                        <div
+                                          key={image.publicId || Math.random()}
+                                          className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md cursor-pointer"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            console.log('Compare phase image clicked:', {
+                                              imageUrl,
+                                              image,
+                                              hasUrl: !!image.url,
+                                              hasPublicId: !!image.publicId
+                                            });
+                                            if (imageUrl) {
+                                              console.log('Setting selected image to:', imageUrl);
+                                              setSelectedImage(imageUrl);
+                                            } else {
+                                              console.warn('Cannot open image viewer: no URL available', image);
+                                            }
+                                          }}
+                                        >
+                                          {imageUrl ? (
+                                            <img
+                                              src={imageUrl}
+                                              alt={typeLabel}
+                                              className="h-40 w-full rounded-lg object-cover"
+                                              loading="lazy"
+                                              onError={(e) => {
+                                                console.error('Failed to load compare phase image:', {
+                                                  imageUrl,
+                                                  image,
+                                                  publicId: image.publicId,
+                                                  url: image.url,
+                                                  error: e
+                                                });
+                                                // Don't hide the image, show error placeholder instead
+                                                const target = e.currentTarget;
+                                                target.style.display = 'none';
+                                                // Create error placeholder
+                                                const placeholder = document.createElement('div');
+                                                placeholder.className = 'flex h-40 items-center justify-center rounded-lg bg-red-50 text-xs text-red-600';
+                                                placeholder.textContent = 'Lỗi tải ảnh';
+                                                target.parentElement?.appendChild(placeholder);
+                                              }}
+                                              onLoad={() => {
+                                                console.log('Successfully loaded compare phase image:', imageUrl);
+                                              }}
+                                            />
+                                          ) : (
+                                            <div className="flex h-40 items-center justify-center rounded-lg bg-muted/20 text-xs text-muted-foreground">
+                                              Không có ảnh (URL: {image.url ? 'có' : 'không'}, PublicId: {image.publicId ? 'có' : 'không'})
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
                                   ) : (
                                     <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 text-xs text-muted-foreground">
                                       Không có hình ảnh
@@ -452,22 +536,38 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                           ) : (
                             // Normal view: grid
                             <div className="grid gap-3 md:grid-cols-3">
-                              {currentImages.map((image) => (
-                                <div
-                                  key={image.publicId}
-                                  className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
-                                  onClick={() => image.url && setSelectedImage(image.url)}
-                                >
-                                  {image.url && (
-                                    <img
-                                      src={image.url}
-                                      alt={typeLabel}
-                                      className="h-32 w-full rounded-xl object-cover"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                </div>
-                              ))}
+                              {currentImages.map((image) => {
+                                // Build image URL: use url if available, otherwise build from publicId
+                                // Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/image/upload/{public_id}
+                                const imageUrl = image.url || (image.publicId 
+                                  ? `https://res.cloudinary.com/dn2plfafj/image/upload/${image.publicId}`
+                                  : null);
+                                
+                                return (
+                                  <div
+                                    key={image.publicId}
+                                    className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
+                                    onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                                  >
+                                    {imageUrl ? (
+                                      <img
+                                        src={imageUrl}
+                                        alt={typeLabel}
+                                        className="h-32 w-full rounded-xl object-cover"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          console.error('Failed to load image:', imageUrl, image);
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="flex h-32 items-center justify-center rounded-xl bg-muted/20 text-xs text-muted-foreground">
+                                        Không có ảnh
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -555,12 +655,18 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
           )}
         </div>
       </DialogContent>
-      <ImageViewer
-        open={!!selectedImage}
-        imageUrl={selectedImage}
-        alt="Treatment phase image"
-        onClose={() => setSelectedImage(null)}
-      />
+      {/* Render ImageViewer outside of this dialog to avoid z-index conflicts */}
+      {selectedImage && (
+        <ImageViewer
+          open={!!selectedImage}
+          imageUrl={selectedImage}
+          alt="Treatment phase image"
+          onClose={() => {
+            console.log('Closing image viewer');
+            setSelectedImage(null);
+          }}
+        />
+      )}
     </Dialog>
   );
 };

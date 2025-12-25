@@ -739,7 +739,7 @@ const DoctorDashboard: React.FC = () => {
           setPhaseDialog({ mode: 'create', plan });
         }}
         onEditPhase={(plan, phase) => {
-          setPlanDetailDialog(null);
+          // Don't close Treatment Plan Detail Dialog - keep it open as parent
           setPhaseDetailDialog({ phase, plan });
         }}
       />

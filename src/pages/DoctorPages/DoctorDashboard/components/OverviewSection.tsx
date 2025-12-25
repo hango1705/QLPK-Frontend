@@ -36,7 +36,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   const { hasPermission } = usePermission();
   const canCreateExamination = hasPermission('CREATE_EXAMINATION');
   const canCreateTreatmentPhase = hasPermission('CREATE_TREATMENT_PHASES');
-
+  
   // Calculate statistics for charts
   const chartData = useMemo(() => {
     // Last 7 days appointments trend
@@ -211,22 +211,22 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         <CardContent>
           {nextAppointment ? (
             <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-5">
-              <div className="grid gap-4 md:grid-cols-3">
-                <OverviewDetail
-                  label="Thời gian"
-                  value={formatDateTime(nextAppointment.dateTime)}
+            <div className="grid gap-4 md:grid-cols-3">
+              <OverviewDetail
+                label="Thời gian"
+                value={formatDateTime(nextAppointment.dateTime)}
                   icon={<Clock className="h-4 w-4 text-blue-600" />}
-                />
-                <OverviewDetail
-                  label="Loại hẹn"
-                  value={nextAppointment.type}
+              />
+              <OverviewDetail
+                label="Loại hẹn"
+                value={nextAppointment.type}
                   icon={<FileText className="h-4 w-4 text-emerald-600" />}
-                />
-                <OverviewDetail
-                  label="Ghi chú"
-                  value={nextAppointment.notes || 'Không có ghi chú'}
+              />
+              <OverviewDetail
+                label="Ghi chú"
+                value={nextAppointment.notes || 'Không có ghi chú'}
                   icon={<NotebookPen className="h-4 w-4 text-amber-600" />}
-                />
+              />
               </div>
             </div>
           ) : (
@@ -387,8 +387,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, trend, icon, bgColor,
       </div>
       <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
       <p className="text-sm font-medium text-gray-700">{title}</p>
-    </div>
-  );
+  </div>
+);
 };
 
 const OverviewDetail: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({
