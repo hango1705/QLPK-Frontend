@@ -348,7 +348,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                   listImage: comparePhase?.listImage,
                   selectedComparePhaseId
                 });
-                
+
                 // Group compare phase images by type
                 const compareImagesByType = (comparePhase?.listImage || []).reduce((acc, img) => {
                   const key = getImageTypeKey(img.type || '');
@@ -399,28 +399,28 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                         : null);
                                       
                                       return (
-                                        <div
-                                          key={image.publicId}
+                                      <div
+                                        key={image.publicId}
                                           className="group relative rounded-xl border border-primary/30 bg-primary/5 p-2 transition hover:shadow-md cursor-pointer"
                                           onClick={() => imageUrl && setSelectedImage(imageUrl)}
-                                        >
+                                      >
                                           {imageUrl ? (
-                                            <img
+                                          <img
                                               src={imageUrl}
-                                              alt={typeLabel}
-                                              className="h-40 w-full rounded-lg object-cover"
-                                              loading="lazy"
+                                            alt={typeLabel}
+                                            className="h-40 w-full rounded-lg object-cover"
+                                            loading="lazy"
                                               onError={(e) => {
                                                 console.error('Failed to load current phase image:', imageUrl, image);
                                                 e.currentTarget.style.display = 'none';
                                               }}
-                                            />
+                                          />
                                           ) : (
                                             <div className="flex h-40 items-center justify-center rounded-lg bg-muted/20 text-xs text-muted-foreground">
                                               Không có ảnh
                                             </div>
-                                          )}
-                                        </div>
+                                        )}
+                                      </div>
                                       );
                                     })
                                   ) : (
@@ -471,7 +471,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                       }
                                       
                                       return (
-                                        <div
+                                      <div
                                           key={image.publicId || Math.random()}
                                           className="group relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 transition hover:shadow-md cursor-pointer"
                                           onClick={(e) => {
@@ -491,11 +491,11 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                           }}
                                         >
                                           {imageUrl ? (
-                                            <img
+                                          <img
                                               src={imageUrl}
-                                              alt={typeLabel}
-                                              className="h-40 w-full rounded-lg object-cover"
-                                              loading="lazy"
+                                            alt={typeLabel}
+                                            className="h-40 w-full rounded-lg object-cover"
+                                            loading="lazy"
                                               onError={(e) => {
                                                 console.error('Failed to load compare phase image:', {
                                                   imageUrl,
@@ -521,8 +521,8 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                             <div className="flex h-40 items-center justify-center rounded-lg bg-muted/20 text-xs text-muted-foreground">
                                               Không có ảnh (URL: {image.url ? 'có' : 'không'}, PublicId: {image.publicId ? 'có' : 'không'})
                                             </div>
-                                          )}
-                                        </div>
+                                        )}
+                                      </div>
                                       );
                                     })
                                   ) : (
@@ -544,28 +544,28 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                   : null);
                                 
                                 return (
-                                  <div
-                                    key={image.publicId}
+                                <div
+                                  key={image.publicId}
                                     className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
                                     onClick={() => imageUrl && setSelectedImage(imageUrl)}
-                                  >
+                                >
                                     {imageUrl ? (
-                                      <img
+                                    <img
                                         src={imageUrl}
-                                        alt={typeLabel}
-                                        className="h-32 w-full rounded-xl object-cover"
-                                        loading="lazy"
+                                      alt={typeLabel}
+                                      className="h-32 w-full rounded-xl object-cover"
+                                      loading="lazy"
                                         onError={(e) => {
                                           console.error('Failed to load image:', imageUrl, image);
                                           e.currentTarget.style.display = 'none';
                                         }}
-                                      />
+                                    />
                                     ) : (
                                       <div className="flex h-32 items-center justify-center rounded-xl bg-muted/20 text-xs text-muted-foreground">
                                         Không có ảnh
                                       </div>
-                                    )}
-                                  </div>
+                                  )}
+                                </div>
                                 );
                               })}
                             </div>
