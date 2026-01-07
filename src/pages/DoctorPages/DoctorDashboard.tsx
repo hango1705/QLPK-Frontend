@@ -425,6 +425,7 @@ const DoctorDashboard: React.FC = () => {
       planId: plan.id,
       payload: {
         id: plan.id,
+        treatmentPlansId: plan.id,
         title: plan.title,
         description: plan.description,
         duration: plan.duration,
@@ -677,6 +678,7 @@ const DoctorDashboard: React.FC = () => {
             // Edit mode - map form to update payload
             const updatePayload: Parameters<typeof doctorAPI.updateTreatmentPlan>[1] = {
               id: planDialog.plan.id,
+              treatmentPlansId: planDialog.plan.id,
               title: form.title,
               description: form.description,
               duration: form.duration || '',
