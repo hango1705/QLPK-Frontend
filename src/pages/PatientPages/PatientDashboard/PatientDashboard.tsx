@@ -724,6 +724,7 @@ const PatientDashboard: React.FC = () => {
             onDocumentPageChange={setDocumentPage}
             onBookAppointment={handleBookAppointment}
             onRefreshData={handleRefreshData}
+            onSectionChange={setSection}
           />
         </main>
       </div>

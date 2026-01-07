@@ -17,3 +17,8 @@ export type {
   DicomSeriesResponse,
   DicomInstanceResponse,
 } from './api/dicom';
+export { aiAPI } from './api/ai';
+export type {
+  AiAnalysisResponse,
+  AiDetection,
+} from './api/ai';

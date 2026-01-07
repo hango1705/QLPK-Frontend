@@ -92,6 +92,7 @@ export interface PatientContentProps {
   // Handlers
   onBookAppointment: () => void;
   onRefreshData: () => void;
+  onSectionChange?: (section: Section) => void;
 }
 
 export interface OverviewSectionProps {
@@ -106,6 +107,16 @@ export interface OverviewSectionProps {
   recentAppointments: Array<any>;
   treatments: Array<any>;
   onBookAppointment: () => void;
+  // Extended props for new design
+  patientId?: string | number;
+  emergencyContactName?: string;
+  emergencyPhoneNumber?: string;
+  medicalConditions?: Array<{ type: 'allergy' | 'disease' | 'vip'; label: string }>;
+  onEditInfo?: () => void;
+  onAddNote?: () => void;
+  onCreateExamination?: () => void;
+  onSendReminder?: () => void;
+  onViewOdontogramDetail?: () => void;
 }
 
 export interface AppointmentFormProps {

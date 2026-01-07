@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
-import { Image as ImageIcon, MessageSquare, Send, Calendar, DollarSign, FileText, GitCompare } from 'lucide-react';
+import { Image as ImageIcon, MessageSquare, Send, Calendar, DollarSign, FileText, GitCompare, Brain } from 'lucide-react';
 import type { TreatmentPhase, TreatmentPlan } from '@/types/doctor';
 import { formatDate, formatCurrency } from '../../utils';
 import { doctorAPI } from '@/services';
@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks';
 import { isDoctorLV2 } from '@/utils/auth';
 import { showNotification } from '@/components/ui';
 import ImageViewer from '@/components/ui/ImageViewer';
+import AiAnalysisViewer from '@/components/ui/AiAnalysisViewer';
 
 interface TreatmentPhaseDetailDialogProps {
   open: boolean;
@@ -50,6 +51,7 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
   const [selectedComparePhaseId, setSelectedComparePhaseId] = useState<string | null>(null);
   const [compareKey, setCompareKey] = useState(0); // Force re-render key
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [aiAnalysisImage, setAiAnalysisImage] = useState<{ url: string; imageId: string } | null>(null);
 
   // Update phase data when prop changes
   useEffect(() => {
@@ -546,24 +548,51 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
                                 return (
                                 <div
                                   key={image.publicId}
-                                    className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium cursor-pointer"
-                                    onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                                  className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium overflow-visible"
                                 >
-                                    {imageUrl ? (
-                                    <img
-                                        src={imageUrl}
-                                      alt={typeLabel}
-                                      className="h-32 w-full rounded-xl object-cover"
-                                      loading="lazy"
-                                        onError={(e) => {
-                                          console.error('Failed to load image:', imageUrl, image);
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                    />
-                                    ) : (
-                                      <div className="flex h-32 items-center justify-center rounded-xl bg-muted/20 text-xs text-muted-foreground">
-                                        Không có ảnh
+                                  {imageUrl ? (
+                                    <>
+                                      <div
+                                        className="cursor-pointer relative"
+                                        onClick={() => setSelectedImage(imageUrl)}
+                                      >
+                                        <img
+                                          src={imageUrl}
+                                          alt={typeLabel}
+                                          className="h-32 w-full rounded-xl object-cover"
+                                          loading="lazy"
+                                          onError={(e) => {
+                                            console.error('Failed to load image:', imageUrl, image);
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                        />
+                                        {/* AI Analysis button for X-Ray images */}
+                                        {(typeKey === 'xray' || image.type?.toLowerCase().includes('xray')) && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="absolute bottom-2 right-2 h-7 min-w-[50px] text-xs bg-blue-600 hover:bg-blue-700 text-white border-none z-20 shadow-lg flex items-center gap-1"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              // Only set if imageUrl is valid
+                                              if (imageUrl) {
+                                                setAiAnalysisImage({ url: imageUrl, imageId: image.id || '' });
+                                              } else {
+                                                showNotification.warning('Cảnh báo', 'Ảnh không có URL hợp lệ');
+                                              }
+                                            }}
+                                          >
+                                            <Brain className="h-3 w-3" />
+                                            <span>AI</span>
+                                          </Button>
+                                        )}
                                       </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex h-32 items-center justify-center rounded-xl bg-muted/20 text-xs text-muted-foreground">
+                                      Không có ảnh
+                                    </div>
                                   )}
                                 </div>
                                 );
@@ -665,6 +694,16 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
             console.log('Closing image viewer');
             setSelectedImage(null);
           }}
+        />
+      )}
+
+      {/* AI Analysis Viewer */}
+      {aiAnalysisImage && aiAnalysisImage.url && (
+        <AiAnalysisViewer
+          open={!!aiAnalysisImage && !!aiAnalysisImage.url}
+          imageUrl={aiAnalysisImage.url}
+          imageId={aiAnalysisImage.imageId}
+          onClose={() => setAiAnalysisImage(null)}
         />
       )}
     </Dialog>

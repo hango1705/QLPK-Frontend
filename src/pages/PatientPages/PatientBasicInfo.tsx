@@ -167,7 +167,8 @@ const PatientBasicInfo = () => {
         </Alert>
       </div>
     }>
-      <div className="min-h-screen bg-gray-50">
+      {/* Align background with Patient overview page: remove gray container background */}
+      <div className="min-h-screen">
       <div className="py-8">
         {msg && (
           <Alert variant="default" className="mb-2">

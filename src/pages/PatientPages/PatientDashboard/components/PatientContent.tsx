@@ -1,6 +1,5 @@
 import React, { Suspense } from 'react';
 import { Alert, AlertTitle, AlertDescription, Loading, Card, CardContent } from '@/components/ui';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui';
 import { Input, Label, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Edit } from 'lucide-react';
@@ -46,35 +45,6 @@ const PatientContent: React.FC<PatientContentProps> = (props) => {
 
   return (
     <div className="space-y-6">
-      {/* Patient Header Card - shown on overview and some sections */}
-      {patient && (activeSection === 'overview' || activeSection === 'basic') && (
-        <Card className="mb-6 border-none shadow-lg bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 border-4 border-white/30">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-white/20 text-white text-2xl">
-                    {patient.fullName && patient.fullName.length > 0
-                      ? patient.fullName
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2)
-                      : 'P'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="text-2xl font-bold">{patient.fullName || 'Bệnh nhân'}</h2>
-                  <p className="text-white/80 text-sm">{patient.email || 'Chưa cập nhật email'}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Route to different sections */}
       {activeSection === 'overview' && (
         <OverviewSection
@@ -89,6 +59,37 @@ const PatientContent: React.FC<PatientContentProps> = (props) => {
           recentAppointments={props.recentAppointments}
           treatments={props.treatments}
           onBookAppointment={onBookAppointment}
+          patientId={patient?.id}
+          emergencyContactName={patient?.emergencyContactName}
+          emergencyPhoneNumber={patient?.emergencyPhoneNumber}
+          medicalConditions={[
+            ...(patient?.allergy ? [{ type: 'allergy' as const, label: `DỊ ỨNG: ${patient.allergy}` }] : []),
+            // Có thể thêm các điều kiện y tế khác từ patient data
+          ]}
+          onEditInfo={() => {
+            // Navigate to basic info section
+            if (props.onSectionChange) {
+              props.onSectionChange('basic');
+            }
+          }}
+          onAddNote={() => {
+            // TODO: Implement add note functionality
+            console.log('Add note clicked');
+          }}
+          onCreateExamination={() => {
+            // Navigate to initial examination
+            if (props.onSectionChange) {
+              props.onSectionChange('initial');
+            }
+          }}
+          onSendReminder={() => {
+            // TODO: Implement send reminder functionality
+            console.log('Send reminder clicked');
+          }}
+          onViewOdontogramDetail={() => {
+            // TODO: Navigate to detailed odontogram view
+            console.log('View odontogram detail clicked');
+          }}
         />
       )}
 

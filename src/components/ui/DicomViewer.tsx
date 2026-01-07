@@ -188,7 +188,7 @@ const DicomViewer: React.FC<DicomViewerProps> = ({ open, studyId, onClose }) => 
         renderingEngine.enableElement(viewportInput);
 
         // Get viewport and load images
-        if (study.series && study.series.length > 0) {
+        if (study && study.series && study.series.length > 0) {
           const currentSeries = study.series[currentSeriesIndex];
           if (currentSeries.instances && currentSeries.instances.length > 0) {
             // Cache imageIds array - only recreate when series changes
@@ -423,7 +423,7 @@ const DicomViewer: React.FC<DicomViewerProps> = ({ open, studyId, onClose }) => 
     if (!open || !viewportRef.current || !study?.series?.[currentSeriesIndex]?.instances) return;
 
     const element = viewportRef.current;
-    const instances = study.series[currentSeriesIndex].instances || [];
+    const instances = study?.series?.[currentSeriesIndex]?.instances || [];
     const maxIndex = instances.length - 1;
 
     const handleWheel = (event: WheelEvent) => {
@@ -527,7 +527,7 @@ const DicomViewer: React.FC<DicomViewerProps> = ({ open, studyId, onClose }) => 
 
   const handleNextInstance = () => {
     if (!study?.series?.[currentSeriesIndex]?.instances) return;
-    const instances = study.series[currentSeriesIndex].instances || [];
+    const instances = study?.series?.[currentSeriesIndex]?.instances || [];
     if (currentInstanceIndex < instances.length - 1) {
       setCurrentInstanceIndex(currentInstanceIndex + 1);
     }
@@ -548,6 +548,7 @@ const DicomViewer: React.FC<DicomViewerProps> = ({ open, studyId, onClose }) => 
   };
 
   const handlePrevSeries = () => {
+    if (!study?.series) return;
     if (currentSeriesIndex > 0) {
       setCurrentSeriesIndex(currentSeriesIndex - 1);
       setCurrentInstanceIndex(0);

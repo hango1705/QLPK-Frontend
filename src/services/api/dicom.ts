@@ -74,14 +74,11 @@ export const dicomAPI = {
     if (examinationId) formData.append('examinationId', examinationId);
     if (treatmentPhaseId) formData.append('treatmentPhaseId', treatmentPhaseId);
 
+    // For FormData, axios will automatically set Content-Type with boundary
+    // The interceptor will remove default Content-Type header
     const response = await apiClient.post<{ code: number; result: DicomStudyResponse }>(
       '/api/v1/dicom/upload',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     return response.data.result;
   },

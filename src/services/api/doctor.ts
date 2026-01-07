@@ -137,6 +137,7 @@ export interface TreatmentPlanPayload {
 }
 
 export interface TreatmentPlanUpdatePayload {
+  id?: string;
   title: string;
   description: string;
   duration: string;

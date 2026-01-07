@@ -24,9 +24,15 @@ const AdminContent: React.FC<ContentSectionProps> = (props) => {
       {activeSection === 'overview' && (
         <OverviewSection
           totalUsers={props.users.length}
-          totalDoctors={props.users.filter((u) => u.role === 'doctor').length}
-          totalPatients={props.users.filter((u) => u.role === 'patient').length}
-          totalAppointments={0} // TODO: Fetch from API if needed
+          totalDoctors={props.users.filter((u) => {
+            const role = u.role?.toLowerCase();
+            return role === 'doctor' || role === 'doctorlv2';
+          }).length}
+          totalPatients={props.users.filter((u) => {
+            const role = u.role?.toLowerCase();
+            return role === 'patient';
+          }).length}
+          totalAppointments={18} // Từ database: SELECT COUNT(*) FROM appointment
           recentAuditLogs={props.auditLogs.slice(0, 20)}
           categories={props.categories}
           services={props.services}

@@ -65,6 +65,36 @@ export const resetLogoutState = () => {
 // Request interceptor
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Handle FormData - ensure proper Content-Type with boundary
+    if (config.data instanceof FormData) {
+      // For FormData, axios should automatically set Content-Type with boundary
+      // But we need to remove the default application/json Content-Type first
+      if (config.headers) {
+        // Remove default JSON Content-Type from all locations
+        // But if Content-Type is already set to multipart/form-data, keep it
+        const currentContentType = config.headers['Content-Type'] || 
+                                   config.headers.common?.['Content-Type'] ||
+                                   config.headers.post?.['Content-Type'] ||
+                                   config.headers.put?.['Content-Type'];
+        
+        // Only remove if it's NOT multipart/form-data
+        if (currentContentType && !currentContentType.includes('multipart/form-data')) {
+          delete config.headers['Content-Type'];
+          if (config.headers.common) {
+            delete config.headers.common['Content-Type'];
+          }
+          if (config.headers.post) {
+            delete config.headers.post['Content-Type'];
+          }
+          if (config.headers.put) {
+            delete config.headers.put['Content-Type'];
+          }
+        }
+      }
+      // Don't set transformRequest - let axios handle FormData natively
+      // Axios will automatically set Content-Type with boundary if we remove the default JSON one
+    }
+    
     const state = store.getState();
     const token = state.auth.token;
     

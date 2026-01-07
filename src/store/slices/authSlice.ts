@@ -2,6 +2,8 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authAPI } from '@/services/api/auth';
 import { decodeTokenPayload, extractRoleFromToken, isTokenExpired } from '@/utils/auth';
 import { tokenStorage } from '@/utils/tokenStorage';
+import { queryClient } from '@/services/queryClient';
+import { resetLogoutState } from '@/services/api/client';
 
 export interface User {
   id: string;
@@ -385,6 +387,19 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
+        // Clear all cached queries when a new user logs in to avoid
+        // showing stale/empty data from a previous session with the same query keys
+        try {
+          queryClient.clear();
+        } catch {
+          // Ignore cache clear errors to keep reducer safe
+        }
+        // Ensure any global logout flags in api client are reset
+        try {
+          resetLogoutState();
+        } catch {
+          // Ignore errors from resetting logout state
+        }
         state.isLoading = false;
         state.token = action.payload.token;
         state.refreshToken = action.payload.refreshToken || null;
@@ -452,6 +467,20 @@ const authSlice = createSlice({
       
       // Logout
       .addCase(logoutUser.fulfilled, (state) => {
+        // Clear cached queries on logout so the next login (possibly with another role)
+        // will always refetch fresh data instead of reusing stale cache
+        try {
+          queryClient.clear();
+        } catch {
+          // Ignore cache clear errors
+        }
+        // Reset global logout state in api client so that new requests
+        // after logout are not blocked by 'Logout in progress' guard
+        try {
+          resetLogoutState();
+        } catch {
+          // Ignore errors from resetting logout state
+        }
         state.user = null;
         state.token = null;
         state.refreshToken = null;

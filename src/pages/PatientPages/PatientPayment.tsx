@@ -247,19 +247,8 @@ const PatientPayment = () => {
     .reduce((sum, p) => sum + p.amount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="pl-4 sm:pl-6 lg:pl-8 pr-0">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Thanh toán</h1>
-            </div>
-            {/* Ẩn nút thêm thanh toán */}
-          </div>
-        </div>
-      </div>
-
+    // Remove gray background container to align with Patient overview page
+    <div className="min-h-screen">
       {/* Main Content */}
       <div className="px-0 py-8">
         {error && (

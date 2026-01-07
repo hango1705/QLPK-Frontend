@@ -148,7 +148,6 @@ const AppointmentsCalendar: React.FC<AppointmentsCalendarProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/70 bg-white/60 px-4 py-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Quản lý lịch hẹn</h3>
-          <p className="text-xs text-muted-foreground">Tự động đồng bộ slot đã đặt & trạng thái</p>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <Badge className="bg-primary/10 text-primary">

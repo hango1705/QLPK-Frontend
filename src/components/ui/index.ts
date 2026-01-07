@@ -44,6 +44,9 @@ export {
 } from './dialog';
 export { Label } from './label';
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './tooltip';
+export { default as ImageViewer } from './ImageViewer';
+export { default as DicomViewer } from './DicomViewer';
+export { default as AiAnalysisViewer } from './AiAnalysisViewer';
 
 // Types
 export type { ButtonProps } from './Button';
