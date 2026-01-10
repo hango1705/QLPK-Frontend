@@ -254,6 +254,21 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
     }
   }, [toothStatusMap, initialSelected]);
 
+  // Helper function to extract description before "Ghi chú:"
+  const extractDescriptionBeforeNote = (text: string | null | undefined): string => {
+    if (!text) return 'Không xác định';
+    
+    // Tìm vị trí của "Ghi chú:" (case insensitive)
+    const noteIndex = text.toLowerCase().indexOf('ghi chú:');
+    if (noteIndex !== -1) {
+      // Lấy phần trước "Ghi chú:" và trim
+      return text.substring(0, noteIndex).trim();
+    }
+    
+    // Nếu không có "Ghi chú:", trả về toàn bộ text
+    return text.trim();
+  };
+
   // Format next appointment
   const nextAppointmentData = useMemo(() => {
     if (!nextAppointment) return null;
@@ -311,6 +326,12 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                       DỊ ỨNG: {patient.allergy.toUpperCase()}
                     </Badge>
                   )}
+                  {patient?.bloodGroup && (
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-100">
+                      <Activity className="h-3 w-3 mr-1" />
+                      NHÓM MÁU: {patient.bloodGroup.toUpperCase()}
+                    </Badge>
+                  )}
                   {medicalConditions
                     .filter((c) => c.type === 'disease')
                     .map((condition, idx) => (
@@ -341,14 +362,6 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
               >
                 <Edit className="h-4 w-4" />
                 Sửa thông tin
-              </Button>
-              <Button
-                size="sm"
-                onClick={onAddNote}
-                className="gap-2 bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="h-4 w-4" />
-                Thêm ghi chú
               </Button>
             </div>
           </div>
@@ -390,12 +403,15 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                 </div>
               </div>
               {emergencyContactName && (
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-gray-500 uppercase mb-2">Liên hệ khẩn cấp</p>
-                  <p className="text-sm font-medium">
-                    {emergencyContactName}
-                    {emergencyPhoneNumber && ` (${emergencyPhoneNumber})`}
-                  </p>
+                <div className="flex items-start gap-3 pt-3 border-t">
+                  <Phone className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase mb-1">Liên hệ khẩn cấp</p>
+                    <p className="text-sm font-medium">
+                      {emergencyContactName}
+                      {emergencyPhoneNumber && ` (${emergencyPhoneNumber})`}
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -459,19 +475,8 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Smile className="h-5 w-5" />
-                Sơ đồ răng nhanh
+                Sơ đồ răng
               </CardTitle>
-              {onViewOdontogramDetail && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onViewOdontogramDetail}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Xem chi tiết
-                </Button>
-              )}
             </CardHeader>
             <CardContent>
               <div className="bg-white rounded-lg p-4">
@@ -605,14 +610,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
                 <CardTitle className="text-lg">Lịch sử điều trị gần đây</CardTitle>
-                <CardDescription>3 điều trị gần nhất</CardDescription>
               </div>
-              {onCreateExamination && (
-                <Button size="sm" onClick={onCreateExamination} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Tạo phiếu khám
-                </Button>
-              )}
             </CardHeader>
             <CardContent>
               {treatments.length > 0 ? (
@@ -621,46 +619,49 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                     <thead>
                       <tr className="border-b text-left">
                         <th className="pb-2 text-xs font-semibold text-gray-600 uppercase">Ngày</th>
-                        <th className="pb-2 text-xs font-semibold text-gray-600 uppercase">Răng</th>
                         <th className="pb-2 text-xs font-semibold text-gray-600 uppercase">Thủ thuật</th>
                         <th className="pb-2 text-xs font-semibold text-gray-600 uppercase">Bác sĩ</th>
                         <th className="pb-2 text-xs font-semibold text-gray-600 uppercase">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {treatments.slice(0, 3).map((treatment: any, idx: number) => (
-                        <tr key={idx} className="border-b hover:bg-gray-50">
-                          <td className="py-3 text-sm">
-                            {treatment.date ? formatDate(treatment.date) : '-'}
-                          </td>
-                          <td className="py-3 text-sm">
-                            {treatment.toothNumber ? `R${treatment.toothNumber}` : 'Toàn hàm'}
-                          </td>
-                          <td className="py-3 text-sm font-medium">
-                            {treatment.name || treatment.procedure || 'Không xác định'}
-                          </td>
-                          <td className="py-3 text-sm">
-                            {treatment.doctorName || treatment.doctor || 'Chưa xác định'}
-                          </td>
-                          <td className="py-3">
-                            <Badge
-                              className={
-                                treatment.status === 'completed' || treatment.status === 'done'
-                                  ? 'bg-green-100 text-green-800 border-green-300'
+                      {treatments.slice(0, 3).map((treatment: any, idx: number) => {
+                        // Extract description before "Ghi chú:" if exists
+                        const displayText = extractDescriptionBeforeNote(
+                          treatment.name || treatment.description || treatment.procedure
+                        );
+                        
+                        return (
+                          <tr key={idx} className="border-b hover:bg-gray-50">
+                            <td className="py-3 text-sm pr-6">
+                              {treatment.date ? formatDate(treatment.date) : '-'}
+                            </td>
+                            <td className="py-3 text-sm font-medium">
+                              {displayText}
+                            </td>
+                            <td className="py-3 text-sm">
+                              {treatment.doctorName || treatment.doctor || 'Chưa xác định'}
+                            </td>
+                            <td className="py-3">
+                              <Badge
+                                className={
+                                  treatment.status === 'completed' || treatment.status === 'done'
+                                    ? 'bg-green-100 text-green-800 border-green-300'
+                                    : treatment.status === 'in-progress'
+                                    ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                    : 'bg-gray-100 text-gray-800 border-gray-300'
+                                }
+                              >
+                                {treatment.status === 'completed' || treatment.status === 'done'
+                                  ? 'Hoàn thành'
                                   : treatment.status === 'in-progress'
-                                  ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
-                                  : 'bg-gray-100 text-gray-800 border-gray-300'
-                              }
-                            >
-                              {treatment.status === 'completed' || treatment.status === 'done'
-                                ? 'Hoàn thành'
-                                : treatment.status === 'in-progress'
-                                ? 'Đang thực hiện'
-                                : 'Đã lên kế hoạch'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
+                                  ? 'Đang thực hiện'
+                                  : 'Đã lên kế hoạch'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

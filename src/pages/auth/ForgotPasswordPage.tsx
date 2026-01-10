@@ -69,9 +69,14 @@ const ForgotPasswordPage = () => {
     try {
       const result = await forgotPassword(data.username);
       if (result.type === 'auth/forgotPassword/fulfilled') {
+        // Success - show success message and move to next step
+        const message = (result.payload as any)?.message || 'Link khôi phục mật khẩu đã được gửi tới email của bạn.';
+        showNotification.success(message);
         setStep(2);
-      } else {
-        showNotification.error(result.payload || 'Gửi yêu cầu thất bại');
+      } else if (result.type === 'auth/forgotPassword/rejected') {
+        // Error - show error message
+        const errorMsg = result.payload as string || 'Gửi yêu cầu thất bại';
+        showNotification.error(errorMsg);
       }
     } catch (error) {
       showNotification.error('Có lỗi xảy ra. Vui lòng thử lại.');
@@ -153,7 +158,12 @@ const ForgotPasswordPage = () => {
           </div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <Input {...register('username')} type="text" placeholder="Tên đăng nhập" error={!!errors.username} helperText={errors.username?.message} />
-            <Button type="submit" variant="primary" size="lg" loading={isLoading} className="w-full">Gửi link khôi phục</Button>
+            <div className="flex flex-col items-center gap-4">
+              <Button type="submit" variant="primary" size="lg" loading={isLoading}>Gửi link khôi phục</Button>
+              <Link to="/login">
+                <Button type="button" variant="outline" size="lg">Quay lại trang đăng nhập</Button>
+              </Link>
+            </div>
           </form>
           </>) }
         {step === 2 && (

@@ -105,11 +105,13 @@ const ResetPasswordPage = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <Input {...register('newPassword')} type="password" placeholder="Mật khẩu mới" error={!!errors.newPassword} helperText={errors.newPassword?.message} />
             <Input {...register('confirmPassword')} type="password" placeholder="Nhập lại mật khẩu mới" error={!!errors.confirmPassword} helperText={errors.confirmPassword?.message} />
-            <Button type="submit" variant="primary" size="lg" loading={isLoading} className="w-full">Lưu mật khẩu mới</Button>
+            <div className="flex flex-col gap-6 items-center">
+              <Button type="submit" variant="primary" size="lg" loading={isLoading} className="min-w-[200px]">Lưu mật khẩu mới</Button>
+              <Link to="/login">
+                <Button variant="outline" size="lg" className="min-w-[200px]">Quay lại trang đăng nhập</Button>
+              </Link>
+            </div>
           </form>
-          <div className="mt-6 text-center">
-            <Link to="/login" className="text-primary font-medium hover:underline">← Quay lại đăng nhập</Link>
-          </div>
         </div>
       </div>
     </div>

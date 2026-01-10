@@ -4,6 +4,33 @@ import type { TreatmentPhase } from '@/types/doctor';
 import type { DoctorSummary } from '@/types/doctor';
 import type { NurseInfo } from '@/services/api/nurse';
 
+// Import font files as URLs using Vite's ?url suffix
+import BeVietnamProRegular from '@/fonts/Be_Vietnam_Pro/BeVietnamPro-Regular.ttf?url';
+import BeVietnamProMedium from '@/fonts/Be_Vietnam_Pro/BeVietnamPro-Medium.ttf?url';
+import BeVietnamProBold from '@/fonts/Be_Vietnam_Pro/BeVietnamPro-Bold.ttf?url';
+
+// Register Be Vietnam Pro font family
+Font.register({
+  family: 'BeVietnamPro',
+  fonts: [
+    {
+      src: BeVietnamProRegular,
+      fontWeight: 400,
+      fontStyle: 'normal',
+    },
+    {
+      src: BeVietnamProMedium,
+      fontWeight: 500,
+      fontStyle: 'normal',
+    },
+    {
+      src: BeVietnamProBold,
+      fontWeight: 700,
+      fontStyle: 'normal',
+    },
+  ],
+});
+
 interface TreatmentPlanApi {
   id: string;
   title: string;
@@ -19,36 +46,10 @@ interface TreatmentPlanApi {
   createAt?: string;
 }
 
-// Đăng ký font Roboto từ Google Fonts
-// Lưu ý: Link bạn copy là CSS link (https://fonts.googleapis.com/css2?...)
-// Cần mở link đó trong browser để lấy URL trực tiếp đến file font (.woff2)
-// Hoặc sử dụng URL trực tiếp từ fonts.gstatic.com như bên dưới
-Font.register({
-  family: 'Roboto',
-  fonts: [
-    {
-      // Roboto Regular (400) - URL trực tiếp đến file font
-      // Để lấy URL: Mở https://fonts.googleapis.com/css2?family=Roboto:wght@400 trong browser
-      // Tìm @font-face và copy URL từ src: url('...')
-      src: 'https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbVmbiArmlw.woff2',
-      fontWeight: 400,
-      fontStyle: 'normal',
-    },
-    {
-      // Roboto Bold (700) - URL trực tiếp đến file font
-      // Để lấy URL: Mở https://fonts.googleapis.com/css2?family=Roboto:wght@700 trong browser
-      // Tìm @font-face và copy URL từ src: url('...')
-      src: 'https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjalmbiArmlw.woff2',
-      fontWeight: 700,
-      fontStyle: 'normal',
-    },
-  ],
-});
-
-// Styles - Sử dụng font Roboto
+// Styles - Sử dụng font BeVietnamPro
 const styles = StyleSheet.create({
   page: {
-    fontFamily: 'Roboto',
+    fontFamily: 'BeVietnamPro',
     padding: 40,
     fontSize: 10,
     lineHeight: 1.5,
@@ -149,14 +150,9 @@ const TreatmentPlanPDF: React.FC<TreatmentPlanPDFProps> = ({ plan, doctor, nurse
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     try {
-      // Backend trả về định dạng dd/MM/yyyy
       if (dateStr.includes('/')) {
-        const [day, month, year] = dateStr.split('/');
-        if (day && month && year) {
-          return `${day}/${month}/${year}`;
-        }
+        return dateStr;
       }
-      // Nếu là ISO string hoặc format khác
       const date = new Date(dateStr);
       if (!isNaN(date.getTime())) {
         return date.toLocaleDateString('vi-VN');
@@ -306,13 +302,10 @@ const TreatmentPlanPDF: React.FC<TreatmentPlanPDFProps> = ({ plan, doctor, nurse
         )}
 
         {/* Footer */}
-        <Text
-          style={styles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `Trang ${pageNumber} / ${totalPages} - Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`
-          }
-          fixed
-        />
+        <View style={styles.footer}>
+          <Text>Phác đồ điều trị được tạo bởi hệ thống eDental</Text>
+          <Text>Ngày xuất: {new Date().toLocaleDateString('vi-VN')}</Text>
+        </View>
       </Page>
 
       {/* Danh sách tiến trình - mỗi tiến trình có thể là một trang riêng */}
@@ -368,13 +361,10 @@ const TreatmentPlanPDF: React.FC<TreatmentPlanPDFProps> = ({ plan, doctor, nurse
           </View>
 
           {/* Footer */}
-          <Text
-            style={styles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `Trang ${pageNumber} / ${totalPages} - Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`
-            }
-            fixed
-          />
+          <View style={styles.footer}>
+            <Text>Tiến trình điều trị được tạo bởi hệ thống eDental</Text>
+            <Text>Ngày xuất: {new Date().toLocaleDateString('vi-VN')}</Text>
+          </View>
         </Page>
       ))}
     </Document>

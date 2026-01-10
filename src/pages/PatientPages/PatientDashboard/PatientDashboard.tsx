@@ -64,6 +64,20 @@ const PatientDashboard: React.FC = () => {
     })),
   });
 
+  // Fetch examinations for recent treatment history
+  const { data: examinations = [] } = useQuery({
+    queryKey: ['patient', 'examinations'],
+    queryFn: patientAPI.getMyExaminations,
+    enabled: true,
+  });
+
+  // Fetch appointments to get status for examinations
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['patient', 'appointments'],
+    queryFn: patientAPI.getMyAppointments,
+    enabled: true,
+  });
+
   // Overview data
   const [appointmentCount, setAppointmentCount] = useState<number>(0);
   const [planCount, setPlanCount] = useState<number>(0);
@@ -112,7 +126,8 @@ const PatientDashboard: React.FC = () => {
         setSearchParams(newSearchParams, { replace: true });
       }
     }
-  }, [searchParams, setSearchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Load patient and user info
   useEffect(() => {
@@ -147,73 +162,130 @@ const PatientDashboard: React.FC = () => {
   }, [token]);
 
   // Compute treatments, phases, payments, and activities from React Query data
-  // Directly use phaseQueries but with stable dependencies
+  // Include examinations and treatment phases
   const computedTreatmentData = useMemo(() => {
-    if (!canGetAllTreatmentPhases || !treatmentPlans.length) {
-      return {
-        treatments: [],
-        phasesTotal: 0,
-        payments: 0,
-        activities: [],
-        planCount: 0,
-      };
-    }
-
     const treatmentsList: any[] = [];
     let phasesTotal = 0;
     let payments = 0;
     const acts: Array<{ label: string; date: Date; color: string }> = [];
 
-    treatmentPlans.forEach((plan, index) => {
-      const phases = phaseQueries[index]?.data || [];
-      
-      // Build treatments list
-      phases.forEach((ph: any) => {
-        treatmentsList.push({
-          id: ph.id || `${plan.id}-${ph.phaseNumber}`,
-          planId: plan.id,
-          planTitle: plan.title || 'Phác đồ điều trị',
-          phaseNumber: ph.phaseNumber || 0,
-          name: ph.name || plan.title || 'Phác đồ điều trị',
-          description: ph.description || plan.description || '',
-          date: ph.startDate || plan.createAt,
-          endDate: ph.endDate,
-          status: ph.status || 'in-progress',
-          cost: ph.cost || plan.totalCost || 0,
-          notes: ph.notes || plan.description,
-          doctorName: plan.doctorFullName || '',
-          doctorSpecialization: plan.doctorSpecialization || '',
-        });
-      });
-
-      // Calculate statistics
-      phasesTotal += phases.length || 0;
-      const phasePayments = (phases || []).filter((ph: any) => (ph.cost || 0) > 0).length;
-      if (phasePayments > 0) payments += phasePayments;
-      else if ((plan.totalCost || 0) > 0) payments += 1;
-
-      // Build activities
-      phases.forEach((ph: any) => {
-        const d = ph.startDate ? new Date(ph.startDate.split('/').reverse().join('-')) : null;
-        if (d) {
-          acts.push({
-            label: `Cập nhật tiến trình: ${plan.title} - ${ph.phaseNumber}`,
-            date: d,
-            color: 'green',
-          });
+    // Add examinations that are completed (appointment status = "Done")
+    examinations.forEach((exam: any) => {
+      const appointment = appointments.find((app: any) => app.id === exam.appointmentId);
+      if (appointment && (appointment.status === 'Done' || appointment.status === 'done')) {
+        // Parse examined_at date or use appointment dateTime
+        let examDate: Date | null = null;
+        if (exam.examined_at && typeof exam.examined_at === 'string') {
+          // Try to parse if it's a date string
+          const parsed = new Date(exam.examined_at);
+          if (!isNaN(parsed.getTime())) {
+            examDate = parsed;
+          }
         }
-      });
-      
-      if (plan.createAt) {
-        const d = new Date(plan.createAt.split('/').reverse().join('-'));
-        acts.push({ label: `Nhận phác đồ: ${plan.title}`, date: d, color: 'purple' });
+        if (!examDate && appointment.dateTime) {
+          // Parse appointment dateTime format: "HH:mm dd/MM/yyyy"
+          const parts = appointment.dateTime.split(' ');
+          if (parts.length >= 3) {
+            const datePart = parts.slice(1).join(' '); // "dd/MM/yyyy"
+            const [day, month, year] = datePart.split('/');
+            examDate = new Date(`${year}-${month}-${day}`);
+          }
+        }
+        if (!examDate) {
+          examDate = new Date(); // Fallback to today
+        }
+
+        treatmentsList.push({
+          id: `exam-${exam.id}`,
+          type: 'examination',
+          name: exam.diagnosis || exam.treatment || 'Khám bệnh',
+          description: exam.treatment || exam.diagnosis || '',
+          date: examDate,
+          status: 'completed',
+          cost: exam.totalCost || 0,
+          notes: exam.notes || '',
+          doctorName: exam.examined_at || 'Bác sĩ',
+          toothNumber: null,
+        });
       }
     });
 
+    // Add treatment phases (in-progress and completed)
+    if (canGetAllTreatmentPhases && treatmentPlans.length > 0) {
+      treatmentPlans.forEach((plan, index) => {
+        const phases = phaseQueries[index]?.data || [];
+        
+        // Build treatments list from phases
+        phases.forEach((ph: any) => {
+          // Only include in-progress and completed phases
+          const normalizedStatus = (ph.status || '').toLowerCase();
+          if (normalizedStatus === 'inprogress' || normalizedStatus === 'done' || normalizedStatus === 'completed') {
+            let phaseDate: Date | null = null;
+            if (ph.startDate) {
+              // Parse date format: "dd/MM/yyyy"
+              const parts = ph.startDate.split('/');
+              if (parts.length === 3) {
+                phaseDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              }
+            }
+            if (!phaseDate && plan.createAt) {
+              const parts = plan.createAt.split('/');
+              if (parts.length === 3) {
+                phaseDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              }
+            }
+            if (!phaseDate) {
+              phaseDate = new Date(); // Fallback to today
+            }
+
+            treatmentsList.push({
+              id: ph.id || `phase-${plan.id}-${ph.phaseNumber}`,
+              type: 'treatment_phase',
+              planId: plan.id,
+              planTitle: plan.title || 'Phác đồ điều trị',
+              phaseNumber: ph.phaseNumber || 0,
+              name: ph.description || plan.title || 'Phác đồ điều trị',
+              description: ph.description || plan.description || '',
+              date: phaseDate,
+              endDate: ph.endDate,
+              status: normalizedStatus === 'done' || normalizedStatus === 'completed' ? 'completed' : 'in-progress',
+              cost: ph.cost || plan.totalCost || 0,
+              notes: ph.description || plan.description,
+              doctorName: plan.doctorFullname || '',
+              toothNumber: null,
+            });
+          }
+        });
+
+        // Calculate statistics
+        phasesTotal += phases.length || 0;
+        const phasePayments = (phases || []).filter((ph: any) => (ph.cost || 0) > 0).length;
+        if (phasePayments > 0) payments += phasePayments;
+        else if ((plan.totalCost || 0) > 0) payments += 1;
+
+        // Build activities
+        phases.forEach((ph: any) => {
+          const d = ph.startDate ? new Date(ph.startDate.split('/').reverse().join('-')) : null;
+          if (d) {
+            acts.push({
+              label: `Cập nhật tiến trình: ${plan.title} - ${ph.phaseNumber}`,
+              date: d,
+              color: 'green',
+            });
+          }
+        });
+        
+        if (plan.createAt) {
+          const d = new Date(plan.createAt.split('/').reverse().join('-'));
+          acts.push({ label: `Nhận phác đồ: ${plan.title}`, date: d, color: 'purple' });
+        }
+      });
+    }
+
     // Sort treatments by date (newest first)
     treatmentsList.sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
+      const dateA = a.date instanceof Date ? a.date.getTime() : new Date(a.date || 0).getTime();
+      const dateB = b.date instanceof Date ? b.date.getTime() : new Date(b.date || 0).getTime();
       return dateB - dateA;
     });
 
@@ -230,6 +302,8 @@ const PatientDashboard: React.FC = () => {
   }, [
     treatmentPlans.length,
     canGetAllTreatmentPhases,
+    examinations,
+    appointments,
     // Create stable string key from phaseQueries dataUpdatedAt to avoid changing array size
     phaseQueries.map(q => q.dataUpdatedAt || 0).join(',')
   ]);

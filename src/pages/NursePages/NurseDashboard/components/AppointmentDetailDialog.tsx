@@ -112,7 +112,6 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Chi tiết lịch hẹn</DialogTitle>
-          <DialogDescription>Thông tin chi tiết về lịch hẹn khám bệnh</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">

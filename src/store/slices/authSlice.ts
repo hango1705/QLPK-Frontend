@@ -256,9 +256,20 @@ export const forgotPassword = createAsyncThunk(
   async (username: string, { rejectWithValue }) => {
     try {
       const response = await authAPI.forgotPassword(username);
-      return response.data;
+      // Backend returns ApiResponses with structure: { code: int, result: string }
+      // Check if code is 1000 (success)
+      if (response.data && response.data.code === 1000) {
+        return { success: true, message: response.data.result };
+      } else {
+        // If code is not 1000, treat as error
+        const errorMsg = response.data?.result || 'Failed to send reset password request';
+        return rejectWithValue(errorMsg);
+      }
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to send reset password request');
+      // Backend returns ApiResponses with structure: { code: int, result: string }
+      // Error message is in result field, not message field
+      const errorMessage = error.response?.data?.result || error.response?.data?.message || error.message || 'Failed to send reset password request';
+      return rejectWithValue(errorMessage);
     }
   }
 );

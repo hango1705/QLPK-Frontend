@@ -151,8 +151,73 @@ const TreatmentPhaseDetailDialog: React.FC<TreatmentPhaseDetailDialogProps> = ({
             </div>
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground">Trạng thái</h3>
-              <Badge variant="outline" className="w-fit">
-                {phaseData.status || 'Chưa xác định'}
+              <Badge 
+                variant="outline" 
+                className={`w-fit ${
+                  (() => {
+                    // Determine status based on endDate
+                    if (phaseData.endDate) {
+                      try {
+                        const parseDate = (dateStr: string): Date => {
+                          if (dateStr.includes('/')) {
+                            const parts = dateStr.split('/');
+                            if (parts.length === 3) {
+                              const day = parseInt(parts[0], 10);
+                              const month = parseInt(parts[1], 10) - 1;
+                              const year = parseInt(parts[2], 10);
+                              return new Date(year, month, day);
+                            }
+                          }
+                          return new Date(dateStr);
+                        };
+                        
+                        const endDateObj = parseDate(phaseData.endDate);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        endDateObj.setHours(0, 0, 0, 0);
+                        
+                        if (today >= endDateObj) {
+                          return 'bg-green-50 text-green-700 border-green-300';
+                        }
+                      } catch (error) {
+                        // Fall through to default
+                      }
+                    }
+                    return 'bg-blue-50 text-blue-700 border-blue-300';
+                  })()
+                }`}
+              >
+                {(() => {
+                  // Determine status text based on endDate
+                  if (phaseData.endDate) {
+                    try {
+                      const parseDate = (dateStr: string): Date => {
+                        if (dateStr.includes('/')) {
+                          const parts = dateStr.split('/');
+                          if (parts.length === 3) {
+                            const day = parseInt(parts[0], 10);
+                            const month = parseInt(parts[1], 10) - 1;
+                            const year = parseInt(parts[2], 10);
+                            return new Date(year, month, day);
+                          }
+                        }
+                        return new Date(dateStr);
+                      };
+                      
+                      const endDateObj = parseDate(phaseData.endDate);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      endDateObj.setHours(0, 0, 0, 0);
+                      
+                      if (today >= endDateObj) {
+                        return 'Hoàn thành';
+                      }
+                    } catch (error) {
+                      // Fall through to default
+                    }
+                  }
+                  return 'Đang điều trị';
+                })()}
               </Badge>
             </div>
           </div>

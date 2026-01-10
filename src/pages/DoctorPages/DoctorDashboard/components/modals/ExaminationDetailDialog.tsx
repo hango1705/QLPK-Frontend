@@ -12,7 +12,7 @@ import {
 import ImageViewer from '@/components/ui/ImageViewer';
 import DicomViewer from '@/components/ui/DicomViewer';
 import DicomUploadDialog from '@/components/ui/DicomUploadDialog';
-import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send, Scan, Upload, Brain } from 'lucide-react';
+import { Image as ImageIcon, FileText, Calendar, MessageSquare, Send, Scan, Upload, Eye } from 'lucide-react';
 import type { ExaminationSummary } from '@/types/doctor';
 import { formatDate, formatDateTime, formatCurrency } from '../../utils';
 import { doctorAPI, dicomAPI } from '@/services';
@@ -20,7 +20,6 @@ import { useAuth } from '@/hooks';
 import { isDoctorLV2 } from '@/utils/auth';
 import { showNotification } from '@/components/ui';
 import { useQuery } from '@tanstack/react-query';
-import AiAnalysisViewer from '@/components/ui/AiAnalysisViewer';
 
 interface ExaminationDetailDialogProps {
   open: boolean;
@@ -45,7 +44,6 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedDicomStudyId, setSelectedDicomStudyId] = useState<string | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [aiAnalysisImage, setAiAnalysisImage] = useState<{ url: string; imageId: string } | null>(null);
 
   // Get patientId from examination (may be in examination object or need to fetch from appointment)
   const patientId = React.useMemo(() => {
@@ -230,80 +228,166 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
 
           {examinationData.listImage && examinationData.listImage.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Hình ảnh</h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                {examinationData.listImage.map((image) => {
-                  // Map type từ database sang label tiếng Việt
-                  const getImageTypeLabel = (type: string) => {
-                    switch (type) {
-                      case 'examinationTeeth':
-                        return 'Ảnh răng';
-                      case 'examinationFace':
-                        return 'Ảnh mặt';
-                      case 'examinationXray':
-                        return 'Ảnh X-quang';
-                      default:
-                        return type; // Fallback nếu có type khác
-                    }
-                  };
-
-                  const imageUrl = image.url || (image.publicId 
-                    ? `https://res.cloudinary.com/dn2plfafj/image/upload/${image.publicId}`
-                    : null);
-                  const isXray = image.type === 'examinationXray' || image.type?.toLowerCase().includes('xray');
-
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-muted-foreground">Hình ảnh</h3>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Ảnh răng */}
+                {(() => {
+                  const teethImages = examinationData.listImage.filter(img => 
+                    img.type === 'examinationTeeth' || img.type === 'treatmentPhasesTeeth'
+                  );
                   return (
-                    <div
-                      key={image.publicId}
-                      className="group relative rounded-2xl border border-border/70 bg-muted/30 p-3 transition hover:shadow-medium overflow-visible"
-                    >
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ImageIcon className="h-4 w-4" />
-                        <span>{getImageTypeLabel(image.type || '')}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                          Ảnh răng
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">({teethImages.length})</span>
                       </div>
-                      {imageUrl ? (
-                        <>
-                          <div
-                            className="cursor-pointer relative"
-                            onClick={() => setSelectedImage(imageUrl)}
-                          >
-                            <img
-                              src={imageUrl}
-                              alt={getImageTypeLabel(image.type || '')}
-                              className="mt-2 h-32 w-full rounded-xl object-cover"
-                              loading="lazy"
-                            />
-                            {/* AI Analysis button for X-Ray images */}
-                            {isXray && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="absolute bottom-2 right-2 h-7 min-w-[50px] text-xs bg-blue-600 hover:bg-blue-700 text-white border-none z-20 shadow-lg flex items-center gap-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  // Only set if imageUrl is valid
-                                  if (imageUrl) {
-                                    setAiAnalysisImage({ url: imageUrl, imageId: image.id || '' });
-                                  } else {
-                                    showNotification.warning('Cảnh báo', 'Ảnh không có URL hợp lệ');
-                                  }
-                                }}
+                      {teethImages.length > 0 ? (
+                        <div className="space-y-2">
+                          {teethImages.map((img, idx) => {
+                            const imageUrl = img.url || (img.publicId 
+                              ? `https://res.cloudinary.com/dn2plfafj/image/upload/${img.publicId}`
+                              : null);
+                            return (
+                              <div
+                                key={idx}
+                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all duration-300"
+                                onClick={() => imageUrl && setSelectedImage(imageUrl)}
                               >
-                                <Brain className="h-3 w-3" />
-                                <span>AI</span>
-                              </Button>
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="mt-2 h-32 flex items-center justify-center rounded-xl bg-muted/20 text-xs text-muted-foreground">
-                          Không có ảnh
+                                {imageUrl ? (
+                                  <>
+                                    <img
+                                      src={imageUrl}
+                                      alt="Ảnh răng"
+                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-40 flex items-center justify-center bg-muted/20 text-xs text-muted-foreground">
+                                    Không có ảnh
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Không có ảnh răng</p>
                       )}
                     </div>
                   );
-                })}
+                })()}
+
+                {/* Ảnh mặt */}
+                {(() => {
+                  const faceImages = examinationData.listImage.filter(img => 
+                    img.type === 'examinationFace' || img.type === 'treatmentPhasesFace'
+                  );
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                        <Badge className="bg-green-100 text-green-800 border-green-300">
+                          Ảnh mặt
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">({faceImages.length})</span>
+                      </div>
+                      {faceImages.length > 0 ? (
+                        <div className="space-y-2">
+                          {faceImages.map((img, idx) => {
+                            const imageUrl = img.url || (img.publicId 
+                              ? `https://res.cloudinary.com/dn2plfafj/image/upload/${img.publicId}`
+                              : null);
+                            return (
+                              <div
+                                key={idx}
+                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-green-500 transition-all duration-300"
+                                onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                              >
+                                {imageUrl ? (
+                                  <>
+                                    <img
+                                      src={imageUrl}
+                                      alt="Ảnh mặt"
+                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-40 flex items-center justify-center bg-muted/20 text-xs text-muted-foreground">
+                                    Không có ảnh
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Không có ảnh mặt</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Ảnh X-quang */}
+                {(() => {
+                  const xrayImages = examinationData.listImage.filter(img => 
+                    img.type === 'examinationXray' || img.type === 'treatmentPhasesXray' || img.type?.toLowerCase().includes('xray')
+                  );
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                        <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                          Ảnh X-quang
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">({xrayImages.length})</span>
+                      </div>
+                      {xrayImages.length > 0 ? (
+                        <div className="space-y-2">
+                          {xrayImages.map((img, idx) => {
+                            const imageUrl = img.url || (img.publicId 
+                              ? `https://res.cloudinary.com/dn2plfafj/image/upload/${img.publicId}`
+                              : null);
+                            return (
+                              <div
+                                key={idx}
+                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-all duration-300"
+                                onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                              >
+                                {imageUrl ? (
+                                  <>
+                                    <img
+                                      src={imageUrl}
+                                      alt="Ảnh X-quang"
+                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-40 flex items-center justify-center bg-muted/20 text-xs text-muted-foreground">
+                                    Không có ảnh
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Không có ảnh X-quang</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -407,15 +491,6 @@ const ExaminationDetailDialog: React.FC<ExaminationDetailDialogProps> = ({
         />
       )}
 
-      {/* AI Analysis Viewer */}
-      {aiAnalysisImage && aiAnalysisImage.url && (
-        <AiAnalysisViewer
-          open={!!aiAnalysisImage && !!aiAnalysisImage.url}
-          imageUrl={aiAnalysisImage.url}
-          imageId={aiAnalysisImage.imageId}
-          onClose={() => setAiAnalysisImage(null)}
-        />
-      )}
       <DicomViewer
         open={!!selectedDicomStudyId}
         studyId={selectedDicomStudyId}

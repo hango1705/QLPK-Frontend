@@ -137,8 +137,6 @@ export interface TreatmentPlanPayload {
 }
 
 export interface TreatmentPlanUpdatePayload {
-  id?: string;               // Một số backend dùng id trong body
-  treatmentPlansId?: string; // Một số implementation khác dùng treatmentPlansId
   title: string;
   description: string;
   duration: string;

@@ -115,7 +115,9 @@ export const authAPI = {
   //   }),
     
   forgotPassword: (username: string) =>
-    apiClient.post('/api/v1/auth/forgotPassword', { username }),
+    apiClient.post('/api/v1/auth/forgotPassword', { username }, {
+      timeout: 60000, // 60 seconds timeout for email sending
+    }),
     
   verifyResetPassword: (id: string) =>
     apiClient.post(`/api/v1/auth/verifyResetPassword/${id}`),

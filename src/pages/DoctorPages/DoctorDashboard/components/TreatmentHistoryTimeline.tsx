@@ -2,29 +2,25 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from '@/components/ui';
 import { Clock, CheckCircle2, Hourglass, Activity, FileText, User, Plus } from 'lucide-react';
 import { formatDate, formatDateTime } from '../utils';
-// Note: Install react-vertical-timeline-component if available: npm install react-vertical-timeline-component
-// For now using custom vertical timeline implementation
-
-interface TreatmentHistoryItem {
-  id: string;
-  date: string;
-  condition: string;
-  treatment: string;
-  dentist: string;
-  notes?: string;
-  status: 'done' | 'pending' | 'in-progress';
-  type: 'examination' | 'phase';
-  planId?: string; // ID của treatment plan (nếu là phase)
-  phaseId?: string; // ID của phase (nếu là phase)
-}
+import type { TreatmentPlan, TreatmentPhase } from '@/types/doctor';
 
 interface TreatmentHistoryTimelineProps {
-  treatments: TreatmentHistoryItem[];
+  treatmentPlans: TreatmentPlan[];
+  phasesByPlan: Record<string, TreatmentPhase[]>;
   onPhaseClick?: (planId: string, phaseId: string) => void;
   onAddPhase?: () => void;
+  onCreatePlan?: () => void;
+  onViewPlanDetail?: (plan: TreatmentPlan) => void;
 }
 
-const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ treatments, onPhaseClick, onAddPhase }) => {
+const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ 
+  treatmentPlans, 
+  phasesByPlan, 
+  onPhaseClick, 
+  onAddPhase,
+  onCreatePlan,
+  onViewPlanDetail,
+}) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'done':
@@ -51,45 +47,54 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'done':
-        return 'Hoàn thành';
-      case 'in-progress':
-        return 'Đang điều trị';
-      case 'pending':
-        return 'Chờ xử lý';
-      default:
-        return 'Chưa xác định';
-    }
+  const getStatusLabel = (status?: string) => {
+    if (!status) return 'Chưa xác định';
+    const s = status.toLowerCase();
+    if (s.includes('done') || s.includes('hoàn')) return 'Hoàn thành';
+    if (s.includes('inprogress') || s.includes('đang')) return 'Đang điều trị';
+    if (s.includes('paused')) return 'Tạm dừng';
+    if (s.includes('cancelled') || s.includes('hủy')) return 'Đã hủy';
+    return 'Đang điều trị';
   };
 
-  const formatDateLabel = (date: string) => {
-    if (!date) return 'Chưa có ngày';
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return date;
-      
-      const monthNames = ['Thg 1', 'Thg 2', 'Thg 3', 'Thg 4', 'Thg 5', 'Thg 6', 'Thg 7', 'Thg 8', 'Thg 9', 'Thg 10', 'Thg 11', 'Thg 12'];
-      const day = d.getDate();
-      const month = monthNames[d.getMonth()];
-      return `${day} ${month}`;
-    } catch {
-      return date;
-    }
+  const getStatusFromPlan = (plan: TreatmentPlan): 'done' | 'pending' | 'in-progress' => {
+    const status = plan.status?.toLowerCase() || '';
+    if (status.includes('done') || status.includes('hoàn')) return 'done';
+    if (status.includes('paused') || status.includes('cancelled')) return 'pending';
+    return 'in-progress';
   };
 
-  if (treatments.length === 0) {
+  const getPlanDate = (plan: TreatmentPlan): string => {
+    // Try to get date from first phase
+    const phases = phasesByPlan[plan.id] || [];
+    if (phases.length > 0) {
+      const sortedPhases = phases
+        .filter(p => p.startDate)
+        .sort((p1, p2) => {
+          const date1 = new Date(p1.startDate || 0).getTime();
+          const date2 = new Date(p2.startDate || 0).getTime();
+          return date1 - date2; // Oldest first
+        });
+      if (sortedPhases.length > 0) {
+        return sortedPhases[0].startDate || '';
+      }
+    }
+    // Fallback to createAt
+    return plan.createAt || '';
+  };
+
+
+  if (treatmentPlans.length === 0) {
     return (
       <Card className="border-none bg-white/90 shadow-medium rounded-2xl h-full">
         <CardHeader>
-          <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
-          <CardDescription>Timeline các lần khám và điều trị</CardDescription>
+          <CardTitle className="text-lg">Lịch sử phác đồ</CardTitle>
+          <CardDescription>Timeline các phác đồ điều trị của bệnh nhân</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <p className="text-sm text-muted-foreground">Chưa có lịch sử điều trị</p>
+            <p className="text-sm text-muted-foreground">Chưa có phác đồ điều trị</p>
           </div>
         </CardContent>
       </Card>
@@ -100,18 +105,18 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
     <Card className="border-none bg-white/90 shadow-medium rounded-2xl h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
-          <CardTitle className="text-lg">Lịch sử điều trị</CardTitle>
-          <CardDescription>Timeline các lần khám và điều trị</CardDescription>
+          <CardTitle className="text-lg">Lịch sử phác đồ</CardTitle>
+          <CardDescription>Timeline các phác đồ điều trị của bệnh nhân</CardDescription>
         </div>
-        {onAddPhase && (
+        {onCreatePlan && (
           <Button
             size="sm"
             variant="outline"
-            onClick={onAddPhase}
+            onClick={onCreatePlan}
             className="border-primary/40 text-primary hover:bg-primary/10"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Thêm
+            Thêm phác đồ
           </Button>
         )}
       </CardHeader>
@@ -122,98 +127,103 @@ const TreatmentHistoryTimeline: React.FC<TreatmentHistoryTimelineProps> = ({ tre
 
           {/* Timeline items */}
           <div className="space-y-6 pb-4">
-            {treatments.map((treatment, index) => (
-              <div key={treatment.id} className="relative flex gap-4">
-                {/* Icon */}
-                <div className="relative z-10 flex-shrink-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white border-2 border-blue-500 shadow-md">
-                    {getStatusIcon(treatment.status)}
+            {treatmentPlans.map((plan) => {
+              const planDate = getPlanDate(plan);
+              const status = getStatusFromPlan(plan);
+              const phases = phasesByPlan[plan.id] || [];
+              
+              return (
+                <div key={plan.id} className="relative flex gap-4">
+                  {/* Icon */}
+                  <div className="relative z-10 flex-shrink-0">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white border-2 border-blue-500 shadow-md">
+                      {getStatusIcon(status)}
+                    </div>
                   </div>
-                </div>
 
-                {/* Content */}
-                <div className="flex-1 pb-6">
-                  <div 
-                    className={`rounded-xl border border-border/70 bg-white p-4 shadow-sm transition-shadow ${
-                      treatment.type === 'phase' && onPhaseClick ? 'hover:shadow-md cursor-pointer hover:border-primary/50' : 'hover:shadow-md'
-                    }`}
-                    onClick={() => {
-                      if (treatment.type === 'phase' && treatment.planId && treatment.phaseId && onPhaseClick) {
-                        onPhaseClick(treatment.planId, treatment.phaseId);
-                      }
-                    }}
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-primary">
-                            {formatDateLabel(treatment.date)}
-                          </span>
-                          {treatment.type === 'examination' && (
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
-                              Khám bệnh
-                            </Badge>
-                          )}
-                          {treatment.type === 'phase' && (
+                  {/* Content */}
+                  <div className="flex-1 pb-6">
+                    <div 
+                      className={`rounded-xl border border-border/70 bg-white p-4 shadow-sm transition-shadow ${
+                        onViewPlanDetail ? 'hover:shadow-md cursor-pointer hover:border-primary/50' : ''
+                      }`}
+                      onClick={() => onViewPlanDetail?.(plan)}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-primary">
+                              {formatDate(planDate) || 'Chưa có ngày'}
+                            </span>
                             <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
-                              Tiến trình
+                              Phác đồ
                             </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(treatment.date) || 'Chưa có ngày'}
-                        </p>
-                      </div>
-                      <Badge className={`text-xs ${getStatusBadge(treatment.status)}`}>
-                        {getStatusLabel(treatment.status)}
-                      </Badge>
-                    </div>
-
-                    {/* Condition */}
-                    <div className="mb-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                        Tình trạng
-                      </p>
-                      <p className="text-sm font-medium text-foreground">{treatment.condition}</p>
-                    </div>
-
-                    {/* Treatment */}
-                    <div className="mb-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                        Phương pháp điều trị
-                      </p>
-                      <p className="text-sm text-foreground">{treatment.treatment}</p>
-                    </div>
-
-                    {/* Dentist */}
-                    <div className="mb-2 flex items-center gap-2">
-                      <User className="h-3.5 w-3.5 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-medium">Bác sĩ:</span> {treatment.dentist}
-                      </p>
-                    </div>
-
-                    {/* Notes */}
-                    {treatment.notes && (
-                      <div className="mt-3 pt-3 border-t border-border/50">
-                        <div className="flex items-start gap-2">
-                          <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                              Ghi chú
-                            </p>
-                            <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                              {treatment.notes}
-                            </p>
                           </div>
                         </div>
+                        <Badge className={`text-xs ${getStatusBadge(status)}`}>
+                          {getStatusLabel(plan.status)}
+                        </Badge>
                       </div>
-                    )}
+
+                      {/* Title */}
+                      <div className="mb-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          Tên phác đồ
+                        </p>
+                        <p className="text-sm font-medium text-foreground">{plan.title || 'Không có tiêu đề'}</p>
+                      </div>
+
+                      {/* Description */}
+                      {plan.description && (
+                        <div className="mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                            Mô tả
+                          </p>
+                          <p className="text-sm text-foreground">{plan.description}</p>
+                        </div>
+                      )}
+
+                      {/* Dentist */}
+                      {plan.doctorFullname && (
+                        <div className="mb-2 flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">Bác sĩ:</span> {plan.doctorFullname}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Phases count */}
+                      {phases.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">Số giai đoạn:</span> {phases.length}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {plan.notes && (
+                        <div className="mt-3 pt-3 border-t border-border/50">
+                          <div className="flex items-start gap-2">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                Ghi chú
+                              </p>
+                              <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                                {plan.notes}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </CardContent>

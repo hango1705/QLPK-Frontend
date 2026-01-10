@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Badge } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Badge, Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui';
 import { showNotification } from '@/components/ui';
-import { patientAPI } from '@/services/api/patient';
+import { patientAPI, type CostResponse } from '@/services/api/patient';
 import { doctorAPI } from '@/services/api/doctor';
 import { nurseAPI } from '@/services/api/nurse';
 import type { TreatmentPhase } from '@/types/doctor';
@@ -10,7 +10,7 @@ import type { NurseInfo } from '@/services/api/nurse';
 import { pdf } from '@react-pdf/renderer';
 import TreatmentPlanPDF from './PatientTreatmentPlan/TreatmentPlanPDF';
 import ImageViewer from '@/components/ui/ImageViewer';
-import { CheckCircle2, Hourglass, Activity, Clock, FileText } from 'lucide-react';
+import { CheckCircle2, Hourglass, Activity, Clock, FileText, Stethoscope, Image as ImageIcon, Eye, Wallet } from 'lucide-react';
 
 interface TreatmentPlanApi {
   id: string;
@@ -24,8 +24,56 @@ interface TreatmentPlanApi {
   doctorId?: string;
   nurseId?: string;
   patientId?: string;
-  createAt?: string; // dd/MM/yyyy
+  createAt?: string; // dd/MM/yyyy or ISO date string
 }
+
+// Helper function to format date from various formats to dd/MM/yyyy
+const formatDateDisplay = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  
+  // Backend trả về dd/MM/yyyy format (do @JsonFormat), nên nếu đã đúng format thì return luôn
+  if (dateStr.includes('/') && dateStr.length === 10) {
+    const parts = dateStr.split('/');
+    // Validate format: should be dd/MM/yyyy
+    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+      return dateStr;
+    }
+  }
+  
+  // Nếu không phải dd/MM/yyyy, thử parse từ các format khác
+  try {
+    let date: Date;
+    
+    if (dateStr.includes('T')) {
+      // ISO format: "2025-12-13T17:00:00.000Z"
+      date = new Date(dateStr);
+      // Với ISO string có Z (UTC), dùng UTC methods để lấy đúng ngày
+      if (dateStr.endsWith('Z')) {
+        const day = date.getUTCDate();
+        const month = date.getUTCMonth() + 1;
+        const year = date.getUTCFullYear();
+        return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+      }
+    } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Date-only format: "2025-12-13" - parse as local date
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    } else {
+      date = new Date(dateStr);
+    }
+    
+    if (!isNaN(date.getTime())) {
+      const day = date.getDate();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    }
+  } catch {
+    // If parsing fails, return original string
+  }
+  
+  return dateStr;
+};
 
 const PatientTreatmentPlan = () => {
   // Global loading & data
@@ -41,6 +89,9 @@ const PatientTreatmentPlan = () => {
   // Phases for selected plan
   const [phases, setPhases] = useState<TreatmentPhase[]>([]);
   const [loadingPhases, setLoadingPhases] = useState(false);
+  
+  // Phases for all plans (to get latest start_date)
+  const [allPlansPhases, setAllPlansPhases] = useState<Map<string, TreatmentPhase[]>>(new Map());
 
   // Dialog states
   const [showDoctorDialog, setShowDoctorDialog] = useState(false);
@@ -51,16 +102,41 @@ const PatientTreatmentPlan = () => {
   const [loadingNurse, setLoadingNurse] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+
   useEffect(() => {
     setFetching(true);
     setError(null);
     patientAPI
       .getMyTreatmentPlans()
       .then((data) => {
-        setTreatmentPlans(data);
+        // Map dữ liệu để đảm bảo create_at được map đúng
+        const mappedData: TreatmentPlanApi[] = data.map((plan: any) => ({
+          ...plan,
+          createAt: plan.createAt || plan.create_at || undefined,
+        }));
+        setTreatmentPlans(mappedData);
+        
+        // Fetch phases cho tất cả plans để lấy start_date mới nhất
+        const phasesMap = new Map<string, TreatmentPhase[]>();
+        Promise.all(
+          mappedData.map((plan) =>
+            doctorAPI
+              .getTreatmentPhases(plan.id)
+              .then((phases) => {
+                phasesMap.set(plan.id, phases);
+              })
+              .catch(() => {
+                // Ignore errors, just set empty array
+                phasesMap.set(plan.id, []);
+              })
+          )
+        ).then(() => {
+          setAllPlansPhases(phasesMap);
+        });
+        
         // Chọn mặc định phác đồ đầu tiên
-        if (data && data.length > 0) {
-          setSelectedPlanId((prev) => prev || data[0].id);
+        if (mappedData && mappedData.length > 0) {
+          setSelectedPlanId((prev) => prev || mappedData[0].id);
         }
       })
       .catch(() => setError('Không thể tải phác đồ điều trị'))
@@ -83,6 +159,29 @@ const PatientTreatmentPlan = () => {
       })
       .finally(() => setLoadingPhases(false));
   }, [selectedPlanId]);
+
+
+  // Load nurse info whenever selected plan changes
+  useEffect(() => {
+    if (!selectedPlanId) {
+      setNurseInfo(null);
+      return;
+    }
+    const plan = treatmentPlans.find((p) => p.id === selectedPlanId);
+    if (!plan || !plan.nurseId) {
+      setNurseInfo(null);
+      return;
+    }
+    setLoadingNurse(true);
+    nurseAPI
+      .getNurseInfo(plan.nurseId)
+      .then((data) => setNurseInfo(data))
+      .catch(() => {
+        setNurseInfo(null);
+        // Không hiển thị error notification vì có thể không có nurse
+      })
+      .finally(() => setLoadingNurse(false));
+  }, [selectedPlanId, treatmentPlans]);
 
   const normalizedStatus = (s?: string) => {
     const v = (s || '').toLowerCase();
@@ -110,44 +209,274 @@ const PatientTreatmentPlan = () => {
     }
   };
 
-  const getStatusText = (status: string) => status || 'Không xác định';
+  const getStatusText = (status: string) => {
+    if (!status) return 'Không xác định';
+    const s = status.toLowerCase().trim();
+    
+    // Dịch các label phổ biến sang tiếng Việt
+    if (s === 'inprogress' || s === 'in progress' || s === 'đang điều trị' || s.includes('đang')) {
+      return 'Đang điều trị';
+    }
+    if (s === 'completed' || s === 'hoàn thành' || s.includes('hoàn')) {
+      return 'Hoàn thành';
+    }
+    if (s === 'paused' || s === 'tạm dừng' || s.includes('tạm')) {
+      return 'Tạm dừng';
+    }
+    if (s === 'active' || s === 'đang hoạt động') {
+      return 'Đang điều trị';
+    }
+    if (s === 'planned' || s === 'kế hoạch' || s.includes('kế hoạch')) {
+      return 'Kế hoạch';
+    }
+    if (s === 'cancelled' || s === 'hủy' || s.includes('hủy')) {
+      return 'Đã hủy';
+    }
+    
+    // Nếu không khớp với bất kỳ label nào, trả về status gốc
+    return status;
+  };
+
+  // Helper function to extract description before "Ghi chú:"
+  const extractDescriptionBeforeNote = (text: string | null | undefined): string => {
+    if (!text) return '';
+    
+    // Tìm vị trí của "Ghi chú:" (case insensitive)
+    const noteIndex = text.toLowerCase().indexOf('ghi chú:');
+    if (noteIndex !== -1) {
+      // Lấy phần trước "Ghi chú:" và trim
+      return text.substring(0, noteIndex).trim();
+    }
+    
+    // Nếu không có "Ghi chú:", trả về toàn bộ text
+    return text.trim();
+  };
+
+  // Helper function to extract note after "Ghi chú:"
+  const extractNote = (text: string | null | undefined): string | null => {
+    if (!text) return null;
+    
+    // Tìm vị trí của "Ghi chú:" (case insensitive)
+    const noteIndex = text.toLowerCase().indexOf('ghi chú:');
+    if (noteIndex !== -1) {
+      // Lấy phần sau "Ghi chú:" và trim
+      const noteText = text.substring(noteIndex + 'Ghi chú:'.length).trim();
+      return noteText || null;
+    }
+    
+    return null;
+  };
+
+  // Helper function to determine status based on end_date
+  const getStatusByEndDate = (status?: string, endDate?: string): string => {
+    // Nếu status đã là "Hoàn thành" hoặc "Completed", giữ nguyên
+    const s = (status || '').toLowerCase();
+    if (s.includes('hoàn') || s === 'completed') {
+      return status || 'Hoàn thành';
+    }
+    
+    // Nếu có end_date, kiểm tra xem đã qua ngày end_date chưa
+    if (endDate) {
+      try {
+        // Parse end_date từ format dd/MM/yyyy
+        const parseDate = (dateStr: string): Date => {
+          if (dateStr.includes('/')) {
+            const [day, month, year] = dateStr.split('/').map(Number);
+            return new Date(year, month - 1, day);
+          }
+          // Fallback cho format khác
+          return new Date(dateStr);
+        };
+        
+        const endDateObj = parseDate(endDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        endDateObj.setHours(0, 0, 0, 0);
+        
+        // Nếu ngày hiện tại > end_date → "Hoàn thành"
+        if (today > endDateObj) {
+          return 'Hoàn thành';
+        }
+      } catch (error) {
+        // Nếu parse lỗi, giữ nguyên status
+        console.error('Error parsing end_date:', endDate, error);
+      }
+    }
+    
+    // Nếu chưa qua end_date hoặc không có end_date, giữ nguyên status
+    return status || 'Đang điều trị';
+  };
 
   // Helper functions for timeline status
   const getStatusIcon = (status?: string) => {
     const s = (status || '').toLowerCase();
-    if (s.includes('hoàn')) return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-    if (s.includes('tạm')) return <Hourglass className="h-5 w-5 text-amber-600" />;
-    if (s.includes('đang') || s.includes('diễn')) return <Activity className="h-5 w-5 text-blue-600" />;
+    if (s.includes('hoàn') || s === 'completed' || s === 'hoàn thành') return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+    if (s.includes('tạm') || s === 'paused') return <Hourglass className="h-5 w-5 text-amber-600" />;
+    if (s.includes('đang') || s.includes('diễn') || s === 'inprogress' || s === 'active') return <Activity className="h-5 w-5 text-blue-600" />;
     return <Clock className="h-5 w-5 text-gray-600" />;
   };
 
   const getStatusBadgeClass = (status?: string) => {
     const s = (status || '').toLowerCase();
-    if (s.includes('hoàn')) return 'bg-green-50 text-green-600 border-green-100';
-    if (s.includes('tạm')) return 'bg-amber-50 text-amber-600 border-amber-100';
-    if (s.includes('đang') || s.includes('diễn')) return 'bg-blue-50 text-blue-600 border-blue-100';
+    if (s.includes('hoàn') || s === 'completed' || s === 'hoàn thành') return 'bg-green-50 text-green-600 border-green-100';
+    if (s.includes('tạm') || s === 'paused') return 'bg-amber-50 text-amber-600 border-amber-100';
+    if (s.includes('đang') || s.includes('diễn') || s === 'inprogress' || s === 'active') return 'bg-blue-50 text-blue-600 border-blue-100';
     return 'bg-gray-50 text-gray-600 border-gray-100';
-  };
-
-  const formatDateLabel = (date?: string) => {
-    if (!date) return 'Chưa có ngày';
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return date;
-      
-      const monthNames = ['Thg 1', 'Thg 2', 'Thg 3', 'Thg 4', 'Thg 5', 'Thg 6', 'Thg 7', 'Thg 8', 'Thg 9', 'Thg 10', 'Thg 11', 'Thg 12'];
-      const day = d.getDate();
-      const month = monthNames[d.getMonth()];
-      const year = d.getFullYear();
-      return `${day} ${month} ${year}`;
-    } catch {
-      return date;
-    }
   };
 
   const avatarOf = (name?: string) => {
     const ch = (name || '?').trim().charAt(0).toUpperCase();
     return ch || 'U';
+  };
+
+  const formatCurrency = (amount?: number) => {
+    if (!amount) return '0 VNĐ';
+    return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+  };
+
+  // Helper function to calculate phase cost from services and prescriptions
+  const calculatePhaseCost = (phase: TreatmentPhase): number => {
+    const services = phase.listDentalServicesEntityOrder || [];
+    const prescriptions = phase.listPrescriptionOrder || [];
+    
+    const calculateServiceCost = (service: typeof services[0]) => {
+      if (service.cost && service.cost > 0) {
+        return service.cost;
+      }
+      return (service.quantity || 0) * (service.unitPrice || 0);
+    };
+
+    const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+      if (prescription.cost && prescription.cost > 0) {
+        return prescription.cost;
+      }
+      return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+    };
+
+    const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+    const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+    const calculatedTotal = servicesTotal + prescriptionsTotal;
+    
+    // Nếu có services hoặc prescriptions, dùng calculatedTotal, ngược lại dùng phase.cost
+    if (services.length > 0 || prescriptions.length > 0) {
+      return calculatedTotal;
+    }
+    
+    return phase.cost || 0;
+  };
+
+  // Component để hiển thị tooltip chi tiết giá tiền
+  const CostTooltip: React.FC<{
+    phase: TreatmentPhase;
+    children: React.ReactNode;
+  }> = ({ phase, children }) => {
+    const services = phase.listDentalServicesEntityOrder || [];
+    const prescriptions = phase.listPrescriptionOrder || [];
+    const hasDetails = services.length > 0 || prescriptions.length > 0;
+
+    if (!hasDetails || !phase.cost || phase.cost <= 0) return <>{children}</>;
+
+    // Calculate cost from quantity * unitPrice if cost is not provided or seems incorrect
+    const calculateServiceCost = (service: typeof services[0]) => {
+      if (service.cost && service.cost > 0) {
+        return service.cost;
+      }
+      return (service.quantity || 0) * (service.unitPrice || 0);
+    };
+
+    const calculatePrescriptionCost = (prescription: typeof prescriptions[0]) => {
+      if (prescription.cost && prescription.cost > 0) {
+        return prescription.cost;
+      }
+      return (prescription.quantity || 0) * (prescription.unitPrice || 0);
+    };
+
+    const servicesTotal = services.reduce((sum, item) => sum + calculateServiceCost(item), 0);
+    const prescriptionsTotal = prescriptions.reduce((sum, item) => sum + calculatePrescriptionCost(item), 0);
+    const calculatedTotal = servicesTotal + prescriptionsTotal;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-pointer hover:text-blue-600 transition-colors">
+              {children}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-sm">
+            <div className="space-y-3 text-sm">
+              <div className="font-semibold text-base border-b pb-2">Chi tiết giá tiền</div>
+              
+              {services.length > 0 && (
+                <div>
+                  <div className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <Stethoscope className="h-4 w-4" />
+                    Dịch vụ:
+                  </div>
+                  <div className="space-y-1.5">
+                    {services.map((service, idx) => (
+                      <div key={idx} className="flex items-start justify-between text-xs bg-blue-50/50 p-2 rounded">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{service.name}</div>
+                          <div className="text-gray-600">
+                            {service.quantity} {service.unit} × {formatCurrency(service.unitPrice)}
+                          </div>
+                        </div>
+                        <div className="font-semibold text-blue-600 ml-2">
+                          {formatCurrency(calculateServiceCost(service))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-1 border-t font-semibold">
+                      <span>Tổng dịch vụ:</span>
+                      <span className="text-blue-600">{formatCurrency(servicesTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {prescriptions.length > 0 && (
+                <div>
+                  <div className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Thuốc:
+                  </div>
+                  <div className="space-y-1.5">
+                    {prescriptions.map((prescription, idx) => (
+                      <div key={idx} className="flex items-start justify-between text-xs bg-green-50/50 p-2 rounded">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{prescription.name}</div>
+                          <div className="text-gray-600">
+                            {prescription.quantity} × {formatCurrency(prescription.unitPrice)}
+                          </div>
+                          {prescription.dosage && (
+                            <div className="text-gray-600 text-xs">
+                              Liều: {prescription.dosage} - {prescription.frequency} - {prescription.duration}
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-semibold text-green-600 ml-2">
+                          {formatCurrency(calculatePrescriptionCost(prescription))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-1 border-t font-semibold">
+                      <span>Tổng thuốc:</span>
+                      <span className="text-green-600">{formatCurrency(prescriptionsTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t-2 font-bold text-base">
+                <span>Tổng cộng:</span>
+                <span className="text-blue-600">{formatCurrency(calculatedTotal)}</span>
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   const handleDownloadPDF = async (plan: TreatmentPlanApi) => {
@@ -268,9 +597,11 @@ const PatientTreatmentPlan = () => {
     }
   }, [filteredPlans, selectedPlan]);
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   return (
     <div className="min-h-screen bg-white">
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden relative">
         {error && (
           <Alert variant="destructive" className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-2xl">
             <AlertTitle>Lỗi</AlertTitle>
@@ -278,11 +609,31 @@ const PatientTreatmentPlan = () => {
           </Alert>
         )}
 
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-30"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* LEFT SIDEBAR - Danh sách phác đồ */}
-        <div className="w-80 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Phác đồ điều trị</h2>
-            
+        <div className={`${
+          sidebarOpen ? 'w-80' : 'w-0'
+        } lg:w-80 border-r border-gray-200 bg-white flex flex-col overflow-hidden transition-all duration-300 ${
+          sidebarOpen ? 'fixed lg:relative z-40' : 'hidden lg:flex'
+        }`}>
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            {/* Mobile close button */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden absolute top-4 right-4 p-1 text-gray-500 hover:text-gray-700"
+              aria-label="Close sidebar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             {/* Search Bar */}
             <div className="relative mb-4">
               <svg
@@ -337,7 +688,7 @@ const PatientTreatmentPlan = () => {
           </div>
 
           {/* Treatment Plans List */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
             {fetching && (
               <div className="text-sm text-gray-500 py-8 text-center">Đang tải phác đồ...</div>
             )}
@@ -361,13 +712,6 @@ const PatientTreatmentPlan = () => {
                     >
                       <div className="flex items-start gap-3">
                         {/* Icon placeholder - có thể thay bằng icon thực tế */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          isActive ? 'bg-blue-600' : 'bg-blue-100'
-                        }`}>
-                          <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-blue-600'}`}>
-                            {plan.title?.charAt(0) || 'P'}
-                          </span>
-                        </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-semibold mb-1 line-clamp-1 ${
                             isActive ? 'text-gray-900' : 'text-gray-900'
@@ -375,21 +719,51 @@ const PatientTreatmentPlan = () => {
                             {plan.title || 'Không có tiêu đề'}
                           </p>
                           <p className="text-xs text-gray-600 mb-1">
-                            Mã hồ sơ: #{plan.id.slice(0, 8).toUpperCase()}
+                            Mã phác đồ: {plan.id}
                           </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0A7 7 0 013 16z" clipRule="evenodd" />
-                            </svg>
-                            <span className="text-xs text-gray-600">
-                              {plan.doctorFullname ? `BS. ${plan.doctorFullname}` : 'Chưa có bác sĩ'}
-                            </span>
-                          </div>
-                          {plan.createAt && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Cập nhật: {plan.createAt}
-                            </p>
-                          )}
+                          {(() => {
+                            // Lấy start_date của phase mới nhất
+                            const planPhases = allPlansPhases.get(plan.id) || [];
+                            const latestPhase = planPhases
+                              .filter((p) => p.startDate)
+                              .sort((a, b) => {
+                                // Parse dd/MM/yyyy format
+                                const parseDate = (dateStr: string): number => {
+                                  const parts = dateStr.split('/');
+                                  if (parts.length === 3) {
+                                    const [day, month, year] = parts.map(Number);
+                                    return new Date(year, month - 1, day).getTime();
+                                  }
+                                  // Fallback to ISO format
+                                  return new Date(dateStr).getTime();
+                                };
+                                
+                                try {
+                                  const dateA = parseDate(a.startDate);
+                                  const dateB = parseDate(b.startDate);
+                                  return dateB - dateA; // Descending order
+                                } catch {
+                                  return 0;
+                                }
+                              })[0];
+                            
+                            if (latestPhase?.startDate) {
+                              return (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Cập nhật: {formatDateDisplay(latestPhase.startDate)}
+                                </p>
+                              );
+                            }
+                            // Fallback to createAt if no phases
+                            if (plan.createAt) {
+                              return (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Cập nhật: {formatDateDisplay(plan.createAt)}
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ${
@@ -412,7 +786,17 @@ const PatientTreatmentPlan = () => {
         </div>
 
         {/* RIGHT SIDE - Chi tiết phác đồ */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="flex-1 overflow-y-auto bg-gray-50 relative">
+          {/* Mobile sidebar toggle button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-white rounded-md shadow-md border border-gray-200 hover:bg-gray-50"
+            aria-label="Toggle sidebar"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           {!selectedPlan ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -420,12 +804,13 @@ const PatientTreatmentPlan = () => {
               </div>
             </div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Header Section */}
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm">
+                {/* Title and Status */}
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h1 className="text-2xl font-bold text-gray-900">
                         {selectedPlan.title}
                       </h1>
@@ -441,31 +826,51 @@ const PatientTreatmentPlan = () => {
                         {getStatusText(selectedPlan.status)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {selectedPlan.description ||
-                        'Phác đồ điều trị chi tiết nhằm tối ưu kết quả điều trị và trải nghiệm cho bệnh nhân.'}
-                    </p>
+                    {selectedPlan.createAt && (
+                      <p className="text-xs text-gray-500">
+                        Ngày tạo: {formatDateDisplay(selectedPlan.createAt)}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDownloadPDF(selectedPlan)}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 flex-1 sm:flex-initial"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
-                      In phác đồ
-                    </Button>
-                    <Button variant="primary" size="sm" className="flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Đặt lịch hẹn
+                      <span className="hidden sm:inline">Tải xuống phác đồ</span>
+                      <span className="sm:hidden">Tải xuống</span>
                     </Button>
                   </div>
                 </div>
+
+                {/* Description Section */}
+                {selectedPlan.description && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Mô tả</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {selectedPlan.description}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes Section */}
+                {selectedPlan.notes && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Ghi chú</h3>
+                    <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {selectedPlan.notes}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
@@ -500,39 +905,18 @@ const PatientTreatmentPlan = () => {
                   </div>
                   <div className="bg-amber-50 rounded-lg px-4 py-3 border border-amber-100">
                     <p className="text-xs font-medium text-amber-700 uppercase tracking-wide mb-1">
-                      Tiến độ
+                      Tổng tiến trình
                     </p>
-                    <div className="mt-1">
-                      <p className="text-lg font-semibold text-amber-900 mb-1">
-                        {phases.length
-                          ? `${Math.round(
-                              (phases.filter((p) => p.status?.toLowerCase().includes('hoàn')).length /
-                                phases.length) *
-                                100
-                            )}%`
-                          : '0%'}
-                      </p>
-                      <div className="w-full bg-amber-200 rounded-full h-2">
-                        <div
-                          className="bg-amber-600 h-2 rounded-full transition-all"
-                          style={{
-                            width: phases.length
-                              ? `${Math.round(
-                                  (phases.filter((p) => p.status?.toLowerCase().includes('hoàn')).length /
-                                    phases.length) *
-                                    100
-                                )}%`
-                              : '0%',
-                          }}
-                        />
-                      </div>
-                    </div>
+                    <p className="text-lg font-semibold text-amber-900">
+                      {phases.length || 0}
+                    </p>
                   </div>
                 </div>
+
               </div>
 
                 {/* Đội ngũ điều trị */}
-                <Card className="p-6">
+                <Card className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-semibold text-gray-900">Đội ngũ điều trị</h3>
                   </div>
@@ -586,7 +970,7 @@ const PatientTreatmentPlan = () => {
                 </Card>
 
                 {/* Chi tiết các giai đoạn */}
-                <Card className="p-6">
+                <Card className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-semibold text-gray-900">Chi tiết các giai đoạn</h3>
                   </div>
@@ -610,7 +994,7 @@ const PatientTreatmentPlan = () => {
                             {/* Icon */}
                             <div className="relative z-10 flex-shrink-0">
                               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white border-2 border-blue-500 shadow-md">
-                                {getStatusIcon(phase.status)}
+                                {getStatusIcon(getStatusByEndDate(phase.status, phase.endDate))}
                               </div>
                             </div>
 
@@ -622,27 +1006,40 @@ const PatientTreatmentPlan = () => {
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-xs font-semibold text-blue-600">
-                                        {formatDateLabel(phase.startDate)}
+                                        {formatDateDisplay(phase.startDate)}
                                       </span>
                                       <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
                                         Tiến trình {phase.phaseNumber}
                                       </Badge>
                                     </div>
-                                    <h4 className="text-sm font-semibold text-gray-900 mt-1">
-                                      {phase.description?.split('.')[0] || `Giai đoạn ${phase.phaseNumber}`}
-                                    </h4>
                                   </div>
-                                  <Badge className={`text-xs ${getStatusBadgeClass(phase.status)}`}>
-                                    {phase.status || 'Đang thực hiện'}
+                                  <Badge className={`text-xs ${getStatusBadgeClass(getStatusByEndDate(phase.status, phase.endDate))}`}>
+                                    {getStatusText(getStatusByEndDate(phase.status, phase.endDate))}
                                   </Badge>
                                 </div>
 
                                 {/* Description */}
                                 {phase.description && (
-                                  <div className="mb-3">
-                                    <p className="text-sm text-gray-700 leading-relaxed">
-                                      {phase.description}
-                                    </p>
+                                  <div className="mb-3 space-y-3">
+                                    {/* Mô tả - phần trước "Ghi chú:" */}
+                                    {extractDescriptionBeforeNote(phase.description) && (
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-gray-600 mb-1">Mô tả</h5>
+                                        <p className="text-sm text-gray-700 leading-relaxed">
+                                          {extractDescriptionBeforeNote(phase.description)}
+                                        </p>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Ghi chú - phần sau "Ghi chú:" */}
+                                    {extractNote(phase.description) && (
+                                      <div className="pt-2 border-t border-gray-200">
+                                        <h5 className="text-xs font-semibold text-gray-600 mb-1">Ghi chú</h5>
+                                        <p className="text-sm text-gray-700 leading-relaxed">
+                                          {extractNote(phase.description)}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
 
@@ -651,23 +1048,31 @@ const PatientTreatmentPlan = () => {
                                   {phase.startDate && (
                                     <div>
                                       <span className="text-gray-500 font-medium">Ngày bắt đầu: </span>
-                                      <span className="text-gray-900">{phase.startDate}</span>
+                                      <span className="text-gray-900">{formatDateDisplay(phase.startDate)}</span>
                                     </div>
                                   )}
                                   {phase.endDate && (
                                     <div>
                                       <span className="text-gray-500 font-medium">Ngày kết thúc: </span>
-                                      <span className="text-gray-900">{phase.endDate}</span>
+                                      <span className="text-gray-900">{formatDateDisplay(phase.endDate)}</span>
                                     </div>
                                   )}
-                                  {phase.cost && (
-                                    <div>
-                                      <span className="text-gray-500 font-medium">Chi phí: </span>
-                                      <span className="text-gray-900">
-                                        {new Intl.NumberFormat('vi-VN').format(phase.cost) + ' ₫'}
-                                      </span>
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    const phaseCost = calculatePhaseCost(phase);
+                                    if (phaseCost > 0) {
+                                      return (
+                                        <div>
+                                          <span className="text-gray-500 font-medium">Chi phí: </span>
+                                          <CostTooltip phase={phase}>
+                                            <span className="text-gray-900 font-medium">
+                                              {new Intl.NumberFormat('vi-VN').format(phaseCost) + ' ₫'}
+                                            </span>
+                                          </CostTooltip>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                   {phase.nextAppointment && (
                                     <div className="sm:col-span-2 md:col-span-1">
                                       <span className="text-gray-500 font-medium">Lịch hẹn tiếp theo: </span>
@@ -697,47 +1102,132 @@ const PatientTreatmentPlan = () => {
                                   </div>
                                 )}
 
-                                {/* Images */}
+                                {/* Images - Chia 3 phần như PatientInitialExamination */}
                                 {phase.listImage && phase.listImage.length > 0 && (
                                   <div className="mt-3 pt-3 border-t border-gray-200">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                      Hình ảnh
-                                    </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                      {phase.listImage.map((img, idx) => {
-                                        const getImageTypeLabel = (type: string) => {
-                                          switch (type) {
-                                            case 'treatmentPhasesTeeth':
-                                            case 'examinationTeeth':
-                                              return 'Ảnh răng';
-                                            case 'treatmentPhasesFace':
-                                            case 'examinationFace':
-                                              return 'Ảnh mặt';
-                                            case 'treatmentPhasesXray':
-                                            case 'examinationXray':
-                                              return 'Ảnh X-quang';
-                                            default:
-                                              return type;
-                                          }
-                                        };
-
+                                    <div className="flex items-center gap-2 mb-4">
+                                      <ImageIcon className="h-4 w-4 text-gray-500" />
+                                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                        Hình ảnh
+                                      </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                      {/* Ảnh răng */}
+                                      {(() => {
+                                        const teethImages = phase.listImage.filter(img => 
+                                          img.type === 'treatmentPhasesTeeth' || img.type === 'examinationTeeth'
+                                        );
                                         return (
-                                          <div
-                                            key={idx}
-                                            className="flex flex-col cursor-pointer group"
-                                            onClick={() => img.url && setSelectedImage(img.url)}
-                                          >
-                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium bg-blue-600 text-white shadow-sm mb-2 w-fit group-hover:bg-blue-700 transition-colors">
-                                              {getImageTypeLabel(img.type || '')}
-                                            </span>
-                                            <img
-                                              src={img.url}
-                                              alt={`treatment phase ${img.type || ''}`}
-                                              className="rounded-md border border-gray-200 w-full h-auto hover:border-blue-400 transition-colors"
-                                            />
+                                          <div className="space-y-3">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                              <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                                                Ảnh răng
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">({teethImages.length})</span>
+                                            </div>
+                                            {teethImages.length > 0 ? (
+                                              <div className="space-y-2">
+                                                {teethImages.map((img, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all duration-300"
+                                                    onClick={() => img.url && setSelectedImage(img.url)}
+                                                  >
+                                                    <img
+                                                      src={img.url}
+                                                      alt="Ảnh răng"
+                                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-sm text-gray-400 text-center py-4">Không có ảnh răng</p>
+                                            )}
                                           </div>
                                         );
-                                      })}
+                                      })()}
+
+                                      {/* Ảnh mặt */}
+                                      {(() => {
+                                        const faceImages = phase.listImage.filter(img => 
+                                          img.type === 'treatmentPhasesFace' || img.type === 'examinationFace'
+                                        );
+                                        return (
+                                          <div className="space-y-3">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                              <Badge className="bg-green-100 text-green-800 border-green-300">
+                                                Ảnh mặt
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">({faceImages.length})</span>
+                                            </div>
+                                            {faceImages.length > 0 ? (
+                                              <div className="space-y-2">
+                                                {faceImages.map((img, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-green-500 transition-all duration-300"
+                                                    onClick={() => img.url && setSelectedImage(img.url)}
+                                                  >
+                                                    <img
+                                                      src={img.url}
+                                                      alt="Ảnh mặt"
+                                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-sm text-gray-400 text-center py-4">Không có ảnh mặt</p>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {/* Ảnh X-quang */}
+                                      {(() => {
+                                        const xrayImages = phase.listImage.filter(img => 
+                                          img.type === 'treatmentPhasesXray' || img.type === 'examinationXray'
+                                        );
+                                        return (
+                                          <div className="space-y-3">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                              <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                                                Ảnh X-quang
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">({xrayImages.length})</span>
+                                            </div>
+                                            {xrayImages.length > 0 ? (
+                                              <div className="space-y-2">
+                                                {xrayImages.map((img, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-all duration-300"
+                                                    onClick={() => img.url && setSelectedImage(img.url)}
+                                                  >
+                                                    <img
+                                                      src={img.url}
+                                                      alt="Ảnh X-quang"
+                                                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-sm text-gray-400 text-center py-4">Không có ảnh X-quang</p>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                 )}

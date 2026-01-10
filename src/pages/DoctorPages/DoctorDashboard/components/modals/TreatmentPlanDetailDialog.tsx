@@ -23,6 +23,16 @@ import { queryKeys } from '@/services/queryClient';
 import DicomViewer from '@/components/ui/DicomViewer';
 import DicomUploadDialog from '@/components/ui/DicomUploadDialog';
 
+// Helper function to translate gender to Vietnamese
+const translateGender = (gender?: string): string => {
+  if (!gender) return '';
+  const genderLower = gender.toLowerCase();
+  if (genderLower === 'male' || genderLower === 'nam') return 'Nam';
+  if (genderLower === 'female' || genderLower === 'nữ') return 'Nữ';
+  if (genderLower === 'other' || genderLower === 'khác') return 'Khác';
+  return gender; // Fallback to original if unknown
+};
+
 interface TreatmentPlanDetailDialogProps {
   open: boolean;
   plan: TreatmentPlan | null;
@@ -31,6 +41,7 @@ interface TreatmentPlanDetailDialogProps {
   onEdit?: (plan: TreatmentPlan) => void;
   onCreatePhase?: (plan: TreatmentPlan) => void;
   onEditPhase?: (plan: TreatmentPlan, phase: TreatmentPhase) => void;
+  onUpdatePlanStatus?: (plan: TreatmentPlan, status: string) => void;
 }
 
 // Component để hiển thị tooltip cho bác sĩ
@@ -146,7 +157,7 @@ const PatientTooltip: React.FC<{
               {info.gender && (
                 <div className="flex items-center gap-2">
                   <User className="h-3 w-3" />
-                  <span>Giới tính: {info.gender === 'MALE' ? 'Nam' : info.gender === 'FEMALE' ? 'Nữ' : info.gender}</span>
+                  <span>Giới tính: {translateGender(info.gender)}</span>
                 </div>
               )}
               {info.dob && (
@@ -240,7 +251,7 @@ const NurseTooltip: React.FC<{
               {info.gender && (
                 <div className="flex items-center gap-2">
                   <User className="h-3 w-3" />
-                  <span>Giới tính: {info.gender === 'MALE' ? 'Nam' : info.gender === 'FEMALE' ? 'Nữ' : info.gender}</span>
+                  <span>Giới tính: {translateGender(info.gender)}</span>
                 </div>
               )}
               {info.dob && (
@@ -288,6 +299,27 @@ const calculatePhaseCost = (phase: TreatmentPhase): number | null => {
   return servicesTotal + prescriptionsTotal;
 };
 
+// Helper function to extract description before "Ghi chú:"
+const extractDescriptionBeforeNote = (text: string | null | undefined): string => {
+  if (!text) return '';
+  const noteIndex = text.toLowerCase().indexOf('ghi chú:');
+  if (noteIndex !== -1) {
+    return text.substring(0, noteIndex).trim();
+  }
+  return text.trim();
+};
+
+// Helper function to extract note after "Ghi chú:"
+const extractNote = (text: string | null | undefined): string | null => {
+  if (!text) return null;
+  const noteIndex = text.toLowerCase().indexOf('ghi chú:');
+  if (noteIndex !== -1) {
+    const noteText = text.substring(noteIndex + 'ghi chú:'.length).trim();
+    return noteText || null;
+  }
+  return null;
+};
+
 // Helper function to get payment badge
 const getPaymentBadge = (paymentStatus?: string) => {
   if (!paymentStatus) return null;
@@ -303,27 +335,103 @@ const getPaymentBadge = (paymentStatus?: string) => {
   );
 };
 
+// Helper function to determine status based on endDate
+const getPhaseStatusByEndDate = (status?: string, endDate?: string): string => {
+  // If endDate exists and current date has passed it, status is "Done"
+  if (endDate) {
+    try {
+      const parseDate = (dateStr: string): Date => {
+        // Handle dd/MM/yyyy format
+        if (dateStr.includes('/')) {
+          const parts = dateStr.split('/');
+          if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+            const year = parseInt(parts[2], 10);
+            return new Date(year, month, day);
+          }
+        }
+        return new Date(dateStr);
+      };
+      
+      const endDateObj = parseDate(endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      endDateObj.setHours(0, 0, 0, 0);
+      
+      // If today >= endDate, status is "Done"
+      if (today >= endDateObj) {
+        return 'Done';
+      }
+    } catch (error) {
+      // If parse error, fall back to original status
+    }
+  }
+  
+  // If no endDate or endDate hasn't passed, check original status
+  const s = (status || '').toLowerCase();
+  if (s.includes('done') || s.includes('hoàn')) return 'Done';
+  if (s.includes('paused') || s.includes('tạm')) return 'Paused';
+  if (s.includes('cancelled') || s.includes('hủy')) return 'Cancelled';
+  return 'Inprogress';
+};
+
+// Helper to normalize status
+const normalizedStatus = (status?: string) => {
+  const s = (status || '').toLowerCase();
+  if (s.includes('done') || s.includes('hoàn')) return 'Done';
+  if (s.includes('paused') || s.includes('tạm')) return 'Paused';
+  if (s.includes('cancelled') || s.includes('hủy')) return 'Cancelled';
+  return 'Inprogress';
+};
+
+// Helper function to translate status to Vietnamese
+const translateStatus = (status?: string): string => {
+  const s = (status || '').toLowerCase();
+  if (s.includes('done') || s.includes('hoàn')) return 'Hoàn thành';
+  if (s.includes('paused') || s.includes('tạm')) return 'Tạm dừng';
+  if (s.includes('cancelled') || s.includes('hủy')) return 'Đã hủy';
+  return 'Đang điều trị';
+};
+
+// Get status value for backend (reverse translation)
+const getStatusValue = (vietnameseStatus: string): string => {
+  switch (vietnameseStatus) {
+    case 'Hoàn thành':
+      return 'Done';
+    case 'Tạm dừng':
+      return 'Paused';
+    case 'Đã hủy':
+      return 'Cancelled';
+    default:
+      return 'Inprogress';
+  }
+};
+
 // Helper function to get status badge
-const getStatusBadge = (status: string) => {
-  const normalizedStatus = status || 'Inprogress';
-  const badgeClassName = STATUS_BADGE[normalizedStatus] || STATUS_BADGE.Inprogress;
+const getStatusBadge = (status: string, endDate?: string) => {
+  // Use endDate-based status if endDate is provided
+  const finalStatus = endDate ? getPhaseStatusByEndDate(status, endDate) : normalizedStatus(status);
+  const badgeClassName = STATUS_BADGE[finalStatus] || STATUS_BADGE.Inprogress;
   return (
     <Badge className={badgeClassName}>
-      {normalizedStatus}
+      {finalStatus === 'Done' ? 'Hoàn thành' : finalStatus === 'Paused' ? 'Tạm dừng' : finalStatus === 'Cancelled' ? 'Đã hủy' : 'Đang điều trị'}
     </Badge>
   );
 };
 
 // Helper function to get status icon
-const getStatusIcon = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case 'done':
+const getStatusIcon = (status: string, endDate?: string) => {
+  // Use endDate-based status if endDate is provided
+  const finalStatus = endDate ? getPhaseStatusByEndDate(status, endDate) : normalizedStatus(status);
+  switch (finalStatus) {
+    case 'Done':
       return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-    case 'cancelled':
+    case 'Cancelled':
       return <XCircle className="h-4 w-4 text-red-600" />;
-    case 'paused':
+    case 'Paused':
       return <Pause className="h-4 w-4 text-yellow-600" />;
-    case 'inprogress':
+    case 'Inprogress':
       return <Clock className="h-4 w-4 text-blue-600" />;
     default:
       return <AlertCircle className="h-4 w-4 text-gray-600" />;
@@ -476,11 +584,32 @@ const PhaseItem: React.FC<{
             <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
               Giai đoạn {index + 1}
             </span>
-            {getStatusBadge(phase.status || 'Inprogress')}
+            {getStatusBadge(phase.status || 'Inprogress', phase.endDate)}
             {phase.cost > 0 && getPaymentBadge(phase.paymentStatus)}
           </div>
-          {phase.description && (
-            <p className="text-sm text-foreground mb-2">{phase.description}</p>
+          
+          {/* Mô tả - phần trước "Ghi chú:" */}
+          {extractDescriptionBeforeNote(phase.description) && (
+            <div className="mb-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Mô tả
+              </p>
+              <p className="text-sm text-foreground leading-relaxed">
+                {extractDescriptionBeforeNote(phase.description)}
+              </p>
+            </div>
+          )}
+          
+          {/* Ghi chú - phần sau "Ghi chú:" */}
+          {extractNote(phase.description) && (
+            <div className="mb-2 pt-2 border-t border-border/50">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Ghi chú
+              </p>
+              <p className="text-sm text-foreground leading-relaxed">
+                {extractNote(phase.description)}
+              </p>
+            </div>
           )}
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             {phase.startDate && (
@@ -550,7 +679,7 @@ const PhaseItem: React.FC<{
           </div>
         </div>
         <div className="flex items-center gap-2 ml-4">
-          {getStatusIcon(phase.status || 'Inprogress')}
+          {getStatusIcon(phase.status || 'Inprogress', phase.endDate)}
         </div>
       </div>
     </div>
@@ -565,6 +694,7 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
   onEdit,
   onCreatePhase,
   onEditPhase,
+  onUpdatePlanStatus,
 }) => {
   const [selectedDicomStudyId, setSelectedDicomStudyId] = React.useState<string | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = React.useState<string | null>(null);
@@ -573,15 +703,46 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
 
   if (!plan) return null;
 
+  // Helper function to parse date from various formats
+  const parseDateForSort = (dateStr?: string): number => {
+    if (!dateStr) return 0;
+    
+    try {
+      // Handle dd/MM/yyyy format
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+          const year = parseInt(parts[2], 10);
+          const date = new Date(year, month, day);
+          return date.getTime();
+        }
+      }
+      // Handle ISO format or other standard formats
+      const date = new Date(dateStr);
+      return isNaN(date.getTime()) ? 0 : date.getTime();
+    } catch (error) {
+      return 0;
+    }
+  };
+
   const sortedPhases = [...phases].sort((a, b) => {
-    const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-    const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-    return dateA - dateB;
+    const dateA = parseDateForSort(a.startDate);
+    const dateB = parseDateForSort(b.startDate);
+    return dateA - dateB; // Sort ascending (oldest first)
   });
 
   const totalPhases = phases.length;
-  const completedPhases = phases.filter(p => p.status?.toLowerCase() === 'done').length;
-  const inProgressPhases = phases.filter(p => p.status?.toLowerCase() === 'inprogress').length;
+  // Count phases based on endDate logic
+  const completedPhases = phases.filter(p => {
+    const phaseStatus = getPhaseStatusByEndDate(p.status, p.endDate);
+    return phaseStatus === 'Done';
+  }).length;
+  const inProgressPhases = phases.filter(p => {
+    const phaseStatus = getPhaseStatusByEndDate(p.status, p.endDate);
+    return phaseStatus === 'Inprogress';
+  }).length;
   
   // Calculate total cost from all phases (same as nurse)
   const totalCostFromPhases = phases.reduce((sum, phase) => {
@@ -596,9 +757,38 @@ const TreatmentPlanDetailDialog: React.FC<TreatmentPlanDetailDialogProps> = ({
           <DialogHeader className="space-y-2 border-b border-border/70 px-6 pb-4 pt-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <DialogTitle className="text-xl font-semibold text-foreground">{plan.title}</DialogTitle>
-                  {getStatusBadge(plan.status)}
+                  {onUpdatePlanStatus ? (
+                    <PermissionGuard permission="UPDATE_TREATMENT_PLANS">
+                      <select
+                        value={plan.status || 'Inprogress'}
+                        onChange={(e) => onUpdatePlanStatus(plan, e.target.value)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium cursor-pointer ${
+                          normalizedStatus(plan.status) === 'Done'
+                            ? 'bg-green-100 text-green-800 border-green-300'
+                            : normalizedStatus(plan.status) === 'Paused'
+                            ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                            : normalizedStatus(plan.status) === 'Cancelled'
+                            ? 'bg-red-100 text-red-800 border-red-300'
+                            : 'bg-blue-100 text-blue-800 border-blue-300'
+                        }`}
+                      >
+                        {[
+                          { value: 'Inprogress', label: 'Đang điều trị' },
+                          { value: 'Done', label: 'Hoàn thành' },
+                          { value: 'Paused', label: 'Tạm dừng' },
+                          { value: 'Cancelled', label: 'Đã hủy' },
+                        ].map((status) => (
+                          <option key={status.value} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    </PermissionGuard>
+                  ) : (
+                    getStatusBadge(plan.status)
+                  )}
                 </div>
                 <DialogDescription className="text-sm text-muted-foreground">
                   {plan.description || 'Không có mô tả'}

@@ -14,8 +14,6 @@ export type Section =
   | 'appointments'
   | 'doctors'
   | 'nurses'
-  | 'examinations'
-  | 'treatment'
   | 'catalog'
   | 'insights'
   | 'patients'

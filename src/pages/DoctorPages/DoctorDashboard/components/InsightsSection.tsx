@@ -285,7 +285,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader>
             <CardTitle className="text-lg">Xu hướng lịch hẹn (7 ngày qua)</CardTitle>
-            <CardDescription>Theo dõi số lượng lịch hẹn theo thời gian</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -297,7 +296,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader>
             <CardTitle className="text-lg">Xu hướng khám bệnh (7 ngày qua)</CardTitle>
-            <CardDescription>Theo dõi số lần khám bệnh theo thời gian</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -312,7 +310,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader>
             <CardTitle className="text-lg">Trạng thái lịch hẹn</CardTitle>
-            <CardDescription>Phân bố lịch hẹn theo trạng thái</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -324,7 +321,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         <Card className="border-none bg-white/90 shadow-medium">
           <CardHeader>
             <CardTitle className="text-lg">Dịch vụ sử dụng nhiều nhất</CardTitle>
-            <CardDescription>Top 5 dịch vụ được sử dụng nhiều nhất</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -338,7 +334,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
       <Card className="border-none bg-white/90 shadow-medium">
         <CardHeader>
           <CardTitle className="text-lg">Doanh thu theo tháng (6 tháng qua)</CardTitle>
-          <CardDescription>Theo dõi doanh thu từ các lần khám bệnh</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[350px]">
@@ -346,56 +341,6 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
           </div>
         </CardContent>
       </Card>
-
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="border-none bg-white/90 shadow-medium">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-blue-100 p-3">
-                <ClipboardList className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Phác đồ điều trị</p>
-                <p className="text-xl font-bold">{stats.totalPlans}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none bg-white/90 shadow-medium">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-green-100 p-3">
-                <Activity className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Giai đoạn đang điều trị</p>
-                <p className="text-xl font-bold">{stats.activePhases}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none bg-white/90 shadow-medium">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-amber-100 p-3">
-                <Clock className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tỷ lệ hoàn thành</p>
-                <p className="text-xl font-bold">
-                  {stats.totalAppointments > 0
-                    ? ((stats.doneAppointments / stats.totalAppointments) * 100).toFixed(1)
-                    : 0}
-                  %
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };

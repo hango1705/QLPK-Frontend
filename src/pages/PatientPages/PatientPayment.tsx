@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui';
+import { Card, Button, Input, Alert, AlertTitle, AlertDescription, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { patientAPI, type CostResponse } from '@/services/api/patient';
 import { doctorAPI } from '@/services';
 import { usePermission } from '@/hooks';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { queryKeys } from '@/services/queryClient';
+import { User, Wallet, CheckCircle2, Loader2, Stethoscope, Image as ImageIcon } from 'lucide-react';
 
 interface PaymentRecord {
   id: string;
@@ -18,37 +19,36 @@ interface PaymentRecord {
   invoiceNumber: string;
   dueDate: string;
   treatmentPlan: string;
-  costData?: CostResponse; // Full cost data for detail modal
-}
-
-interface TreatmentPlanApi {
-  id: string;
-  title: string;
-  totalCost?: number;
-  doctorFullname?: string;
-  createAt?: string;
-}
-
-interface TreatmentPhasesApi {
-  id: string;
-  description?: string;
-  cost?: number;
-  startDate?: string; // dd/MM/yyyy
+  costData?: CostResponse;
+  doctorName?: string;
+  imageUrl?: string;
 }
 
 const PatientPayment = () => {
   const { hasPermission } = usePermission();
   const canGetAllTreatmentPhases = hasPermission('GET_ALL_TREATMENT_PHASES');
   const canUpdatePaymentCost = hasPermission('UPDATE_PAYMENT_COST');
-  const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCostDetail, setSelectedCostDetail] = useState<CostResponse | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [paymentMethod, setPaymentMethod] = useState<'vnpay'>('vnpay');
 
-  // Fetch all costs (real cost records from database)
+  // Fetch patient info for profile section
+  const { data: patientInfo } = useQuery({
+    queryKey: ['patient', 'myInfo'],
+    queryFn: patientAPI.getMyInfo,
+  });
+
+  // Fetch all costs (real cost records from database), excluding deposit costs
   const { data: costs = [], isLoading: loadingCosts } = useQuery({
     queryKey: ['patient', 'costs'],
-    queryFn: patientAPI.getAllMyCost,
+    queryFn: async () => {
+      const allCosts = await patientAPI.getAllMyCost();
+      // Filter out deposit costs
+      return allCosts.filter(cost => cost.type !== 'deposit');
+    },
     enabled: canUpdatePaymentCost,
   });
 
@@ -69,11 +69,19 @@ const PatientPayment = () => {
     })),
   });
 
+  // Helper function to extract description before "Ghi chú:"
+  const extractDescriptionBeforeNote = (description: string): string => {
+    if (!description) return '';
+    const noteIndex = description.indexOf('Ghi chú:');
+    if (noteIndex !== -1) {
+      return description.substring(0, noteIndex).trim();
+    }
+    return description;
+  };
+
   // Transform costs to payment records
-  // Use real cost records from database instead of phases/plans
   const paymentRecords = useMemo<PaymentRecord[]>(() => {
     if (!canUpdatePaymentCost || !costs.length) {
-      // Fallback: if no costs, use phases/plans (for display only, not for payment)
       if (!canGetAllTreatmentPhases || !treatmentPlans.length) return [];
       
       const records: PaymentRecord[] = [];
@@ -84,95 +92,101 @@ const PatientPayment = () => {
             const amount = ph.cost || 0;
             if (amount <= 0) return;
             records.push({
-              id: ph.id, // This won't work for payment, but for display
+              id: ph.id,
               date: ph.startDate || plan.createAt || '-',
               amount,
               description: `${plan.title} - Giai đoạn ${idx + 1}`,
               status: 'pending',
-              invoiceNumber: `AUTO-${plan.id.slice(0, 6)}-${idx + 1}`,
+              invoiceNumber: `DV-${String(idx + 1).padStart(3, '0')}`,
               dueDate: ph.startDate || '-',
               treatmentPlan: plan.title,
+              doctorName: plan.doctorFullname,
             });
           });
         } else if ((plan.totalCost || 0) > 0) {
           records.push({
-            id: plan.id, // This won't work for payment, but for display
+            id: plan.id,
             date: plan.createAt || '-',
             amount: plan.totalCost || 0,
             description: plan.title,
             status: 'pending',
-            invoiceNumber: `AUTO-${plan.id.slice(0, 6)}`,
+            invoiceNumber: `DV-${plan.id.slice(0, 6)}`,
             dueDate: plan.createAt || '-',
             treatmentPlan: plan.title,
+            doctorName: plan.doctorFullname,
           });
         }
       });
       return records;
     }
 
-    // Use real cost records from database
-    return costs.map((cost) => ({
-      id: cost.id, // Real cost ID from database
-      date: cost.paymentDate || '-',
-      amount: cost.totalCost,
-      description: cost.title,
-      status: cost.status === 'paid' ? 'paid' : cost.status === 'wait' ? 'pending' : 'pending',
-      paymentMethod: cost.paymentMethod,
-      invoiceNumber: `AUTO-${cost.id.slice(0, 6)}`,
-      dueDate: cost.paymentDate || '-',
-      treatmentPlan: cost.title,
-      costData: cost, // Store full cost data for detail modal
-    }));
+    // Transform costs to payment records
+    const records: PaymentRecord[] = costs.map((cost) => {
+      let status: 'pending' | 'paid' | 'overdue' | 'cancelled' = 'pending';
+      if (cost.status === 'paid') {
+        status = 'paid';
+      } else if (cost.status === 'wait') {
+        status = 'pending';
+      }
+      
+      return {
+        id: cost.id,
+        date: cost.paymentDate || '-',
+        amount: cost.totalCost,
+        description: extractDescriptionBeforeNote(cost.title),
+        status,
+        paymentMethod: cost.paymentMethod,
+        invoiceNumber: cost.id, // Use cost.id from database
+        dueDate: cost.paymentDate || '-',
+        treatmentPlan: cost.title,
+        costData: cost,
+        imageUrl: cost.listDentalServiceEntityOrder?.[0] ? undefined : undefined, // Placeholder for now
+      };
+    });
+
+    return records;
   }, [costs, treatmentPlans, phaseQueries, canGetAllTreatmentPhases, canUpdatePaymentCost]);
 
+  const pendingRecords = paymentRecords.filter(p => p.status === 'pending' || p.status === 'overdue');
+  const historyRecords = paymentRecords.filter(p => p.status === 'paid');
+
   const fetching = loadingCosts || loadingPlans || phaseQueries.some(q => q.isLoading);
-  const error = phaseQueries.find(q => q.error)?.error 
-    ? 'Không thể tải dữ liệu thanh toán (sử dụng tổng chi phí phác đồ)' 
-    : null;
 
-  const handleAddPayment = async () => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      showNotification.success('Thêm thanh toán thành công!');
-      setIsAdding(false);
-    } catch (error) {
-      showNotification.error('Có lỗi xảy ra khi thêm thanh toán');
-    } finally {
-      setIsLoading(false);
+  const handlePayNow = async () => {
+    if (selectedItems.size === 0) {
+      showNotification.error('Vui lòng chọn ít nhất một dịch vụ để thanh toán');
+      return;
     }
-  };
 
-  const handlePayNow = async (paymentId: string) => {
     setIsLoading(true);
     try {
-      // Tìm payment record để lấy amount
-      const payment = paymentRecords.find(p => p.id === paymentId);
-      if (!payment) {
-        showNotification.error('Không tìm thấy thông tin thanh toán');
-        return;
-      }
+      // Calculate total amount from selected items
+      const totalAmount = Array.from(selectedItems).reduce((sum, id) => {
+        const payment = paymentRecords.find(p => p.id === id);
+        return sum + (payment?.amount || 0);
+      }, 0);
 
-      // Lưu costId vào localStorage để sử dụng trong callback
-      // paymentId có thể là phaseId hoặc planId, nhưng cần costId thực sự
-      // Tạm thời sử dụng paymentId, sau này có thể cần map từ phaseId/planId sang costId
-      localStorage.setItem('vnpay_costId', paymentId);
+      const finalAmount = totalAmount;
 
-      // Gọi API VNPay để tạo payment URL
+      // For now, use the first selected item's ID
+      const firstSelectedId = Array.from(selectedItems)[0];
+      localStorage.setItem('vnpay_costId', firstSelectedId);
+      localStorage.setItem('vnpay_selectedItems', JSON.stringify(Array.from(selectedItems)));
+
       const response = await patientAPI.createVnPayPayment({
-        amount: String(payment.amount),
-        // bankCode có thể để trống hoặc thêm UI để user chọn
+        amount: String(finalAmount),
       });
 
       if (response.code === 'ok' && response.paymentUrl) {
-        // Redirect đến VNPay payment page
         window.location.href = response.paymentUrl;
       } else {
         showNotification.error(response.message || 'Không thể tạo liên kết thanh toán');
-        localStorage.removeItem('vnpay_costId'); // Clean up on error
+        localStorage.removeItem('vnpay_costId');
+        localStorage.removeItem('vnpay_selectedItems');
       }
     } catch (error: any) {
-      localStorage.removeItem('vnpay_costId'); // Clean up on error
+      localStorage.removeItem('vnpay_costId');
+      localStorage.removeItem('vnpay_selectedItems');
       showNotification.error(
         error.response?.data?.message || 
         error.message || 
@@ -186,15 +200,15 @@ const PatientPayment = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-300';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'overdue':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-300';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
@@ -221,7 +235,6 @@ const PatientPayment = () => {
   };
 
   const handleViewInvoice = (payment: PaymentRecord) => {
-    // Find the full cost data
     const costData = costs.find(c => c.id === payment.id);
     if (costData) {
       setSelectedCostDetail(costData);
@@ -229,111 +242,242 @@ const PatientPayment = () => {
     }
   };
 
-  const truncateText = (text: string, maxLength: number = 80) => {
-    if (!text || text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+  const toggleItemSelection = (id: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
-  const totalPaid = paymentRecords
-    .filter(p => p.status === 'paid')
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Calculate summary
+  const selectedPayments = paymentRecords.filter(p => selectedItems.has(p.id));
+  const totalServices = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalAmount = totalServices;
 
-  const totalPending = paymentRecords
-    .filter(p => p.status === 'pending')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const totalOverdue = paymentRecords
-    .filter(p => p.status === 'overdue')
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Get patient ID from patientInfo or generate placeholder
+  const patientId = patientInfo?.id ? `BN-${patientInfo.id.slice(-4)}` : 'BN-XXXX';
+  const patientName = patientInfo?.fullName || 'Bệnh nhân';
+  const accountBalance = 0; // Placeholder
 
   return (
-    // Remove gray background container to align with Patient overview page
     <div className="min-h-screen">
-      {/* Main Content */}
       <div className="px-0 py-8">
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <p className="text-sm font-medium text-gray-500">Đã thanh toán</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalPaid)}</p>
-          </Card>
-          <Card className="p-6">
-            <p className="text-sm font-medium text-gray-500">Chờ thanh toán</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalPending)}</p>
-          </Card>
-          <Card className="p-6">
-            <p className="text-sm font-medium text-gray-500">Quá hạn</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalOverdue)}</p>
-          </Card>
-          <Card className="p-6">
-            <p className="text-sm font-medium text-gray-500">Tổng giao dịch</p>
-            <p className="text-lg font-bold text-gray-900">{paymentRecords.length}</p>
-          </Card>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Payment List */}
+          <div className="lg:col-span-2">
+            <Card className="p-6">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'pending' | 'history')}>
+                <TabsList className="mb-6">
+                  <TabsTrigger value="pending" className="relative">
+                    Chi phí chờ thanh toán
+                    {pendingRecords.length > 0 && (
+                      <Badge className="ml-2 bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        {pendingRecords.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="history">
+                    Lịch sử điều trị
+                  </TabsTrigger>
+                </TabsList>
 
-        {/* Payment Records */}
-        <div className="space-y-4">
-          {!fetching && paymentRecords.map((payment) => (
-            <Card key={payment.id} className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold text-gray-900 mb-1">
-                    {truncateText(payment.description, 60)}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    Hóa đơn: {payment.invoiceNumber} • Ngày: {payment.date}
-                  </p>
-                </div>
-                <div className="text-right ml-4 flex-shrink-0">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
-                    {getStatusText(payment.status)}
-                  </span>
-                  <p className="text-lg font-bold text-gray-900 mt-1">
-                    {formatCurrency(payment.amount)}
-                  </p>
-                </div>
-              </div>
+                <TabsContent value="pending" className="space-y-4">
+                  {fetching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : pendingRecords.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      Không có chi phí chờ thanh toán
+                    </div>
+                  ) : (
+                    pendingRecords.map((payment) => (
+                      <Card key={payment.id} className="p-4 border hover:shadow-md transition-shadow">
+                        <div className="flex gap-4">
+                          {/* Image */}
+                          <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {payment.imageUrl ? (
+                              <img src={payment.imageUrl} alt={payment.description} className="w-full h-full object-cover" />
+                            ) : (
+                              <Stethoscope className="h-8 w-8 text-gray-400" />
+                            )}
+                          </div>
 
-              <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between items-center">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleViewInvoice(payment)}
-                >
-                  Xem hóa đơn
-                </Button>
-                {(payment.status === 'pending' || payment.status === 'overdue') && (
-                  <PermissionGuard permission="UPDATE_PAYMENT_COST" fallback={
-                    <Button 
-                      variant="primary" 
-                      size="sm"
-                      disabled
-                      className="bg-gray-400 text-white cursor-not-allowed"
-                    >
-                      Không có quyền thanh toán
-                    </Button>
-                  }>
-                    <Button 
-                      onClick={() => handlePayNow(payment.id)}
-                      variant="primary" 
-                      size="sm"
-                      disabled={isLoading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isLoading ? 'Đang xử lý...' : 'Thanh toán qua VNPay'}
-                    </Button>
-                  </PermissionGuard>
-                )}
-              </div>
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge className={`text-xs ${getStatusColor(payment.status)}`}>
+                                    {getStatusText(payment.status)}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-gray-500 mb-1">Mã: {payment.invoiceNumber}</p>
+                                <h3 className="text-base font-semibold text-gray-900 mb-1">
+                                  {payment.description}
+                                </h3>
+                                {payment.doctorName && (
+                                  <p className="text-sm text-gray-600">
+                                    {payment.date} • BS. {payment.doctorName}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right ml-4">
+                                <p className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(payment.amount)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                              <button
+                                onClick={() => handleViewInvoice(payment)}
+                                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                Xem chi tiết →
+                              </button>
+                              <input
+                                type="checkbox"
+                                checked={selectedItems.has(payment.id)}
+                                onChange={() => toggleItemSelection(payment.id)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="history" className="space-y-4">
+                  {fetching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : historyRecords.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      Chưa có lịch sử điều trị
+                    </div>
+                  ) : (
+                    historyRecords.map((payment) => (
+                      <Card key={payment.id} className="p-4 border">
+                        <div className="flex gap-4">
+                          <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Stethoscope className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <Badge className={`text-xs mb-2 ${getStatusColor(payment.status)}`}>
+                                  {getStatusText(payment.status)}
+                                </Badge>
+                                <p className="text-xs text-gray-500 mb-1">Mã: {payment.invoiceNumber}</p>
+                                <h3 className="text-base font-semibold text-gray-900 mb-1">
+                                  {payment.description}
+                                </h3>
+                                {payment.doctorName && (
+                                  <p className="text-sm text-gray-600">
+                                    {payment.date} • BS. {payment.doctorName}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right ml-4">
+                                <p className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(payment.amount)}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleViewInvoice(payment)}
+                              className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-3"
+                            >
+                              Xem chi tiết →
+                            </button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
             </Card>
-          ))}
-          {fetching && <Card className="p-6">Đang tải giao dịch...</Card>}
+          </div>
+
+          {/* Right Column - Payment Summary */}
+          <div className="lg:col-span-1">
+            <Card className="p-6 sticky top-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-6">Tóm tắt thanh toán</h3>
+
+              {/* Summary Details */}
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tổng dịch vụ ({selectedItems.size})</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(totalServices)}</span>
+                </div>
+                <div className="border-t pt-3 mt-3">
+                  <div className="flex justify-between">
+                    <span className="text-base font-semibold text-gray-900">Tổng cộng</span>
+                    <span className="text-xl font-bold text-blue-600">{formatCurrency(totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">PHƯƠNG THỨC THANH TOÁN</label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="vnpay"
+                      checked={paymentMethod === 'vnpay'}
+                      onChange={() => setPaymentMethod('vnpay')}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <Wallet className="h-5 w-5 text-blue-600" />
+                    <span className="flex-1 font-medium">Ví VNPAY</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Pay Now Button */}
+              <PermissionGuard permission="UPDATE_PAYMENT_COST" fallback={
+                <Button
+                  variant="primary"
+                  className="w-full bg-gray-400 text-white cursor-not-allowed"
+                  disabled
+                >
+                  Không có quyền thanh toán
+                </Button>
+              }>
+                <Button
+                  onClick={handlePayNow}
+                  variant="primary"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isLoading || selectedItems.size === 0}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    'Thanh toán ngay'
+                  )}
+                </Button>
+              </PermissionGuard>
+
+              <p className="text-xs text-gray-500 text-center mt-4">
+                Giao dịch được bảo mật và mã hóa an toàn.
+              </p>
+            </Card>
+          </div>
         </div>
       </div>
 
@@ -342,9 +486,6 @@ const PatientPayment = () => {
         <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Chi tiết hóa đơn</DialogTitle>
-            <DialogDescription>
-              Thông tin chi tiết về thanh toán này
-            </DialogDescription>
           </DialogHeader>
           
           {selectedCostDetail && (

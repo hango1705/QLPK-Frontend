@@ -27,6 +27,16 @@ interface PatientInfoCardProps {
   medicalHistory?: string;
 }
 
+// Helper function to translate gender to Vietnamese
+const translateGender = (gender?: string): string => {
+  if (!gender) return '';
+  const genderLower = gender.toLowerCase();
+  if (genderLower === 'male' || genderLower === 'nam') return 'Nam';
+  if (genderLower === 'female' || genderLower === 'nữ') return 'Nữ';
+  if (genderLower === 'other' || genderLower === 'khác') return 'Khác';
+  return gender; // Fallback to original if unknown
+};
+
 const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
   patientName,
   avatar,
@@ -79,7 +89,7 @@ const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
                   <div className="space-y-0.5">
                     <p className="text-[11px] uppercase tracking-wide text-slate-400">Giới tính</p>
                     <p className="font-medium text-slate-900">
-                      {gender === 'MALE' ? 'Nam' : gender === 'FEMALE' ? 'Nữ' : gender}
+                      {translateGender(gender)}
                     </p>
                   </div>
                 </div>

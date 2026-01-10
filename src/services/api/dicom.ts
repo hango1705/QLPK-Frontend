@@ -76,9 +76,13 @@ export const dicomAPI = {
 
     // For FormData, axios will automatically set Content-Type with boundary
     // The interceptor will remove default Content-Type header
+    // Set timeout to 0 to disable timeout for DICOM upload (large files may take time)
     const response = await apiClient.post<{ code: number; result: DicomStudyResponse }>(
       '/api/v1/dicom/upload',
-      formData
+      formData,
+      {
+        timeout: 0, // Disable timeout for DICOM upload
+      }
     );
     return response.data.result;
   },

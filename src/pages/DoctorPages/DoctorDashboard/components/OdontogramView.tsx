@@ -344,9 +344,8 @@ const OdontogramView: React.FC<OdontogramViewProps> = ({
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Smile className="h-5 w-5 text-primary" />
-          Odontogram
+          Sơ đồ răng
         </CardTitle>
-        <CardDescription>Sơ đồ răng và tình trạng điều trị</CardDescription>
       </CardHeader>
       <CardContent>
         <PermissionGuard permission="GET_TOOTH_STATUS" fallback={

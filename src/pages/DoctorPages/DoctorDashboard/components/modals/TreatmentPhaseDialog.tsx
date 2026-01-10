@@ -15,7 +15,7 @@ import {
 } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Plus, Upload } from 'lucide-react';
-import type { DentalService, PrescriptionItem, TreatmentPlan } from '@/types/doctor';
+import type { DentalService, PrescriptionItem, TreatmentPlan, AppointmentSummary } from '@/types/doctor';
 import type { PhaseDialogState, TreatmentPhaseFormState } from '../../types';
 import { formatToInputDate, formatToInputTime, formatCurrency } from '../../utils';
 import { doctorAPI } from '@/services';
@@ -30,6 +30,7 @@ interface TreatmentPhaseDialogProps {
   context: PhaseDialogState | null;
   services: DentalService[];
   prescriptions: PrescriptionItem[];
+  appointments?: AppointmentSummary[]; // Appointments của bác sĩ hiện tại
   onOpenChange: (open: boolean) => void;
   onSubmit: (form: TreatmentPhaseFormState, context: PhaseDialogState) => void;
   isLoading: boolean;
@@ -58,6 +59,7 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
   context,
   services,
   prescriptions,
+  appointments = [],
   onOpenChange,
   onSubmit,
   isLoading,
@@ -69,6 +71,16 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
     xrayFiles: string[];
     faceFiles: string[];
     teethFiles: string[];
+  }>({
+    xrayFiles: [],
+    faceFiles: [],
+    teethFiles: [],
+  });
+  // Track existing images (from server) with their IDs for removal
+  const [existingImages, setExistingImages] = useState<{
+    xrayFiles: Array<{ url: string; id?: string }>;
+    faceFiles: Array<{ url: string; id?: string }>;
+    teethFiles: Array<{ url: string; id?: string }>;
   }>({
     xrayFiles: [],
     faceFiles: [],
@@ -142,18 +154,33 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
       });
       // Load existing images as previews
       if (context.phase.listImage) {
-        const xrayImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesXray').map((img: any) => img.url);
-        const faceImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesFace').map((img: any) => img.url);
-        const teethImages = context.phase.listImage.filter((img: any) => img.type === 'treatmentPhasesTeeth').map((img: any) => img.url);
-        setImagePreviews({
+        const xrayImages = context.phase.listImage
+          .filter((img: any) => img.type === 'treatmentPhasesXray')
+          .map((img: any) => ({ url: img.url, id: img.id }));
+        const faceImages = context.phase.listImage
+          .filter((img: any) => img.type === 'treatmentPhasesFace')
+          .map((img: any) => ({ url: img.url, id: img.id }));
+        const teethImages = context.phase.listImage
+          .filter((img: any) => img.type === 'treatmentPhasesTeeth')
+          .map((img: any) => ({ url: img.url, id: img.id }));
+        
+        setExistingImages({
           xrayFiles: xrayImages,
           faceFiles: faceImages,
           teethFiles: teethImages,
         });
+        setImagePreviews({
+          xrayFiles: xrayImages.map(img => img.url),
+          faceFiles: faceImages.map(img => img.url),
+          teethFiles: teethImages.map(img => img.url),
+        });
+      } else {
+        setExistingImages({ xrayFiles: [], faceFiles: [], teethFiles: [] });
       }
     } else if (context?.mode === 'create') {
       setForm(defaultForm);
       setImagePreviews({ xrayFiles: [], faceFiles: [], teethFiles: [] });
+      setExistingImages({ xrayFiles: [], faceFiles: [], teethFiles: [] });
     }
   }, [context, services, categories]);
 
@@ -216,6 +243,43 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
     });
     return grouped;
   }, [form.serviceOrders, services, categories, categoriesData]);
+
+  // Generate time slots from 8:00 to 19:00 (each hour)
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let hour = 8; hour <= 19; hour++) {
+      slots.push(`${String(hour).padStart(2, '0')}:00`);
+    }
+    return slots;
+  }, []);
+
+  // Get booked time slots for the selected date
+  const bookedTimeSlots = useMemo(() => {
+    if (!form.nextAppointmentDate || appointments.length === 0) {
+      return new Set<string>();
+    }
+
+    const booked = new Set<string>();
+    appointments.forEach((appointment) => {
+      if (appointment.dateTime) {
+        const appointmentDate = new Date(appointment.dateTime);
+        const selectedDate = new Date(form.nextAppointmentDate);
+        
+        // Check if appointment is on the same date
+        if (
+          appointmentDate.getFullYear() === selectedDate.getFullYear() &&
+          appointmentDate.getMonth() === selectedDate.getMonth() &&
+          appointmentDate.getDate() === selectedDate.getDate()
+        ) {
+          // Extract hour from appointment time
+          const hour = appointmentDate.getHours();
+          const timeSlot = `${String(hour).padStart(2, '0')}:00`;
+          booked.add(timeSlot);
+        }
+      }
+    });
+    return booked;
+  }, [form.nextAppointmentDate, appointments]);
 
   if (!context) return null;
 
@@ -579,58 +643,81 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
                       className="w-full rounded-xl border border-dashed border-border px-3 py-2 text-xs file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20"
                       onChange={(event) => {
                         const files = Array.from(event.target.files || []);
-                        // Revoke old preview URLs for this field (only blob URLs)
-                        const oldPreviews = imagePreviews[field] || [];
-                        oldPreviews.forEach((url) => {
-                          if (url.startsWith('blob:')) {
-                            URL.revokeObjectURL(url);
-                          }
+                        // Append new files to existing ones instead of replacing
+                        setForm((prev) => {
+                          const existingFiles = prev[field] || [];
+                          return { ...prev, [field]: [...existingFiles, ...files] };
                         });
-                        // Create new preview URLs
+                        // Create new preview URLs and append to existing
                         const newPreviews = files.map((file) => URL.createObjectURL(file));
-                        setForm((prev) => ({ ...prev, [field]: files }));
                         setImagePreviews((prev) => ({
                           ...prev,
-                          [field]: newPreviews,
+                          [field]: [...(prev[field] || []), ...newPreviews],
                         }));
+                        // Reset input to allow selecting same files again
+                        event.target.value = '';
                       }}
                     />
                     {/* Preview images */}
                     {imagePreviews[field] && imagePreviews[field].length > 0 && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        {imagePreviews[field].map((previewUrl, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={previewUrl}
-                              alt={`Preview ${index + 1}`}
-                              className="w-full h-24 object-cover rounded-lg border border-border"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                // Revoke URL if it's a blob
-                                if (previewUrl.startsWith('blob:')) {
-                                  URL.revokeObjectURL(previewUrl);
-                                }
-                                // Remove preview
-                                setImagePreviews((prev) => ({
-                                  ...prev,
-                                  [field]: prev[field].filter((_, i) => i !== index),
-                                }));
-                                // Remove from form files
-                                setForm((prev) => {
-                                  const newFiles = [...(prev[field] || [])];
-                                  newFiles.splice(index, 1);
-                                  return { ...prev, [field]: newFiles };
-                                });
-                              }}
-                              className="absolute top-1 right-1 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
+                        {imagePreviews[field].map((previewUrl, index) => {
+                          // Check if this is an existing image (from server) or new (blob)
+                          const existingImage = existingImages[field].find(img => img.url === previewUrl);
+                          const isExisting = !!existingImage;
+                          
+                          return (
+                            <div key={index} className="relative">
+                              <img
+                                src={previewUrl}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border border-border"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (isExisting && existingImage?.id) {
+                                    // Existing image: add to removeImageIds
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      removeImageIds: [...(prev.removeImageIds || []), existingImage.id!],
+                                    }));
+                                    // Remove from existing images
+                                    setExistingImages((prev) => ({
+                                      ...prev,
+                                      [field]: prev[field].filter((img) => img.id !== existingImage.id),
+                                    }));
+                                  } else {
+                                    // New image (blob): revoke URL and remove from form
+                                    if (previewUrl.startsWith('blob:')) {
+                                      URL.revokeObjectURL(previewUrl);
+                                    }
+                                    // Find the index in the form files array
+                                    // Existing images come first in preview, so we need to find the correct index
+                                    const existingCount = existingImages[field].length;
+                                    const newImageIndex = index - existingCount;
+                                    if (newImageIndex >= 0) {
+                                      setForm((prev) => {
+                                        const newFiles = [...(prev[field] || [])];
+                                        newFiles.splice(newImageIndex, 1);
+                                        return { ...prev, [field]: newFiles };
+                                      });
+                                    }
+                                  }
+                                  // Remove from preview
+                                  setImagePreviews((prev) => ({
+                                    ...prev,
+                                    [field]: prev[field].filter((_, i) => i !== index),
+                                  }));
+                                }}
+                                className="absolute top-1 right-1 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -666,11 +753,35 @@ const TreatmentPhaseDialog: React.FC<TreatmentPhaseDialogProps> = ({
             </div>
             <div className="space-y-2">
               <Label>Giờ tái khám</Label>
-              <Input
-                type="time"
+              <Select
                 value={form.nextAppointmentTime}
-                onChange={(e) => setForm((prev) => ({ ...prev, nextAppointmentTime: e.target.value }))}
-              />
+                onValueChange={(value) => setForm((prev) => ({ ...prev, nextAppointmentTime: value }))}
+                disabled={!form.nextAppointmentDate}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={form.nextAppointmentDate ? "Chọn giờ" : "Chọn ngày trước"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeSlots.map((time) => {
+                    const isBooked = bookedTimeSlots.has(time);
+                    return (
+                      <SelectItem
+                        key={time}
+                        value={time}
+                        disabled={isBooked}
+                        className={isBooked ? 'opacity-50 cursor-not-allowed' : ''}
+                      >
+                        {time} {isBooked && '(Đã có lịch hẹn)'}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {form.nextAppointmentDate && bookedTimeSlots.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {bookedTimeSlots.size} giờ đã có lịch hẹn trong ngày này
+                </p>
+              )}
             </div>
           </div>
         </div>

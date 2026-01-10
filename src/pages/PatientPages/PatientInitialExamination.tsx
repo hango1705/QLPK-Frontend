@@ -42,6 +42,8 @@ import { showNotification } from '@/components/ui';
 import { patientAPI } from '@/services/api/patient';
 import ImageViewer from '@/components/ui/ImageViewer';
 import type { DentalServiceOrder, PrescriptionOrder } from '@/types/doctor';
+import { pdf } from '@react-pdf/renderer';
+import ExaminationPDF from './PatientInitialExamination/ExaminationPDF';
 
 interface ExaminationListItem {
   id: string;
@@ -53,7 +55,7 @@ interface ExaminationListItem {
   createAt?: string;    // dd/MM/yyyy
 }
 
-interface ExaminationDetail extends ExaminationListItem {
+export interface ExaminationDetail extends ExaminationListItem {
   totalCost?: number;
   listImage?: Array<{ publicId: string; url: string; type: string }>;
   listDentalServicesEntityOrder?: DentalServiceOrder[];
@@ -70,9 +72,9 @@ const PatientInitialExamination = () => {
   const [page, setPage] = useState(1);
   const pageSize = 5;
 
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ExaminationDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  // Store detail data for each examination
+  const [detailsMap, setDetailsMap] = useState<Map<string, ExaminationDetail>>(new Map());
+  const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -106,22 +108,72 @@ const PatientInitialExamination = () => {
     return max.v;
   }, [examinations]);
 
-  const openDetail = (id: string) => {
-    setDetailId(id);
-    setDetail(null);
-    setDetailLoading(true);
-    patientAPI.getExaminationById(id)
-      .then(data => setDetail(data))
-      .catch(() => showNotification.error('Không thể tải chi tiết hồ sơ'))
-      .finally(() => setDetailLoading(false));
-  };
-
-  const toggleExpand = (id: string) => {
+  const toggleExpand = async (id: string) => {
     setExpandedIds((prev) => {
       const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
+      const isExpanding = !n.has(id);
+      if (isExpanding) {
+        n.add(id);
+        // Fetch detail if not already loaded
+        if (!detailsMap.has(id) && !loadingDetails.has(id)) {
+          setLoadingDetails(prev => new Set(prev).add(id));
+          patientAPI.getExaminationById(id)
+            .then(data => {
+              setDetailsMap(prev => new Map(prev).set(id, data));
+            })
+            .catch(() => {
+              showNotification.error('Không thể tải chi tiết hồ sơ');
+            })
+            .finally(() => {
+              setLoadingDetails(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              });
+            });
+        }
+      } else {
+        n.delete(id);
+      }
       return n;
     });
+  };
+
+  const handleDownloadPDF = async (examination: ExaminationListItem) => {
+    try {
+      showNotification.info('Đang tạo file PDF...');
+
+      // Fetch detail if not already loaded
+      let detail: ExaminationDetail;
+      if (detailsMap.has(examination.id)) {
+        detail = detailsMap.get(examination.id)!;
+      } else {
+        // Fetch detail
+        detail = await patientAPI.getExaminationById(examination.id);
+        setDetailsMap(prev => new Map(prev).set(examination.id, detail));
+      }
+
+      // Create PDF document
+      const doc = <ExaminationPDF examination={detail} />;
+
+      // Generate PDF blob
+      const blob = await pdf(doc).toBlob();
+
+      // Create URL and download
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = examination.createAt?.replace(/\//g, '-') || new Date().toISOString().split('T')[0];
+      link.download = `Ho-so-kham-${dateStr}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showNotification.success('Tải xuống PDF thành công!');
+    } catch (error: any) {
+      showNotification.error('Không thể tạo file PDF: ' + (error.message || 'Lỗi không xác định'));
+    }
   };
 
   const paginated = useMemo(() => {
@@ -267,6 +319,7 @@ const PatientInitialExamination = () => {
                 <CardContent className="p-6">
                   {expandedIds.has(examination.id) ? (
                     <div className="space-y-6">
+                      {/* Basic Info */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -305,6 +358,200 @@ const PatientInitialExamination = () => {
                           </p>
                         </div>
                       </div>
+
+                      {/* Loading state */}
+                      {loadingDetails.has(examination.id) ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+                          <p className="text-gray-600">Đang tải chi tiết...</p>
+                        </div>
+                      ) : (
+                        <>
+                          {(() => {
+                            const detail = detailsMap.get(examination.id);
+                            if (!detail) return null;
+
+                            // Group images by type
+                            const teethImages = (detail.listImage || []).filter(img => img.type === 'examinationTeeth');
+                            const faceImages = (detail.listImage || []).filter(img => img.type === 'examinationFace');
+                            const xrayImages = (detail.listImage || []).filter(img => img.type === 'examinationXray');
+
+                            return (
+                              <>
+                                {/* Dịch vụ đã sử dụng */}
+                                {detail.listDentalServicesEntityOrder && detail.listDentalServicesEntityOrder.length > 0 && (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 mb-3">
+                                      <ClipboardList className="h-5 w-5 text-blue-600" />
+                                      <h4 className="font-semibold text-gray-900 text-lg">Dịch vụ đã sử dụng</h4>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {detail.listDentalServicesEntityOrder.map((service, index) => (
+                                        <div
+                                          key={index}
+                                          className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                                        >
+                                          <div>
+                                            <p className="text-sm font-medium text-gray-900">{service.name}</p>
+                                            <p className="text-xs text-gray-600">
+                                              {service.quantity} {service.unit} × {service.unitPrice.toLocaleString('vi-VN')} đ
+                                            </p>
+                                          </div>
+                                          <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+                                            {(service.cost ?? service.unitPrice * service.quantity).toLocaleString('vi-VN')} đ
+                                          </Badge>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Thuốc đã sử dụng */}
+                                {detail.listPrescriptionOrder && detail.listPrescriptionOrder.length > 0 && (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 mb-3">
+                                      <Pill className="h-5 w-5 text-purple-600" />
+                                      <h4 className="font-semibold text-gray-900 text-lg">Thuốc đã sử dụng</h4>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {detail.listPrescriptionOrder.map((pres, index) => (
+                                        <div
+                                          key={index}
+                                          className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                                        >
+                                          <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                              <p className="text-sm font-semibold text-gray-900">{pres.name}</p>
+                                              <p className="text-xs text-gray-600">
+                                                {pres.dosage} · {pres.frequency} · {pres.duration}
+                                              </p>
+                                            </div>
+                                            <Badge variant="outline" className="border-emerald-200 text-emerald-700">
+                                              {pres.quantity} viên
+                                            </Badge>
+                                          </div>
+                                          {pres.notes && (
+                                            <p className="mt-2 text-xs text-gray-600 italic">
+                                              Ghi chú: {pres.notes}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Hình ảnh - Chia 3 phần */}
+                                {detail.listImage && detail.listImage.length > 0 && (
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-2 mb-4">
+                                      <ImageIcon className="h-5 w-5 text-blue-600" />
+                                      <h4 className="font-semibold text-gray-900 text-lg">Hình ảnh</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                      {/* Ảnh răng */}
+                                      <div className="space-y-3">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                                            Ảnh răng
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">({teethImages.length})</span>
+                                        </div>
+                                        {teethImages.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {teethImages.map((img, idx) => (
+                                              <div
+                                                key={idx}
+                                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all duration-300"
+                                                onClick={() => img.url && setSelectedImage(img.url)}
+                                              >
+                                                <img
+                                                  src={img.url}
+                                                  alt="Ảnh răng"
+                                                  className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-400 text-center py-4">Không có ảnh răng</p>
+                                        )}
+                                      </div>
+
+                                      {/* Ảnh mặt */}
+                                      <div className="space-y-3">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                          <Badge className="bg-green-100 text-green-800 border-green-300">
+                                            Ảnh mặt
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">({faceImages.length})</span>
+                                        </div>
+                                        {faceImages.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {faceImages.map((img, idx) => (
+                                              <div
+                                                key={idx}
+                                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-green-500 transition-all duration-300"
+                                                onClick={() => img.url && setSelectedImage(img.url)}
+                                              >
+                                                <img
+                                                  src={img.url}
+                                                  alt="Ảnh mặt"
+                                                  className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-400 text-center py-4">Không có ảnh mặt</p>
+                                        )}
+                                      </div>
+
+                                      {/* Ảnh X-quang */}
+                                      <div className="space-y-3">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                                          <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                                            Ảnh X-quang
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">({xrayImages.length})</span>
+                                        </div>
+                                        {xrayImages.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {xrayImages.map((img, idx) => (
+                                              <div
+                                                key={idx}
+                                                className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-all duration-300"
+                                                onClick={() => img.url && setSelectedImage(img.url)}
+                                              >
+                                                <img
+                                                  src={img.url}
+                                                  alt="Ảnh X-quang"
+                                                  className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-400 text-center py-4">Không có ảnh X-quang</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-start gap-3">
@@ -325,7 +572,6 @@ const PatientInitialExamination = () => {
                       variant="outline" 
                       size="sm"  
                       onClick={() => toggleExpand(examination.id)}
-                      // Width vừa phải nhưng vẫn đủ chỗ cho icon + text trên một hàng
                       className="px-3 min-w-[110px]"
                     >
                       {expandedIds.has(examination.id) ? (
@@ -340,25 +586,15 @@ const PatientInitialExamination = () => {
                         </span>
                       )}
                     </Button>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => openDetail(examination.id)}
-                        className="gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Xem chi tiết
-                      </Button>
-                      <Button 
-                        variant="primary" 
-                        size="sm"
-                        className="gap-2 bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Download className="h-4 w-4" />
-                        Tải xuống
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => handleDownloadPDF(examination)}
+                    >
+                      <Download className="h-4 w-4" />
+                      Tải xuống
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -396,237 +632,6 @@ const PatientInitialExamination = () => {
             </Button>
           </div>
         )}
-
-        {/* Detail Modal - Redesigned */}
-        <Dialog open={!!detailId} onOpenChange={(open) => !open && setDetailId(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl">Chi tiết hồ sơ khám</DialogTitle>
-              <DialogDescription>
-                Thông tin chi tiết về lần khám này
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mt-6">
-              {detailLoading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-                  <p className="text-gray-600">Đang tải chi tiết...</p>
-                </div>
-              ) : detail ? (
-                <div className="space-y-6">
-                  {/* Header Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-blue-600 text-white rounded-lg p-2">
-                        <Calendar className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase">Ngày khám</p>
-                        <p className="text-sm font-semibold text-gray-900">{detail.createAt || '-'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-green-600 text-white rounded-lg p-2">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase">Bác sĩ</p>
-                        <p className="text-sm font-semibold text-gray-900">{detail.examined_at || '-'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Medical Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Activity className="h-5 w-5 text-blue-600" />
-                          Triệu chứng
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {detail.symptoms || 'Không có thông tin'}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <ClipboardList className="h-5 w-5 text-green-600" />
-                          Chẩn đoán
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {detail.diagnosis || 'Không có thông tin'}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Stethoscope className="h-5 w-5 text-purple-600" />
-                          Điều trị
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {detail.treatment || 'Không có thông tin'}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <MessageSquare className="h-5 w-5 text-orange-600" />
-                          Ghi chú
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {detail.notes || 'Không có ghi chú'}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Selected Services */}
-                  {detail.listDentalServicesEntityOrder && detail.listDentalServicesEntityOrder.length > 0 && (
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <ClipboardList className="h-5 w-5 text-blue-600" />
-                          Dịch vụ đã sử dụng
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {detail.listDentalServicesEntityOrder.map((service, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{service.name}</p>
-                                <p className="text-xs text-gray-600">
-                                  {service.quantity} {service.unit} ×{' '}
-                                  {service.unitPrice.toLocaleString('vi-VN')} đ
-                                </p>
-                              </div>
-                              <Badge className="bg-blue-50 text-blue-700 border-blue-200">
-                                {(service.cost ?? service.unitPrice * service.quantity).toLocaleString('vi-VN')} đ
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Prescribed Medicines */}
-                  {detail.listPrescriptionOrder && detail.listPrescriptionOrder.length > 0 && (
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Pill className="h-5 w-5 text-purple-600" />
-                          Thuốc được kê đơn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {detail.listPrescriptionOrder.map((pres, index) => (
-                            <div
-                              key={index}
-                              className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-semibold text-gray-900">{pres.name}</p>
-                                  <p className="text-xs text-gray-600">
-                                    {pres.dosage} · {pres.frequency} · {pres.duration}
-                                  </p>
-                                </div>
-                                <Badge variant="outline" className="border-emerald-200 text-emerald-700">
-                                  {pres.quantity} viên
-                                </Badge>
-                              </div>
-                              {pres.notes && (
-                                <p className="mt-1 text-xs text-gray-600 italic">
-                                  Ghi chú: {pres.notes}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Cost */}
-                  {detail.totalCost && (
-                    <Card className="border-0 shadow-sm bg-gradient-to-r from-green-50 to-emerald-50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-green-600 text-white rounded-lg p-2">
-                            <DollarSign className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600 uppercase">Tổng chi phí</p>
-                            <p className="text-xl font-bold text-gray-900">
-                              {detail.totalCost.toLocaleString('vi-VN')} đ
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Images */}
-                  {detail.listImage && detail.listImage.length > 0 && (
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <ImageIcon className="h-5 w-5 text-blue-600" />
-                          Hình ảnh ({detail.listImage.length})
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {detail.listImage.map((img, idx) => (
-                            <div 
-                              key={idx} 
-                              className="group cursor-pointer relative overflow-hidden rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all duration-300"
-                              onClick={() => img.url && setSelectedImage(img.url)}
-                            >
-                              <div className="absolute top-2 left-2 z-10">
-                                <Badge className="bg-blue-600 text-white shadow-md">
-                                  {getImageTypeLabel(img.type || '')}
-                                </Badge>
-                              </div>
-                              <img 
-                                src={img.url} 
-                                alt={`examination ${img.type || ''}`} 
-                                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
-                                <Eye className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              ) : null}
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* Add New Examination Modal */}
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -727,12 +732,14 @@ const PatientInitialExamination = () => {
         </Dialog>
       </div>
 
-      <ImageViewer
-        open={!!selectedImage}
-        imageUrl={selectedImage}
-        alt="Examination image"
-        onClose={() => setSelectedImage(null)}
-      />
+      {selectedImage && (
+        <ImageViewer
+          open={true}
+          imageUrl={selectedImage}
+          alt="Examination image"
+          onClose={() => setSelectedImage(null)}
+        />
+      )}
     </div>
   );
 };

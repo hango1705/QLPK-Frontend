@@ -8,7 +8,7 @@ import {
   Button,
   Badge,
 } from '@/components/ui';
-import { Calendar, Clock, User, FileText, Bell, CheckCircle2, Stethoscope, Plus } from 'lucide-react';
+import { Calendar, Clock, User, FileText, Bell, CheckCircle2, Stethoscope, Plus, Activity } from 'lucide-react';
 import type { AppointmentSummary, TreatmentPlan } from '@/types/doctor';
 import { formatDateTime } from '../../utils';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
@@ -134,7 +134,6 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Chi tiết lịch hẹn</DialogTitle>
-          <DialogDescription>Thông tin chi tiết về lịch hẹn</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -156,6 +155,7 @@ const AppointmentDetailDialog: React.FC<AppointmentDetailDialogProps> = ({
                 value={appointment.type}
               />
               <InfoItem
+                icon={<Activity className="h-4 w-4" />}
                 label="Trạng thái"
                 value={
                   <Badge className={getStatusBadge(appointment.status)}>

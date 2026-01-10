@@ -26,7 +26,6 @@ const PatientBasicInfo = () => {
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true); // loading tổng
   const [saving, setSaving] = useState(false); // loading nút Lưu
-  const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<any>({});
   const [fieldErrors, setFieldErrors] = useState<any>({});
@@ -35,7 +34,6 @@ const PatientBasicInfo = () => {
   useEffect(() => {
     if (!token || !canGetBasicInfo) return;
     setLoading(true);
-    setMsg(null);
     setError(null);
     Promise.all([
       adminAPI.getMyInfo(),
@@ -78,7 +76,10 @@ const PatientBasicInfo = () => {
 
   // Lưu info cá nhân
   const saveInfo = async () => {
-    if (!user?.id) return setMsg('Thiếu userId!');
+    if (!user?.id) {
+      showNotification.error('Lỗi', 'Thiếu userId!');
+      return;
+    }
     // Validation các trường bắt buộc
     const errs: any = {};
     
@@ -102,10 +103,11 @@ const PatientBasicInfo = () => {
     setFieldErrors(errs);
     if (Object.keys(errs).length) { 
       setError('Vui lòng kiểm tra lại các trường bôi đỏ'); 
+      showNotification.error('Lỗi', 'Vui lòng kiểm tra lại các trường bôi đỏ');
       return; 
     }
     
-    setSaving(true); setMsg(null); setError(null);
+    setSaving(true); setError(null);
     try {
       // Không gửi email khi update vì không được sửa
       await adminAPI.updateUserInfo(user.id, {
@@ -116,43 +118,52 @@ const PatientBasicInfo = () => {
         gender: form.gender || '',
         dob: form.dob || '',
       });
-      setMsg('Đã lưu thông tin cá nhân!');
       showNotification.success('Thành công', 'Đã lưu thông tin cá nhân');
     } catch (e: any) {
-      setError('Lưu thông tin cá nhân thất bại!');
+      const errorMsg = 'Lưu thông tin cá nhân thất bại!';
+      setError(errorMsg);
+      showNotification.error('Lỗi', errorMsg);
     } finally { setSaving(false); }
   };
 
   // Lưu liên hệ khẩn cấp
   const saveEmergency = async () => {
-    if (!patient?.id) return setMsg('Thiếu patientId!');
-    setSaving(true); setMsg(null); setError(null);
+    if (!patient?.id) {
+      showNotification.error('Lỗi', 'Thiếu patientId!');
+      return;
+    }
+    setSaving(true); setError(null);
     try {
       await patientAPI.updateEmergencyContact(patient.id, {
         emergencyContactName: form.emergencyContactName,
         emergencyPhoneNumber: form.emergencyPhoneNumber
       });
-      setMsg('Đã lưu liên hệ khẩn cấp!');
       showNotification.success('Thành công', 'Đã lưu liên hệ khẩn cấp');
     } catch (e: any) {
-      setError('Lưu liên hệ khẩn cấp thất bại!');
+      const errorMsg = 'Lưu liên hệ khẩn cấp thất bại!';
+      setError(errorMsg);
+      showNotification.error('Lỗi', errorMsg);
     } finally { setSaving(false); }
   };
 
   // Lưu hồ sơ y tế
   const saveMedical = async () => {
-    if (!patient?.id) return setMsg('Thiếu patientId!');
-    setSaving(true); setMsg(null); setError(null);
+    if (!patient?.id) {
+      showNotification.error('Lỗi', 'Thiếu patientId!');
+      return;
+    }
+    setSaving(true); setError(null);
     try {
       await patientAPI.updateMedicalInformation(patient.id, {
         bloodGroup: form.bloodGroup,
         allergy: form.allergy,
         medicalHistory: form.medicalHistory
       });
-      setMsg('Đã lưu hồ sơ y tế!');
       showNotification.success('Thành công', 'Đã lưu hồ sơ y tế');
     } catch (e: any) {
-      setError('Lưu hồ sơ y tế thất bại!');
+      const errorMsg = 'Lưu hồ sơ y tế thất bại!';
+      setError(errorMsg);
+      showNotification.error('Lỗi', errorMsg);
     } finally { setSaving(false); }
   };
 
@@ -170,12 +181,6 @@ const PatientBasicInfo = () => {
       {/* Align background with Patient overview page: remove gray container background */}
       <div className="min-h-screen">
       <div className="py-8">
-        {msg && (
-          <Alert variant="default" className="mb-2">
-            <AlertTitle>Success</AlertTitle>
-            <AlertDescription>{msg}</AlertDescription>
-          </Alert>
-        )}
         {error && (
           <Alert variant="destructive" className="mb-2">
             <AlertTitle>Error</AlertTitle>
@@ -183,6 +188,7 @@ const PatientBasicInfo = () => {
           </Alert>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Side: Thông tin cá nhân */}
           <Card className="p-6">
             <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><UserOutlined /> Thông tin cá nhân</div>
             <label className="block text-sm font-medium mb-1">
@@ -241,39 +247,43 @@ const PatientBasicInfo = () => {
               </Button>
             </div>
           </Card>
-          <Card className="p-6">
-            <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><SafetyCertificateOutlined /> Liên hệ khẩn cấp</div>
-            <label className="block text-sm font-medium mb-1">Họ tên liên hệ</label>
-            <Input aria-label="Họ tên liên hệ" name="emergencyContactName" value={form.emergencyContactName || ''} onChange={onChange} className="mb-3" />
-            <label className="block text-sm font-medium mb-1">Số ĐT khẩn cấp</label>
-            <Input aria-label="Số ĐT khẩn cấp" name="emergencyPhoneNumber" value={form.emergencyPhoneNumber || ''} onChange={onChange} className="mb-3" prefix={<PhoneOutlined />} />
-            <div className="mt-8">
-              <Button className="w-full" onClick={saveEmergency} loading={saving}>
-                <span className="flex items-center justify-center gap-2"><SaveOutlined /> Lưu liên hệ khẩn cấp</span>
-              </Button>
-            </div>
-          </Card>
-          <Card className="p-6 lg:col-span-2">
-            <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><HeartOutlined /> Hồ sơ y tế cá nhân</div>
-            <label className="block text-sm font-medium mb-1">Nhóm máu</label>
-            <Select
-              style={{ width: '100%' }}
-              value={form.bloodGroup || ''}
-              options={BLOOD_OPTS.map(b => ({ label: b, value: b }))}
-              onChange={(v) => onSelectChange('bloodGroup', v)}
-              placeholder="Chọn nhóm máu"
-              className="mb-3"
-            />
-            <label className="block text-sm font-medium mb-1">Dị ứng</label>
-            <Input aria-label="Dị ứng" name="allergy" value={form.allergy || ''} onChange={onChange} className="mb-3" placeholder="Cá, Hải sản, Phấn hoa..." />
-            <label className="block text-sm font-medium mb-1">Lịch sử bệnh</label>
-            <Input aria-label="Lịch sử bệnh" name="medicalHistory" value={form.medicalHistory || ''} onChange={onChange} className="mb-3" placeholder="Không / Tiểu đường / Tăng huyết áp..." />
-            <div className="mt-8">
-              <Button className="w-full" onClick={saveMedical} loading={saving}>
-                <span className="flex items-center justify-center gap-2"><SaveOutlined /> Lưu hồ sơ y tế</span>
-              </Button>
-            </div>
-          </Card>
+
+          {/* Right Side: Liên hệ khẩn cấp và Hồ sơ y tế cá nhân */}
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><SafetyCertificateOutlined /> Liên hệ khẩn cấp</div>
+              <label className="block text-sm font-medium mb-1">Họ tên liên hệ</label>
+              <Input aria-label="Họ tên liên hệ" name="emergencyContactName" value={form.emergencyContactName || ''} onChange={onChange} className="mb-3" />
+              <label className="block text-sm font-medium mb-1">Số ĐT khẩn cấp</label>
+              <Input aria-label="Số ĐT khẩn cấp" name="emergencyPhoneNumber" value={form.emergencyPhoneNumber || ''} onChange={onChange} className="mb-3" prefix={<PhoneOutlined />} />
+              <div className="mt-8">
+                <Button className="w-full" onClick={saveEmergency} loading={saving}>
+                  <span className="flex items-center justify-center gap-2"><SaveOutlined /> Lưu liên hệ khẩn cấp</span>
+                </Button>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="mb-3 font-semibold text-gray-800 flex items-center gap-2"><HeartOutlined /> Hồ sơ y tế cá nhân</div>
+              <label className="block text-sm font-medium mb-1">Nhóm máu</label>
+              <Select
+                style={{ width: '100%' }}
+                value={form.bloodGroup || ''}
+                options={BLOOD_OPTS.map(b => ({ label: b, value: b }))}
+                onChange={(v) => onSelectChange('bloodGroup', v)}
+                placeholder="Chọn nhóm máu"
+                className="mb-3"
+              />
+              <label className="block text-sm font-medium mb-1">Dị ứng</label>
+              <Input aria-label="Dị ứng" name="allergy" value={form.allergy || ''} onChange={onChange} className="mb-3" placeholder="Cá, Hải sản, Phấn hoa..." />
+              <label className="block text-sm font-medium mb-1">Lịch sử bệnh</label>
+              <Input aria-label="Lịch sử bệnh" name="medicalHistory" value={form.medicalHistory || ''} onChange={onChange} className="mb-3" placeholder="Không / Tiểu đường / Tăng huyết áp..." />
+              <div className="mt-8">
+                <Button className="w-full" onClick={saveMedical} loading={saving}>
+                  <span className="flex items-center justify-center gap-2"><SaveOutlined /> Lưu hồ sơ y tế</span>
+                </Button>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

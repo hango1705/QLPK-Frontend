@@ -30,36 +30,79 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadStatus, setUploadStatus] = useState<Record<string, 'idle' | 'success' | 'error'>>({});
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file extension
-      if (!file.name.toLowerCase().endsWith('.dcm')) {
-        showNotification.error('File không hợp lệ', 'Vui lòng chọn file DICOM (.dcm)');
-        return;
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      // Validate file extensions
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+      
+      files.forEach((file) => {
+        if (file.name.toLowerCase().endsWith('.dcm')) {
+          validFiles.push(file);
+        } else {
+          invalidFiles.push(file.name);
+        }
+      });
+
+      if (invalidFiles.length > 0) {
+        showNotification.error(
+          'File không hợp lệ', 
+          `${invalidFiles.length} file không phải DICOM (.dcm): ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}`
+        );
       }
-      setSelectedFile(file);
-      setUploadStatus('idle');
+
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+        // Initialize status for new files
+        const newStatus: Record<string, 'idle' | 'success' | 'error'> = {};
+        validFiles.forEach((file) => {
+          newStatus[file.name] = 'idle';
+        });
+        setUploadStatus((prev) => ({ ...prev, ...newStatus }));
+      }
     }
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      if (!file.name.toLowerCase().endsWith('.dcm')) {
-        showNotification.error('File không hợp lệ', 'Vui lòng chọn file DICOM (.dcm)');
-        return;
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length > 0) {
+      // Validate file extensions
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+      
+      files.forEach((file) => {
+        if (file.name.toLowerCase().endsWith('.dcm')) {
+          validFiles.push(file);
+        } else {
+          invalidFiles.push(file.name);
+        }
+      });
+
+      if (invalidFiles.length > 0) {
+        showNotification.error(
+          'File không hợp lệ', 
+          `${invalidFiles.length} file không phải DICOM (.dcm): ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}`
+        );
       }
-      setSelectedFile(file);
-      setUploadStatus('idle');
+
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+        // Initialize status for new files
+        const newStatus: Record<string, 'idle' | 'success' | 'error'> = {};
+        validFiles.forEach((file) => {
+          newStatus[file.name] = 'idle';
+        });
+        setUploadStatus((prev) => ({ ...prev, ...newStatus }));
+      }
     }
   };
 
@@ -68,34 +111,57 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !patientId) return;
+    if (selectedFiles.length === 0 || !patientId) return;
 
     setUploading(true);
-    setUploadProgress(0);
-    setUploadStatus('idle');
+    setUploadProgress({});
+    setUploadStatus({});
+
+    let successCount = 0;
+    let errorCount = 0;
+    const totalFiles = selectedFiles.length;
 
     try {
-      // Simulate progress (actual upload progress would come from axios)
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
+      // Upload files sequentially
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const fileName = file.name;
 
-      const study = await dicomAPI.uploadDicom(
-        selectedFile,
-        patientId,
-        examinationId,
-        treatmentPhaseId
-      );
+        // Initialize progress and status for this file
+        setUploadProgress((prev) => ({ ...prev, [fileName]: 0 }));
+        setUploadStatus((prev) => ({ ...prev, [fileName]: 'idle' }));
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      setUploadStatus('success');
+        try {
+          // Simulate progress for this file
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => {
+              const current = prev[fileName] || 0;
+              if (current >= 90) {
+                clearInterval(progressInterval);
+                return { ...prev, [fileName]: 90 };
+              }
+              return { ...prev, [fileName]: current + 10 };
+            });
+          }, 200);
+
+          const study = await dicomAPI.uploadDicom(
+            file,
+            patientId,
+            examinationId,
+            treatmentPhaseId
+          );
+
+          clearInterval(progressInterval);
+          setUploadProgress((prev) => ({ ...prev, [fileName]: 100 }));
+          setUploadStatus((prev) => ({ ...prev, [fileName]: 'success' }));
+          successCount++;
+        } catch (error: any) {
+          setUploadProgress((prev) => ({ ...prev, [fileName]: 0 }));
+          setUploadStatus((prev) => ({ ...prev, [fileName]: 'error' }));
+          errorCount++;
+          console.error(`Failed to upload ${fileName}:`, error);
+        }
+      }
 
       // Invalidate queries to refresh data
       if (examinationId) {
@@ -106,25 +172,41 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
       }
       queryClient.invalidateQueries({ queryKey: ['dicom-studies', patientId] });
 
-      showNotification.success('Upload thành công', `DICOM study đã được upload: ${study.studyDescription || 'Study'}`);
-      
-      // Reset form after short delay
-      setTimeout(() => {
-        setSelectedFile(null);
-        setUploadStatus('idle');
-        setUploadProgress(0);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        onSuccess?.();
-        onClose();
-      }, 1500);
+      // Show summary notification
+      if (successCount > 0 && errorCount === 0) {
+        showNotification.success(
+          'Upload thành công', 
+          `Đã upload thành công ${successCount} file DICOM`
+        );
+      } else if (successCount > 0 && errorCount > 0) {
+        showNotification.warning(
+          'Upload một phần', 
+          `Đã upload thành công ${successCount}/${totalFiles} file. ${errorCount} file thất bại.`
+        );
+      } else {
+        showNotification.error(
+          'Upload thất bại',
+          `Không thể upload ${totalFiles} file DICOM. Vui lòng thử lại.`
+        );
+      }
+
+      // Reset form after short delay if all successful
+      if (errorCount === 0) {
+        setTimeout(() => {
+          setSelectedFiles([]);
+          setUploadStatus({});
+          setUploadProgress({});
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          onSuccess?.();
+          onClose();
+        }, 1500);
+      }
     } catch (error: any) {
-      setUploadStatus('error');
-      setUploadProgress(0);
       showNotification.error(
         'Upload thất bại',
-        error?.message || 'Không thể upload DICOM file. Vui lòng thử lại.'
+        error?.message || 'Không thể upload DICOM files. Vui lòng thử lại.'
       );
     } finally {
       setUploading(false);
@@ -133,14 +215,28 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
 
   const handleClose = () => {
     if (!uploading) {
-      setSelectedFile(null);
-      setUploadStatus('idle');
-      setUploadProgress(0);
+      setSelectedFiles([]);
+      setUploadStatus({});
+      setUploadProgress({});
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       onClose();
     }
+  };
+
+  const removeFile = (fileName: string) => {
+    setSelectedFiles((prev) => prev.filter((f) => f.name !== fileName));
+    setUploadStatus((prev) => {
+      const newStatus = { ...prev };
+      delete newStatus[fileName];
+      return newStatus;
+    });
+    setUploadProgress((prev) => {
+      const newProgress = { ...prev };
+      delete newProgress[fileName];
+      return newProgress;
+    });
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -167,31 +263,80 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              selectedFile
+              selectedFiles.length > 0
                 ? 'border-primary bg-primary/5'
                 : 'border-gray-300 hover:border-primary/50 hover:bg-gray-50'
             }`}
           >
-            {selectedFile ? (
-              <div className="space-y-2">
-                <File className="h-12 w-12 mx-auto text-primary" />
-                <div className="font-medium text-sm">{selectedFile.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {formatFileSize(selectedFile.size)}
+            {selectedFiles.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <File className="h-12 w-12 text-primary" />
+                  <div className="text-left">
+                    <div className="font-medium text-sm">
+                      Đã chọn {selectedFiles.length} file
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Tổng dung lượng: {formatFileSize(selectedFiles.reduce((sum, f) => sum + f.size, 0))}
+                    </div>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}
-                  disabled={uploading}
-                >
-                  Chọn file khác
-                </Button>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {selectedFiles.map((file) => (
+                    <div
+                      key={file.name}
+                      className="flex items-center justify-between p-2 bg-white rounded border border-gray-200"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-xs truncate">{file.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </div>
+                        {uploading && uploadProgress[file.name] !== undefined && (
+                          <div className="mt-1">
+                            <div className="w-full bg-gray-200 rounded-full h-1">
+                              <div
+                                className="bg-primary h-1 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress[file.name]}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {uploadStatus[file.name] === 'success' && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-green-600">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Thành công</span>
+                          </div>
+                        )}
+                        {uploadStatus[file.name] === 'error' && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>Thất bại</span>
+                          </div>
+                        )}
+                      </div>
+                      {!uploading && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(file.name)}
+                          className="ml-2 h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {!uploading && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Thêm file
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -208,7 +353,7 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
                   Chọn file
                 </Button>
                 <div className="text-xs text-muted-foreground">
-                  Chỉ chấp nhận file .dcm
+                  Chỉ chấp nhận file .dcm (có thể chọn nhiều file)
                 </div>
               </div>
             )}
@@ -219,41 +364,11 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
             ref={fileInputRef}
             type="file"
             accept=".dcm"
+            multiple
             onChange={handleFileSelect}
             className="hidden"
             disabled={uploading}
           />
-
-          {/* Upload Progress */}
-          {uploading && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Đang upload...</span>
-                <span className="font-medium">{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Upload Status */}
-          {uploadStatus === 'success' && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <span className="text-sm text-green-700">Upload thành công!</span>
-            </div>
-          )}
-
-          {uploadStatus === 'error' && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-              <span className="text-sm text-red-700">Upload thất bại. Vui lòng thử lại.</span>
-            </div>
-          )}
 
           {/* Info Badges */}
           <div className="flex flex-wrap gap-2 text-xs">
@@ -273,7 +388,7 @@ const DicomUploadDialog: React.FC<DicomUploadDialogProps> = ({
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || uploading || uploadStatus === 'success'}
+            disabled={selectedFiles.length === 0 || uploading || Object.values(uploadStatus).some(s => s === 'success')}
           >
             {uploading ? (
               <>

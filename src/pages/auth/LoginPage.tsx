@@ -225,7 +225,7 @@ const LoginPage = () => {
             </form>
 
             {/* Register Link */}
-            <div className="text-center">
+            <div className="text-center mt-6">
               <p className="text-muted-foreground">
                 Chưa có tài khoản?{' '}
                 <Link

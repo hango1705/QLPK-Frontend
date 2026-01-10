@@ -9,10 +9,8 @@ interface ImageViewerProps {
 }
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ open, imageUrl, alt = 'Image', onClose }) => {
-  console.log('ImageViewer render:', { open, imageUrl, hasImageUrl: !!imageUrl });
-  
-  if (!imageUrl) {
-    console.warn('ImageViewer: imageUrl is null/empty');
+  // Don't render or log warnings if dialog is closed or imageUrl is null
+  if (!open || !imageUrl) {
     return null;
   }
 
@@ -29,15 +27,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ open, imageUrl, alt = 'Image'
             alt={alt}
             className="max-w-full max-h-[95vh] object-contain"
             onClick={(e) => e.stopPropagation()}
-            onLoad={() => {
-              console.log('ImageViewer: Image loaded successfully:', imageUrl);
-            }}
-            onError={(e) => {
-              console.error('ImageViewer: Failed to load image:', {
-                imageUrl,
-                error: e
-              });
-            }}
           />
         </div>
       </DialogContent>

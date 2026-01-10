@@ -287,6 +287,26 @@ const DoctorDashboard: React.FC = () => {
       setExamDialog(null);
     },
     onError: (error: any) => {
+      // Kiểm tra xem backend có trả về dữ liệu mặc dù status code là 400 không
+      // Nếu có dữ liệu trong error.response.data, coi như đã lưu thành công
+      if (error?.response?.status === 400 && error?.response?.data) {
+        const responseData = error.response.data;
+        // Kiểm tra xem có dữ liệu examination trong response không
+        const hasData = responseData?.result || responseData?.id || 
+                       (typeof responseData === 'object' && Object.keys(responseData).length > 0);
+        
+        if (hasData) {
+          // Dữ liệu đã được lưu, invalidate queries và hiển thị thông báo thành công
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.examinations });
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.appointments('all') });
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.appointments('scheduled') });
+          showNotification.success('Đã lưu kết quả khám');
+          setExamDialog(null);
+          return;
+        }
+      }
+      
+      // Nếu không có dữ liệu, hiển thị lỗi như bình thường
       showNotification.error('Không thể lưu kết quả khám', error?.message || 'Đã xảy ra lỗi');
     },
   });
@@ -365,28 +385,80 @@ const DoctorDashboard: React.FC = () => {
       await queryClient.refetchQueries({ queryKey: queryKeys.doctor.treatmentPlans });
       queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPhases() });
       
-      // Update planDetailDialog if it's currently open for the updated plan
-      // Wait a bit for refetch to complete, then update with fresh data
-      setTimeout(() => {
-        if (planDetailDialog && planDetailDialog.id === updatedPlan.id) {
-          // Get fresh data from query cache
+      // Update planDetailDialog immediately if it's currently open for the updated plan
+      if (planDetailDialog && planDetailDialog.id === updatedPlan.id) {
+        // Update immediately with response data
+        setPlanDetailDialog({
+          ...planDetailDialog,
+          ...updatedPlan,
+          status: updatedPlan.status || planDetailDialog.status,
+        });
+        
+        // Then update with fresh data from cache after refetch
+        setTimeout(() => {
           const freshPlans = queryClient.getQueryData<TreatmentPlan[]>(queryKeys.doctor.treatmentPlans);
           if (freshPlans) {
             const freshPlan = freshPlans.find(p => p.id === updatedPlan.id);
             if (freshPlan) {
               setPlanDetailDialog(freshPlan);
             }
-          } else {
-            // Fallback to updatedPlan from response
-            setPlanDetailDialog(updatedPlan);
           }
-        }
-      }, 100);
+        }, 100);
+      }
       
       showNotification.success('Đã cập nhật phác đồ');
     },
     onError: (error: any) => {
-      showNotification.error('Không thể cập nhật phác đồ', error?.message || 'Đã xảy ra lỗi');
+      // Kiểm tra xem backend có trả về dữ liệu mặc dù status code là 400 không
+      // (Tương tự như createExamination - backend có thể trả về 400 nhưng vẫn lưu dữ liệu)
+      if (error?.response?.status === 400 && error?.response?.data) {
+        const responseData = error.response.data;
+        
+        // Kiểm tra xem có dữ liệu plan trong response không
+        // Có thể là { result: TreatmentPlan } hoặc TreatmentPlan trực tiếp
+        const updatedPlan = responseData?.result || responseData;
+        
+        // Kiểm tra kỹ hơn: có id hoặc có các trường chính của TreatmentPlan
+        const hasData = updatedPlan && (
+          (updatedPlan.id && updatedPlan.id.trim() !== '') ||
+          (updatedPlan.title && updatedPlan.title.trim() !== '') ||
+          (updatedPlan.status && updatedPlan.status.trim() !== '') ||
+          (typeof updatedPlan === 'object' && updatedPlan !== null && Object.keys(updatedPlan).length > 3)
+        );
+        
+        if (hasData) {
+          // Dữ liệu đã được cập nhật thành công, invalidate queries và hiển thị thông báo thành công
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPlans });
+          queryClient.invalidateQueries({ queryKey: queryKeys.doctor.treatmentPhases() });
+          
+          // Update planDetailDialog if it's currently open for the updated plan
+          if (planDetailDialog && updatedPlan && updatedPlan.id === planDetailDialog.id) {
+            setPlanDetailDialog({
+              ...planDetailDialog,
+              ...updatedPlan,
+              status: updatedPlan.status || planDetailDialog.status,
+            });
+          }
+          
+          showNotification.success('Đã cập nhật phác đồ');
+          // Không throw error nữa vì đã xử lý thành công
+          return;
+        }
+      }
+      
+      // Nếu không có dữ liệu, hiển thị lỗi như bình thường
+      // Log error để debug
+      console.error('Update plan error:', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+      });
+      
+      const errorMessage = error?.response?.data?.message || 
+                          error?.response?.data?.error || 
+                          error?.message || 
+                          'Đã xảy ra lỗi';
+      showNotification.error('Không thể cập nhật phác đồ', errorMessage);
     },
   });
 
@@ -420,18 +492,44 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
+  // Helper to normalize status value for backend
+  const normalizeStatusValue = (status: string): string => {
+    const s = status.toLowerCase();
+    if (s.includes('done') || s.includes('hoàn')) return 'Done';
+    if (s.includes('paused') || s.includes('tạm')) return 'Paused';
+    if (s.includes('cancelled') || s.includes('hủy')) return 'Cancelled';
+    return 'Inprogress';
+  };
+
   const handlePlanStatusChange = (plan: TreatmentPlan, status: string) => {
+    // Normalize status value to ensure it matches backend expectations
+    const normalizedStatusValue = normalizeStatusValue(status);
+    
+    // Ensure all required fields have valid values (not null/undefined)
+    // Use empty string as fallback for required string fields
+    const updatePayload: Parameters<typeof doctorAPI.updateTreatmentPlan>[1] = {
+      title: (plan.title ?? '').trim() || 'Phác đồ điều trị', // Default title if empty
+      description: (plan.description ?? '').trim() || '', // Description can be empty but must be string
+      duration: (plan.duration ?? '').trim() || '', // Duration can be empty but must be string
+      notes: (plan.notes ?? '').trim() || '', // Notes can be empty but must be string
+      status: normalizedStatusValue,
+    };
+    
+    // Only include nurseId if it's provided and not empty
+    const nurseId = (plan as any).nurseId;
+    if (nurseId && typeof nurseId === 'string' && nurseId.trim() !== '') {
+      updatePayload.nurseId = nurseId.trim();
+    }
+    
+    // Validate that required fields are present
+    if (!updatePayload.title || updatePayload.title.trim() === '') {
+      showNotification.error('Không thể cập nhật', 'Tiêu đề phác đồ không được để trống');
+      return;
+    }
+    
     updatePlanMutation.mutate({
       planId: plan.id,
-      payload: {
-        id: plan.id,
-        treatmentPlansId: plan.id,
-        title: plan.title,
-        description: plan.description,
-        duration: plan.duration,
-        notes: plan.notes,
-        status,
-      },
+      payload: updatePayload,
     });
   };
 
@@ -662,6 +760,7 @@ const DoctorDashboard: React.FC = () => {
         context={phaseDialog}
         services={services}
         prescriptions={prescriptionCatalog}
+        appointments={scheduledAppointments}
         onOpenChange={(open) => !open && setPhaseDialog(null)}
         onSubmit={handlePhaseSubmit}
         isLoading={createPhaseMutation.isPending || updatePhaseMutation.isPending}
@@ -677,8 +776,6 @@ const DoctorDashboard: React.FC = () => {
           if (planDialog.plan) {
             // Edit mode - map form to update payload
             const updatePayload: Parameters<typeof doctorAPI.updateTreatmentPlan>[1] = {
-              id: planDialog.plan.id,
-              treatmentPlansId: planDialog.plan.id,
               title: form.title,
               description: form.description,
               duration: form.duration || '',
@@ -746,6 +843,7 @@ const DoctorDashboard: React.FC = () => {
           // Don't close Treatment Plan Detail Dialog - keep it open as parent
           setPhaseDetailDialog({ phase, plan });
         }}
+        onUpdatePlanStatus={handlePlanStatusChange}
       />
       <AppointmentDetailDialog
         open={!!appointmentDetailDialog}

@@ -43,16 +43,6 @@ export const SECTION_CONFIG: Record<
     description: 'Danh sách bệnh nhân đang điều trị',
     icon: <Users className="h-4 w-4" />,
   },
-  examinations: {
-    label: 'Khám bệnh',
-    description: 'Ghi nhận, cập nhật kết quả khám',
-    icon: <Stethoscope className="h-4 w-4" />,
-  },
-  treatment: {
-    label: 'Phác đồ',
-    description: 'Theo dõi kế hoạch & tiến trình điều trị',
-    icon: <ClipboardList className="h-4 w-4" />,
-  },
   catalog: {
     label: 'Danh mục',
     description: 'Tra cứu dịch vụ & đơn thuốc',
@@ -82,8 +72,6 @@ export const SECTION_ORDER: Section[] = [
   'doctors',
   'nurses',
   'patients',
-  'examinations',
-  'treatment',
   'catalog',
   'insights',
   'profile',

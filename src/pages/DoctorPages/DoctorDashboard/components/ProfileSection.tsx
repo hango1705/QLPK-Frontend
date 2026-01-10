@@ -99,9 +99,6 @@ const ProfileSection: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle>Thông tin cơ bản</CardTitle>
-          <CardDescription>
-            Cập nhật thông tin cá nhân của bạn. Thông tin này sẽ được hiển thị trong hồ sơ của bạn.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

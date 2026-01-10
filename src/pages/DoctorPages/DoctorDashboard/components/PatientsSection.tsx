@@ -13,6 +13,9 @@ interface PatientsSectionProps {
   onPhaseClick?: (planId: string, phaseId: string) => void;
   onBackFromDetail?: () => void;
   onAddPhase?: () => void;
+  onViewExamDetail?: (examination: ExaminationSummary) => void;
+  onCreatePlan?: () => void;
+  onViewPlanDetail?: (plan: TreatmentPlan) => void;
 }
 
 interface PatientInfo {
@@ -35,6 +38,9 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
   onPhaseClick,
   onBackFromDetail,
   onAddPhase,
+  onViewExamDetail,
+  onCreatePlan,
+  onViewPlanDetail,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedPatientId, setSelectedPatientId] = React.useState<string | null>(null);
@@ -333,6 +339,9 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
             }, 100);
           }
         }}
+        onViewExamDetail={onViewExamDetail}
+        onCreatePlan={onCreatePlan}
+        onViewPlanDetail={onViewPlanDetail}
       />
     );
   }
@@ -343,7 +352,6 @@ const PatientsSection: React.FC<PatientsSectionProps> = ({
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle className="text-lg">Danh sách bệnh nhân</CardTitle>
-            <CardDescription>Quản lý thông tin bệnh nhân đang điều trị</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 md:w-64">

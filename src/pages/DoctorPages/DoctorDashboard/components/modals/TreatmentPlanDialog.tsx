@@ -12,7 +12,7 @@ import {
   Button,
   Loading,
 } from '@/components/ui';
-import type { ExaminationSummary } from '@/types/doctor';
+import type { ExaminationSummary, TreatmentPlan } from '@/types/doctor';
 import { usePermission } from '@/hooks';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { nurseAPI, doctorAPI } from '@/services';
@@ -138,7 +138,18 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
             <Label>Kết quả khám bệnh *</Label>
             <select
               value={form.examinationId}
-              onChange={(e) => setForm((prev) => ({ ...prev, examinationId: e.target.value }))}
+              onChange={(e) => {
+                const selectedExamId = e.target.value;
+                const selectedExam = examinations.find(exam => exam.id === selectedExamId);
+                setForm((prev) => ({
+                  ...prev,
+                  examinationId: selectedExamId,
+                  // Auto-fill title with "Phác đồ điều trị - {treatment}" if treatment exists
+                  title: selectedExam?.treatment 
+                    ? `Phác đồ điều trị - ${selectedExam.treatment}`
+                    : prev.title || '',
+                }));
+              }}
               className="w-full rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
               required
             >
@@ -149,11 +160,14 @@ const TreatmentPlanDialog: React.FC<TreatmentPlanDialogProps> = ({
                 </option>
               ))}
             </select>
-            {examination && (
-              <p className="text-xs text-muted-foreground">
-                Đang chọn: {examination.diagnosis} ({new Date(examination.createAt).toLocaleDateString('vi-VN')})
-              </p>
-            )}
+            {form.examinationId && (() => {
+              const selectedExam = examinations.find(exam => exam.id === form.examinationId);
+              return selectedExam ? (
+                <p className="text-xs text-muted-foreground">
+                  Đang chọn: {selectedExam.diagnosis} ({new Date(selectedExam.createAt).toLocaleDateString('vi-VN')})
+                </p>
+              ) : null;
+            })()}
           </div>
           )}
 

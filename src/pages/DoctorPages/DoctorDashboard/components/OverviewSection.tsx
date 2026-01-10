@@ -244,9 +244,6 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         <Card className="border border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-gray-900">Xu hướng lịch hẹn (7 ngày)</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              Theo dõi số lượng lịch hẹn theo thời gian
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
@@ -322,9 +319,6 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         <Card className="border border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-gray-900">Lịch hẹn sắp tới</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              Ưu tiên xử lý các ca chưa có kết quả
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {scheduledAppointments.slice(0, 3).map((appointment) => (
@@ -347,9 +341,6 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         <Card className="border border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-gray-900">Ca đã hoàn tất</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              Những ca đã đánh dấu Done gần nhất
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {doneAppointments.slice(0, 3).map((appointment) => (

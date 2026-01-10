@@ -68,6 +68,8 @@ export interface CostResponse {
   totalCost: number;
   vnpTxnRef?: string;
   paymentDate: string; // Format: "dd/MM/yyyy"
+  type?: string; // 'deposit' | 'phase_payment' | 'examination'
+  treatmentPlanId?: string; // ID of treatment plan if type is 'deposit' or 'phase_payment'
   listDentalServiceEntityOrder?: Array<{
     name: string;
     unit: string;

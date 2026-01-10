@@ -89,9 +89,6 @@ const AccountSection: React.FC = () => {
             <KeyRound className="h-5 w-5" />
             Đổi mật khẩu
           </CardTitle>
-          <CardDescription>
-            Thay đổi mật khẩu của bạn. Mật khẩu mới phải có ít nhất 8 ký tự.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

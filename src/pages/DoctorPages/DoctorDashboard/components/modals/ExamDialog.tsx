@@ -344,6 +344,34 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
     }));
   };
 
+  const handlePrescriptionRemove = (index: number) => {
+    setForm((prev) => {
+      const removedPrescription = prev.prescriptionOrders[index];
+      return {
+        ...prev,
+        prescriptionOrders: prev.prescriptionOrders.filter((_, i) => i !== index),
+        totalCost: prev.totalCost - (removedPrescription.cost || 0),
+      };
+    });
+  };
+
+  const handlePrescriptionQuantityChange = (index: number, quantity: number) => {
+    if (quantity < 1) return;
+    setForm((prev) => {
+      const updated = [...prev.prescriptionOrders];
+      const prescription = updated[index];
+      const oldCost = prescription.cost || 0;
+      prescription.quantity = quantity;
+      prescription.cost = (prescription.unitPrice || 0) * quantity;
+      const newCost = prescription.cost;
+      return {
+        ...prev,
+        prescriptionOrders: updated,
+        totalCost: prev.totalCost - oldCost + newCost,
+      };
+    });
+  };
+
   const handleSubmit = () => {
     // Nếu có existingExamination, cập nhật context để có examination
     if (existingExamination && context.mode === 'create') {
@@ -368,22 +396,23 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
               'Cập nhật kết quả khám'
             )}
           </DialogTitle>
-          <DialogDescription>
-            {loadingExamination ? (
-              'Đang kiểm tra kết quả khám hiện có...'
-            ) : existingExamination ? (
-              `Đã có kết quả khám. Cập nhật lần cuối: ${formatDateTime(existingExamination.createAt)}`
-            ) : (
-              `Liên kết trực tiếp với lịch hẹn ${
-                context.mode === 'create'
-                  ? formatDateTime(context.appointment?.dateTime)
-                  : formatDateTime(context.examination?.createAt)
-              }`
-            )}
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 px-6 py-6">
+          {/* Thời gian khám */}
+          <div className="space-y-2">
+            <Label>Thời gian khám</Label>
+            <Input
+              type="date"
+              value={context?.appointment?.dateTime ? new Date(context.appointment.dateTime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                // Store in form state if needed, but this is mainly for display
+              }}
+              disabled
+              className="bg-muted/50"
+            />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Triệu chứng</Label>
@@ -521,6 +550,79 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
             )}
           </div>
 
+          {/* Thuốc đã sử dụng */}
+          <div className="rounded-2xl border border-border/70 bg-muted/50 p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-foreground">Thuốc đã sử dụng</p>
+              <Select 
+                value=""
+                onValueChange={(value) => {
+                  const prescription = prescriptions.find((item) => item.name === value);
+                  if (prescription) {
+                    handlePrescriptionAdd(prescription);
+                  }
+                }}
+                disabled={prescriptions.length === 0}
+              >
+                <SelectTrigger className="w-64 text-xs">
+                  <SelectValue placeholder={prescriptions.length > 0 ? "Chọn thuốc" : "Không có thuốc"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {prescriptions.map((prescription, idx) => (
+                    <SelectItem key={idx} value={prescription.name}>
+                      {prescription.name} · {prescription.unitPrice?.toLocaleString('vi-VN') || 0} đ
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Hiển thị danh sách thuốc đã chọn */}
+            {form.prescriptionOrders.length > 0 && (
+              <div className="space-y-2 mt-4">
+                {form.prescriptionOrders.map((prescription, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between rounded-lg border border-border/60 bg-white px-3 py-2"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">{prescription.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {prescription.dosage && `Liều: ${prescription.dosage}`}
+                        {prescription.frequency && ` · ${prescription.frequency}`}
+                        {prescription.duration && ` · ${prescription.duration}`}
+                      </p>
+                      {prescription.notes && (
+                        <p className="text-xs text-muted-foreground italic mt-1">{prescription.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={prescription.quantity}
+                        onChange={(e) => handlePrescriptionQuantityChange(index, Number(e.target.value))}
+                        className="w-16 text-center text-xs"
+                      />
+                      <span className="text-xs text-muted-foreground">x</span>
+                      <span className="w-24 text-right text-sm font-semibold text-primary">
+                        {(prescription.cost || 0).toLocaleString('vi-VN')} đ
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePrescriptionRemove(index)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="gap-4 md:grid md:grid-cols-3">
             {(['xrayFiles', 'faceFiles', 'teethFiles'] as const).map((field) => (
               <div key={field} className="space-y-2">
@@ -532,27 +634,26 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
                   className="w-full rounded-2xl border border-dashed border-border px-3 py-2 text-xs"
                   onChange={(event) => {
                     const files = Array.from(event.target.files || []);
-                    // Revoke old preview URLs for this field (only blob URLs)
-                    const oldPreviews = imagePreviews[field] || [];
-                    oldPreviews.forEach((url) => {
-                      if (url.startsWith('blob:')) {
-                        URL.revokeObjectURL(url);
-                      }
+                    // Append new files to existing ones instead of replacing
+                    setForm((prev) => {
+                      const existingFiles = prev[field] || [];
+                      return { ...prev, [field]: [...existingFiles, ...files] };
                     });
-                    // Create new preview URLs
+                    // Create new preview URLs and append to existing
                     const newPreviews = files.map((file) => URL.createObjectURL(file));
-                    setForm((prev) => ({ ...prev, [field]: files }));
                     setImagePreviews((prev) => ({
                       ...prev,
-                      [field]: newPreviews,
+                      [field]: [...(prev[field] || []), ...newPreviews],
                     }));
+                    // Reset input to allow selecting same files again
+                    event.target.value = '';
                   }}
                 />
                 {/* Preview images */}
                 {imagePreviews[field] && imagePreviews[field].length > 0 && (
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     {imagePreviews[field].map((previewUrl, index) => (
-                      <div key={index} className="relative group">
+                      <div key={index} className="relative">
                         <img
                           src={previewUrl}
                           alt={`Preview ${index + 1}`}
@@ -578,7 +679,7 @@ const ExamDialog: React.FC<ExamDialogProps> = ({
                               URL.revokeObjectURL(previewUrl);
                             }
                           }}
-                          className="absolute top-1 right-1 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
                         >
                           <X className="h-3 w-3" />
                         </Button>
